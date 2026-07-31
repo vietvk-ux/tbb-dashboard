@@ -1,0 +1,49 @@
+name: Dashboard giao hàng TBB (Pages · 7h sáng)
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Ngày YYYY-MM-DD (trống = hôm qua)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Generate dashboard + gửi GTalk
+        env:
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+          EOD_DATE: ${{ github.event.inputs.date }}
+          DASH_SLUG: 9c7e4b21a6f0
+          DASH_URL: https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/
+          DASH_SEND: '1'
+          GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
+          GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
+        run: python report_dashboard.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v4
