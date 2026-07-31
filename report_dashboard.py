@@ -136,8 +136,8 @@ def main():
     if not token:
         raise SystemExit("Thiếu NHANH_TOKEN")
     s = os.environ.get("EOD_DATE", "").strip()
-    d = (datetime.strptime(s, "%Y-%m-%d").date() if s
-         else (datetime.now(VN).date() - timedelta(days=1)))
+    # Chạy 23h → lấy dữ liệu NGÀY HÔM NAY (ngày đã gần kết thúc)
+    d = (datetime.strptime(s, "%Y-%m-%d").date() if s else datetime.now(VN).date())
     logger.info("Dashboard ngày %s", d)
     try:
         payload = asyncio.run(fetch_report(token, d))

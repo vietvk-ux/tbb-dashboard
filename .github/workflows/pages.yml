@@ -4,9 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: 'Ngày YYYY-MM-DD (trống = hôm qua)'
+        description: 'Ngày YYYY-MM-DD (trống = hôm nay)'
         required: false
         default: ''
+  schedule:
+    # 23:00 VN = 16:00 UTC — tự cập nhật cuối ngày (repo public nên dùng được schedule GitHub)
+    - cron: '0 16 * * *'
 
 permissions:
   contents: read
