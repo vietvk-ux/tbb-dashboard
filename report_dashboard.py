@@ -211,7 +211,7 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    with open(os.path.join(outdir, "index.html"), "w", encoding="utf-8") as f:
+    with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
         f.write(gen_html(agg, backlog, backlog_time))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],

@@ -1,0 +1,47 @@
+name: Trang trực tiếp TBB (mỗi 30 phút)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mỗi 30' tại phút :15 và :45 (tránh trùng job 23h chạy ở phút :00).
+    # Lịch GitHub là best-effort — có thể trễ/bỏ lượt.
+    - cron: '15,45 * * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Tạo trang realtime (index.html + live.html)
+        env:
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+          DASH_SLUG: 9c7e4b21a6f0
+        run: python report_live.py
+      - name: Giữ lại báo cáo %GTC cuối ngày (eod.html)
+        run: |
+          curl -sf "https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html" \
+            -o docs/9c7e4b21a6f0/eod.html || echo "chưa có eod.html (sẽ có sau bản 23h đầu tiên)"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v4
