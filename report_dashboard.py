@@ -189,22 +189,12 @@ def main():
     except TokenExpiredError as e:
         raise SystemExit("Token hết hạn: %s" % e)
 
-    # Đơn chưa gán giao: ƯU TIÊN số CHỤP LÚC 15h (backlog_15h.json cùng ngày báo cáo);
-    # nếu chưa có thì lấy live tại thời điểm chạy.
-    backlog, backlog_time = {}, "hiện tại"
-    if os.path.exists("backlog_15h.json"):
-        try:
-            snap = json.load(open("backlog_15h.json", encoding="utf-8"))
-            if snap.get("date") == d.isoformat():
-                backlog = snap.get("hubs", {})
-                backlog_time = "lúc " + snap.get("time", "15h")
-        except Exception:
-            pass
-    if not backlog:
-        try:
-            backlog = asyncio.run(fetch_backlog(token))
-        except TokenExpiredError:
-            backlog = {}
+    # Đơn chưa gán giao: lấy số THẬT (live) tại thời điểm chạy báo cáo cuối ngày (23h).
+    backlog, backlog_time = {}, "cuối ngày"
+    try:
+        backlog = asyncio.run(fetch_backlog(token))
+    except TokenExpiredError:
+        backlog = {}
     total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
     logger.info("Tồn chưa gán giao toàn vùng (%s): %d đơn", backlog_time, total_backlog)
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
