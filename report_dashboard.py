@@ -13,7 +13,9 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
-from report import fetch_report, aggregate, send_gtalk, TokenExpiredError
+import aiohttp
+from report import (fetch_report, aggregate, send_gtalk, TokenExpiredError,
+                    _get_hubs, _post, CONCURRENCY)
 
 logger = logging.getLogger("dash")
 VN = timezone(timedelta(hours=7))
@@ -35,7 +37,33 @@ def _esc(s):
     return html.escape(str(s))
 
 
-def gen_html(agg):
+async def fetch_backlog(token):
+    """Số đơn tồn CHƯA GÁN vào chuyến theo bưu cục (live) qua /oss/v4/count-orders-to-assign.
+    Trả về {tên_bưu_cục: {'deliver':x,'pick':y,'return':z}}."""
+    sem = asyncio.Semaphore(CONCURRENCY)
+    timeout = aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=30)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        hubs = await _get_hubs(session, token)
+
+        async def one(h):
+            hid = str(h["locationCode"])
+            try:
+                async with sem:
+                    d = await _post(session, "/oss/v4/count-orders-to-assign",
+                                    {"hub_id": hid}, hid, token)
+                data = d.get("data") or {}
+                return (h["locationName"], {"deliver": data.get("deliver") or 0,
+                                            "pick": data.get("pick") or 0,
+                                            "return": data.get("return") or 0})
+            except Exception:
+                return (h["locationName"], {"deliver": 0, "pick": 0, "return": 0})
+
+        rows = await asyncio.gather(*[one(h) for h in hubs])
+    return dict(rows)
+
+
+def gen_html(agg, backlog=None):
+    backlog = backlog or {}
     g = agg["grand"]
     d = agg["date"]
     total_gtb = g["total"] - g["success"]
@@ -90,6 +118,9 @@ details[open] summary{border-bottom:1px solid #2a2f45}
     P.append("<div class='kpi'><div class='l'>Giao thành công</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(g["success"]))
     P.append("<div class='kpi'><div class='l'>Giao thất bại</div><div class='v' style='color:var(--bad)'>%s</div></div>" % _n(total_gtb))
     P.append("<div class='kpi'><div class='l'>COD GTB</div><div class='v'>%.0f tr</div></div>" % (total_cod / 1e6))
+    total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
+    P.append("<div class='kpi big'><div class='l'>⏳ Chưa gán giao (chờ xếp chuyến · hiện tại)</div><div class='v' style='color:var(--warn)'>%s đơn</div></div>"
+             % _n(total_backlog))
     P.append("</div>")
 
     # Theo tỉnh
@@ -108,10 +139,17 @@ details[open] summary{border-bottom:1px solid #2a2f45}
         drivers = sorted(by_bc.get(b["bc"], []),
                          key=lambda x: (x["gtc"] if x["gtc"] is not None else 999))
         P.append("<details class='bcrow' data-k=\"%s\">" % _esc((b["bc"] + " " + " ".join(dr["driver_name"] for dr in drivers)).lower()))
-        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>%s đơn · GTB %s · <span class='pill %s'>%s%%</span></span></summary>"
-                 % (_esc(b["bc"]), _n(b["total"]), _n(b["total"] - b["success"]), _cls(b["gtc"]),
+        bl = backlog.get(b["bc"], {})
+        bl_d = bl.get("deliver", 0)
+        blstr = ("⏳<b style='color:var(--warn)'>%s</b> chờ gán · " % _n(bl_d)) if bl_d else ""
+        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>%s%s đơn · GTB %s · <span class='pill %s'>%s%%</span></span></summary>"
+                 % (_esc(b["bc"]), blstr, _n(b["total"]), _n(b["total"] - b["success"]), _cls(b["gtc"]),
                     b["gtc"] if b["gtc"] is not None else "—"))
-        P.append("<div class='dtl'><table><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>GTB</th><th>%GTC</th></tr>")
+        P.append("<div class='dtl'>")
+        if bl_d or bl.get("pick") or bl.get("return"):
+            P.append("<div class='sub' style='margin:2px 0 8px'>⏳ Chưa gán chuyến: <b>%s</b> giao · %s lấy · %s trả</div>"
+                     % (_n(bl_d), _n(bl.get("pick", 0)), _n(bl.get("return", 0))))
+        P.append("<table><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>GTB</th><th>%GTC</th></tr>")
         for dr in drivers:
             P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
                      % (_esc(dr["driver_name"]), _n(dr["total"]), _n(dr["success"]),
@@ -148,14 +186,17 @@ def main():
     try:
         payload = asyncio.run(fetch_report(token, d))
         agg = aggregate(payload)
+        backlog = asyncio.run(fetch_backlog(token))
     except TokenExpiredError as e:
         raise SystemExit("Token hết hạn: %s" % e)
+    total_backlog = sum(v["deliver"] for v in backlog.values())
+    logger.info("Tồn chưa gán giao toàn vùng: %d đơn", total_backlog)
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "index.html"), "w", encoding="utf-8") as f:
-        f.write(gen_html(agg))
+        f.write(gen_html(agg, backlog))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],
@@ -181,10 +222,16 @@ def main():
                  "🎯 %%GTC vùng: **%s%%** · Giao TC %s · GTB %s" %
                  (g["gtc"] if g["gtc"] is not None else "—", _n(g["success"]), _n(gtb)),
                  "💰 COD GTB: **%.0f triệu₫**" % (cod / 1e6),
+                 "⏳ Chưa gán giao (chờ xếp chuyến): **%s đơn**" % _n(total_backlog),
                  "",
                  "🔴 5 bưu cục %GTC thấp nhất:"]
             for i, b in enumerate(worst, 1):
                 L.append("%d. %s — %s%%" % (i, b["bc"], b["gtc"]))
+            top_bl = sorted(backlog.items(), key=lambda kv: -kv[1].get("deliver", 0))[:5]
+            if top_bl and top_bl[0][1].get("deliver", 0) > 0:
+                L += ["", "⏳ 5 bưu cục tồn chưa gán giao nhiều nhất:"]
+                for i, (name, v) in enumerate(top_bl, 1):
+                    L.append("%d. %s — %s đơn" % (i, name, _n(v.get("deliver", 0))))
             if url:
                 L += ["", "📱 Xem đầy đủ 61 bưu cục + chi tiết nhân viên:", url]
             send_gtalk("\n".join(L), oa, ch)
