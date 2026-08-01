@@ -136,8 +136,14 @@ def main():
     if not token:
         raise SystemExit("Thiếu NHANH_TOKEN")
     s = os.environ.get("EOD_DATE", "").strip()
-    # Chạy 23h → lấy dữ liệu NGÀY HÔM NAY (ngày đã gần kết thúc)
-    d = (datetime.strptime(s, "%Y-%m-%d").date() if s else datetime.now(VN).date())
+    # Không chỉ định ngày: báo cáo NGÀY VỪA KẾT THÚC.
+    # >=22h coi là báo cáo của hôm nay; ngược lại (kể cả run trễ qua nửa đêm, hoặc
+    # xem ban ngày) lấy hôm qua — tránh bị "0 chuyến" khi lịch chạy trễ sang ngày mới.
+    if s:
+        d = datetime.strptime(s, "%Y-%m-%d").date()
+    else:
+        now = datetime.now(VN)
+        d = now.date() if now.hour >= 22 else (now.date() - timedelta(days=1))
     logger.info("Dashboard ngày %s", d)
     try:
         payload = asyncio.run(fetch_report(token, d))
