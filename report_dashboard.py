@@ -62,7 +62,7 @@ async def fetch_backlog(token):
     return dict(rows)
 
 
-def gen_html(agg, backlog=None):
+def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     backlog = backlog or {}
     g = agg["grand"]
     d = agg["date"]
@@ -119,8 +119,8 @@ details[open] summary{border-bottom:1px solid #2a2f45}
     P.append("<div class='kpi'><div class='l'>Giao thất bại</div><div class='v' style='color:var(--bad)'>%s</div></div>" % _n(total_gtb))
     P.append("<div class='kpi'><div class='l'>COD GTB</div><div class='v'>%.0f tr</div></div>" % (total_cod / 1e6))
     total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
-    P.append("<div class='kpi big'><div class='l'>⏳ Chưa gán giao (chờ xếp chuyến · hiện tại)</div><div class='v' style='color:var(--warn)'>%s đơn</div></div>"
-             % _n(total_backlog))
+    P.append("<div class='kpi big'><div class='l'>⏳ Chưa gán giao (chờ xếp chuyến · %s)</div><div class='v' style='color:var(--warn)'>%s đơn</div></div>"
+             % (_esc(backlog_time), _n(total_backlog)))
     P.append("</div>")
 
     # Theo tỉnh
@@ -186,17 +186,33 @@ def main():
     try:
         payload = asyncio.run(fetch_report(token, d))
         agg = aggregate(payload)
-        backlog = asyncio.run(fetch_backlog(token))
     except TokenExpiredError as e:
         raise SystemExit("Token hết hạn: %s" % e)
-    total_backlog = sum(v["deliver"] for v in backlog.values())
-    logger.info("Tồn chưa gán giao toàn vùng: %d đơn", total_backlog)
+
+    # Đơn chưa gán giao: ƯU TIÊN số CHỤP LÚC 15h (backlog_15h.json cùng ngày báo cáo);
+    # nếu chưa có thì lấy live tại thời điểm chạy.
+    backlog, backlog_time = {}, "hiện tại"
+    if os.path.exists("backlog_15h.json"):
+        try:
+            snap = json.load(open("backlog_15h.json", encoding="utf-8"))
+            if snap.get("date") == d.isoformat():
+                backlog = snap.get("hubs", {})
+                backlog_time = "lúc " + snap.get("time", "15h")
+        except Exception:
+            pass
+    if not backlog:
+        try:
+            backlog = asyncio.run(fetch_backlog(token))
+        except TokenExpiredError:
+            backlog = {}
+    total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
+    logger.info("Tồn chưa gán giao toàn vùng (%s): %d đơn", backlog_time, total_backlog)
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "index.html"), "w", encoding="utf-8") as f:
-        f.write(gen_html(agg, backlog))
+        f.write(gen_html(agg, backlog, backlog_time))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],
@@ -222,7 +238,7 @@ def main():
                  "🎯 %%GTC vùng: **%s%%** · Giao TC %s · GTB %s" %
                  (g["gtc"] if g["gtc"] is not None else "—", _n(g["success"]), _n(gtb)),
                  "💰 COD GTB: **%.0f triệu₫**" % (cod / 1e6),
-                 "⏳ Chưa gán giao (chờ xếp chuyến): **%s đơn**" % _n(total_backlog),
+                 "⏳ Chưa gán giao (chờ xếp chuyến · %s): **%s đơn**" % (backlog_time, _n(total_backlog)),
                  "",
                  "🔴 5 bưu cục %GTC thấp nhất:"]
             for i, b in enumerate(worst, 1):
