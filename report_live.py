@@ -13,7 +13,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
-from report import _get_hubs, _post, CONCURRENCY, TokenExpiredError
+from report import _get_hubs, _post, _trip_success, CONCURRENCY, TokenExpiredError
 
 logger = logging.getLogger("live")
 VN = timezone(timedelta(hours=7))
@@ -67,12 +67,12 @@ async def fetch_live(token):
                                       "offset": 0, "limit": 200, "page": 1, "size": 200, "reverse": 1},
                                      hid, token)
                 fin_today = [t for t in (fn.get("data") or []) if t.get("endDateIndex") == ymd]
-                codes = [t["tripCode"] for t in ontrip] + [t["tripCode"] for t in fin_today]
+                # profile CHỈ cho chuyến đang chạy → tiến độ (updated/order)
                 pm = {}
-                if codes:
+                if ontrip:
                     async with sem:
                         pr = await _post(session, "/lastmile/trip/get-trip-profile",
-                                         {"tripCodes": codes}, hid, token)
+                                         {"tripCodes": [t["tripCode"] for t in ontrip]}, hid, token)
                     pm = {x["tripCode"]: x for x in (pr.get("data") or [])}
                 ot_order = ot_upd = 0
                 drivers = {}
@@ -86,10 +86,15 @@ async def fetch_live(token):
                     d = drivers.setdefault(k, {"name": k, "order": 0, "upd": 0})
                     d["order"] += o
                     d["upd"] += u
-                giao_today = ot_upd
-                for t in fin_today:
-                    p = pm.get(t["tripCode"], {})
-                    giao_today += p.get("updatedCount") or 0
+                # ĐÃ GIAO hôm nay = số GIAO THÀNH CÔNG (isSucceeded) từ chuyến ĐÃ KẾT THÚC hôm nay
+                async def _fsucc(tc):
+                    try:
+                        _tot, succ, *_ = await _trip_success(session, token, hid, tc, sem)
+                        return succ
+                    except Exception:
+                        return 0
+                succ_list = await asyncio.gather(*[_fsucc(t["tripCode"]) for t in fin_today])
+                giao_today = sum(succ_list)
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "ontrip": len(ontrip), "ot_order": ot_order, "ot_upd": ot_upd,
                         "giao_today": giao_today, "drivers": list(drivers.values())}
@@ -153,7 +158,7 @@ summary::-webkit-details-marker{display:none}
     P.append("<div class='kpis'>")
     P.append("<div class='kpi big'><div class='l'>⏳ Đơn chưa gán giao (chờ xếp chuyến)</div><div class='v' style='color:var(--warn)'>%s</div></div>" % _n(R["backlog"]))
     P.append("<div class='kpi'><div class='l'>🚚 Chuyến đang chạy</div><div class='v'>%s</div></div>" % _n(R["ontrip"]))
-    P.append("<div class='kpi'><div class='l'>📦 Đã giao hôm nay</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(R["giao_today"]))
+    P.append("<div class='kpi'><div class='l'>📦 Đã giao TC hôm nay (chuyến kết thúc)</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(R["giao_today"]))
     P.append("<div class='kpi big'><div class='l'>Tiến độ chuyến đang chạy</div><div class='v' style='color:var(--%s)'>%s%%</div></div>"
              % (_pcls(ot_prog), ot_prog if ot_prog is not None else "—"))
     P.append("</div>")
