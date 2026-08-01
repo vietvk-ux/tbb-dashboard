@@ -154,20 +154,22 @@ summary::-webkit-details-marker{display:none}
     P.append("<h1><span class='live'></span>TBB TRỰC TIẾP</h1>")
     P.append("<div class='sub'>Cập nhật <b>%s %s</b> · tự làm mới 5 phút/lần</div>"
              % (now.strftime("%H:%M"), now.strftime("%d/%m")))
+    can_giao = R["total"] + R["backlog"]
     P.append("<div class='kpis'>")
-    P.append("<div class='kpi big'><div class='l'>⏳ Đơn chưa gán giao (chờ xếp chuyến)</div><div class='v' style='color:var(--warn)'>%s</div></div>" % _n(R["backlog"]))
+    P.append("<div class='kpi'><div class='l'>📥 Đã gán lên chuyến</div><div class='v'>%s</div></div>" % _n(R["total"]))
+    P.append("<div class='kpi'><div class='l'>⏳ Chưa gán giao (chờ xếp chuyến)</div><div class='v' style='color:var(--warn)'>%s</div></div>" % _n(R["backlog"]))
     P.append("<div class='kpi'><div class='l'>🚚 Chuyến đang chạy</div><div class='v'>%s</div></div>" % _n(R["ontrip"]))
     P.append("<div class='kpi'><div class='l'>📦 Đơn GTC hôm nay (tới hiện tại)</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(R["gtc"]))
-    P.append("<div class='kpi big'><div class='l'>🎯 %%GTC toàn vùng (tới hiện tại)</div><div class='v' style='color:var(--%s)'>%s%%</div></div>"
-             % (_cls(reg_pct), reg_pct if reg_pct is not None else "—"))
+    P.append("<div class='kpi big'><div class='l'>🎯 %%GTC toàn vùng · tổng cần giao %s đơn</div><div class='v' style='color:var(--%s)'>%s%%</div></div>"
+             % (_n(can_giao), _cls(reg_pct), reg_pct if reg_pct is not None else "—"))
     P.append("</div>")
     P.append("<a class='eod' href='eod.html'>📊 Báo cáo %GTC cuối ngày (chi tiết nhân viên) →</a>")
 
-    P.append("<h2>🗺 Theo tỉnh (%GTC thấp → cao)</h2><table><tr><th>Tỉnh</th><th>Chưa gán</th><th>Đang chạy</th><th>GTC</th><th>%GTC</th></tr>")
+    P.append("<h2>🗺 Theo tỉnh (%GTC thấp → cao)</h2><table><tr><th>Tỉnh</th><th>Đã gán</th><th>Chưa gán</th><th>GTC</th><th>%GTC</th></tr>")
     for pv, v in sorted(prov.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
         pc = _pct(v["gtc"], v["total"])
         P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
-                 % (_esc(PROV_NAME.get(pv, pv)), _n(v["backlog"]), _n(v["ontrip"]), _n(v["gtc"]),
+                 % (_esc(PROV_NAME.get(pv, pv)), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _cls(pc), pc if pc is not None else "—"))
     P.append("</table>")
 
@@ -178,8 +180,8 @@ summary::-webkit-details-marker{display:none}
         pc = _pct(r["gtc"], r["total"])
         keys = (r["name"] + " " + " ".join(d["name"] for d in r["drivers"])).lower()
         P.append("<details class='bcrow' data-k=\"%s\">" % _esc(keys))
-        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>⏳<b style='color:var(--warn)'>%s</b> · 🚚%s · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
-                 % (_esc(r["name"]), _n(r["backlog"]), _n(r["ontrip"]), _n(r["gtc"]),
+        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>📥%s · ⏳<b style='color:var(--warn)'>%s</b> · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
+                 % (_esc(r["name"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
                     _cls(pc), pc if pc is not None else "—"))
         P.append("<div class='dtl'>")
         drv = [d for d in r["drivers"] if d["total"] > 0]
