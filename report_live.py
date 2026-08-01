@@ -86,14 +86,16 @@ async def fetch_live(token):
                     d = drivers.setdefault(k, {"name": k, "order": 0, "upd": 0})
                     d["order"] += o
                     d["upd"] += u
-                # ĐÃ GIAO hôm nay = số GIAO THÀNH CÔNG (isSucceeded) từ chuyến ĐÃ KẾT THÚC hôm nay
+                # ĐÃ GIAO hôm nay tới hiện tại = số GIAO THÀNH CÔNG (isSucceeded) trong
+                # TẤT CẢ chuyến hôm nay: đang chạy (đã giao dở) + đã kết thúc.
                 async def _fsucc(tc):
                     try:
                         _tot, succ, *_ = await _trip_success(session, token, hid, tc, sem)
                         return succ
                     except Exception:
                         return 0
-                succ_list = await asyncio.gather(*[_fsucc(t["tripCode"]) for t in fin_today])
+                succ_list = await asyncio.gather(
+                    *[_fsucc(t["tripCode"]) for t in (ontrip + fin_today)])
                 giao_today = sum(succ_list)
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "ontrip": len(ontrip), "ot_order": ot_order, "ot_upd": ot_upd,
@@ -158,7 +160,7 @@ summary::-webkit-details-marker{display:none}
     P.append("<div class='kpis'>")
     P.append("<div class='kpi big'><div class='l'>⏳ Đơn chưa gán giao (chờ xếp chuyến)</div><div class='v' style='color:var(--warn)'>%s</div></div>" % _n(R["backlog"]))
     P.append("<div class='kpi'><div class='l'>🚚 Chuyến đang chạy</div><div class='v'>%s</div></div>" % _n(R["ontrip"]))
-    P.append("<div class='kpi'><div class='l'>📦 Đã giao TC hôm nay (chuyến kết thúc)</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(R["giao_today"]))
+    P.append("<div class='kpi'><div class='l'>📦 Đã giao TC hôm nay (tới hiện tại)</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(R["giao_today"]))
     P.append("<div class='kpi big'><div class='l'>Tiến độ chuyến đang chạy</div><div class='v' style='color:var(--%s)'>%s%%</div></div>"
              % (_pcls(ot_prog), ot_prog if ot_prog is not None else "—"))
     P.append("</div>")
@@ -215,9 +217,9 @@ def main():
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
-    tot = sum(r["backlog"] for r in rows)
-    logger.info("Live: %d bưu cục · chưa gán %d · đang chạy %d chuyến",
-                len(rows), tot, sum(r["ontrip"] for r in rows))
+    logger.info("Live: %d bưu cục · chưa gán %d · đang chạy %d chuyến · đã giao %d",
+                len(rows), sum(r["backlog"] for r in rows),
+                sum(r["ontrip"] for r in rows), sum(r["giao_today"] for r in rows))
 
 
 if __name__ == "__main__":
