@@ -1,9 +1,9 @@
 """
 Trang GẦN REALTIME giao hàng Vùng TBB (mobile) — tự tạo lại mỗi ~30'.
-Số LIVE: tồn chưa gán giao · chuyến đang chạy + tiến độ · đơn đã giao hôm nay tới hiện tại.
-Nhẹ (không bóc từng đơn). %GTC đầy đủ ở báo cáo 23h.
+Số LIVE (bóc từng đơn qua get-trip-items): tồn chưa gán · chuyến đang chạy ·
+đơn GTC (giao thành công) hôm nay tới hiện tại · %GTC (GTC/đã xử lý) theo bưu cục & nhân viên.
 
-Env: NHANH_TOKEN. Xuất: docs/<slug>/live.html (+ index.html cùng nội dung).
+Env: NHANH_TOKEN. Xuất: docs/<slug>/index.html (+ live.html).
 """
 from __future__ import annotations
 import asyncio
@@ -13,7 +13,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
-from report import _get_hubs, _post, _trip_success, CONCURRENCY, TokenExpiredError
+from report import _get_hubs, _post, CONCURRENCY, TokenExpiredError
 
 logger = logging.getLogger("live")
 VN = timezone(timedelta(hours=7))
@@ -33,7 +33,11 @@ def _prov(name):
     return name[name.find("(") + 1:name.find(")")] if "(" in name else "?"
 
 
-def _pcls(p):
+def _pct(gtc, att):
+    return round(gtc * 100 / att, 1) if att else None
+
+
+def _cls(p):
     if p is None:
         return "na"
     return "bad" if p < 50 else ("warn" if p < 80 else "good")
@@ -55,73 +59,65 @@ async def fetch_live(token):
                     bl = await _post(session, "/oss/v4/count-orders-to-assign",
                                      {"hub_id": hid}, hid, token)
                 backlog = (bl.get("data") or {}).get("deliver", 0)
-                async with sem:
-                    ot = await _post(session, "/lastmile/trip/get-trip-list-by-hub",
-                                     {"hub_id": hid, "status": "ON_TRIP", "is_ready": 0,
-                                      "offset": 0, "limit": 200, "page": 1, "size": 200, "reverse": 1},
-                                     hid, token)
-                ontrip = ot.get("data") or []
-                async with sem:
-                    fn = await _post(session, "/lastmile/trip/get-trip-list-by-hub",
-                                     {"hub_id": hid, "status": "FINISHED",
-                                      "offset": 0, "limit": 200, "page": 1, "size": 200, "reverse": 1},
-                                     hid, token)
-                fin_today = [t for t in (fn.get("data") or []) if t.get("endDateIndex") == ymd]
-                # profile CHỈ cho chuyến đang chạy → tiến độ (updated/order)
-                pm = {}
-                if ontrip:
+
+                async def _list(status):
                     async with sem:
-                        pr = await _post(session, "/lastmile/trip/get-trip-profile",
-                                         {"tripCodes": [t["tripCode"] for t in ontrip]}, hid, token)
-                    pm = {x["tripCode"]: x for x in (pr.get("data") or [])}
-                ot_order = ot_upd = 0
-                drivers = {}
-                for t in ontrip:
-                    p = pm.get(t["tripCode"], {})
-                    o = p.get("orderCount") or 0
-                    u = p.get("updatedCount") or 0
-                    ot_order += o
-                    ot_upd += u
-                    k = t.get("driverName") or "—"
-                    d = drivers.setdefault(k, {"name": k, "order": 0, "upd": 0})
-                    d["order"] += o
-                    d["upd"] += u
-                # ĐÃ GIAO hôm nay tới hiện tại = số GIAO THÀNH CÔNG (isSucceeded) trong
-                # TẤT CẢ chuyến hôm nay: đang chạy (đã giao dở) + đã kết thúc.
-                async def _fsucc(tc):
+                        r = await _post(session, "/lastmile/trip/get-trip-list-by-hub",
+                                        {"hub_id": hid, "status": status, "is_ready": 0,
+                                         "offset": 0, "limit": 200, "page": 1, "size": 200, "reverse": 1},
+                                        hid, token)
+                    return r.get("data") or []
+                ontrip = await _list("ON_TRIP")
+                fin = [t for t in await _list("FINISHED") if t.get("endDateIndex") == ymd]
+
+                async def _it(t):
+                    dn = t.get("driverName") or "—"
                     try:
-                        _tot, succ, *_ = await _trip_success(session, token, hid, tc, sem)
-                        return succ
+                        async with sem:
+                            d = await _post(session, "/lastmile/trip/get-trip-items",
+                                            {"tripCode": t["tripCode"]}, hid, token)
+                        its = [x for x in (d.get("data") or []) if x.get("type") == "DELIVER"]
+                        gtc = sum(1 for x in its if x.get("isSucceeded") is True)
+                        att = sum(1 for x in its if x.get("isUpdated") is True)
+                        return (dn, gtc, att, len(its))
                     except Exception:
-                        return 0
-                succ_list = await asyncio.gather(
-                    *[_fsucc(t["tripCode"]) for t in (ontrip + fin_today)])
-                giao_today = sum(succ_list)
+                        return (dn, 0, 0, 0)
+
+                res = await asyncio.gather(*[_it(t) for t in (ontrip + fin)])
+                drivers = {}
+                h_gtc = h_att = h_total = 0
+                for dn, gtc, att, tot in res:
+                    d = drivers.setdefault(dn, {"name": dn, "gtc": 0, "att": 0, "total": 0})
+                    d["gtc"] += gtc
+                    d["att"] += att
+                    d["total"] += tot
+                    h_gtc += gtc
+                    h_att += att
+                    h_total += tot
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
-                        "ontrip": len(ontrip), "ot_order": ot_order, "ot_upd": ot_upd,
-                        "giao_today": giao_today, "drivers": list(drivers.values())}
+                        "ontrip": len(ontrip), "gtc": h_gtc, "att": h_att, "total": h_total,
+                        "drivers": list(drivers.values())}
             except TokenExpiredError:
                 raise
             except Exception as e:
                 logger.warning("Hub %s lỗi: %s", name, str(e)[:100])
                 return {"name": name, "prov": _prov(name), "backlog": 0, "ontrip": 0,
-                        "ot_order": 0, "ot_upd": 0, "giao_today": 0, "drivers": []}
+                        "gtc": 0, "att": 0, "total": 0, "drivers": []}
 
-        rows = await asyncio.gather(*[one(h) for h in hubs])
-    return rows
+        return await asyncio.gather(*[one(h) for h in hubs])
 
 
 def gen_html(rows):
     now = datetime.now(VN)
-    R = {"backlog": 0, "ontrip": 0, "ot_order": 0, "ot_upd": 0, "giao_today": 0}
+    R = {"backlog": 0, "ontrip": 0, "gtc": 0, "att": 0, "total": 0}
     prov = {}
     for r in rows:
         for k in R:
             R[k] += r[k]
-        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "ot_order": 0, "ot_upd": 0, "giao_today": 0})
-        for k in R:
+        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "gtc": 0, "att": 0})
+        for k in ("backlog", "ontrip", "gtc", "att"):
             p[k] += r[k]
-    ot_prog = round(R["ot_upd"] * 100 / R["ot_order"], 1) if R["ot_order"] else None
+    reg_pct = _pct(R["gtc"], R["att"])
 
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
@@ -136,10 +132,11 @@ def gen_html(rows):
 h1{font-size:18px;margin:2px 0}.sub{color:#9aa0b4;font-size:12px;margin-bottom:12px}
 .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 1.6s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
 .kpi{background:#191d2e;border:1px solid #2a2f45;border-radius:12px;padding:12px}
 .kpi .v{font-size:24px;font-weight:700}.kpi .l{color:#9aa0b4;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
 .big{grid-column:span 2;text-align:center}.big .v{font-size:32px}
+a.eod{display:block;text-align:center;padding:11px;border:1px solid #2a2f45;border-radius:10px;background:#191d2e;color:#e8eaf0;text-decoration:none;margin-bottom:14px}
 h2{font-size:14px;margin:18px 0 8px;color:#c7cbe0}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:7px 6px;text-align:right;border-bottom:1px solid #2a2f45}
@@ -160,41 +157,44 @@ summary::-webkit-details-marker{display:none}
     P.append("<div class='kpis'>")
     P.append("<div class='kpi big'><div class='l'>⏳ Đơn chưa gán giao (chờ xếp chuyến)</div><div class='v' style='color:var(--warn)'>%s</div></div>" % _n(R["backlog"]))
     P.append("<div class='kpi'><div class='l'>🚚 Chuyến đang chạy</div><div class='v'>%s</div></div>" % _n(R["ontrip"]))
-    P.append("<div class='kpi'><div class='l'>📦 Đã giao TC hôm nay (tới hiện tại)</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(R["giao_today"]))
-    P.append("<div class='kpi big'><div class='l'>Tiến độ chuyến đang chạy</div><div class='v' style='color:var(--%s)'>%s%%</div></div>"
-             % (_pcls(ot_prog), ot_prog if ot_prog is not None else "—"))
+    P.append("<div class='kpi'><div class='l'>📦 Đơn GTC hôm nay (tới hiện tại)</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(R["gtc"]))
+    P.append("<div class='kpi big'><div class='l'>🎯 %%GTC toàn vùng (tới hiện tại)</div><div class='v' style='color:var(--%s)'>%s%%</div></div>"
+             % (_cls(reg_pct), reg_pct if reg_pct is not None else "—"))
     P.append("</div>")
-    P.append("<a href='eod.html' style='display:block;text-align:center;padding:11px;border:1px solid #2a2f45;border-radius:10px;background:#191d2e;color:#e8eaf0;text-decoration:none;margin-bottom:14px'>📊 Báo cáo %GTC cuối ngày (theo nhân viên) →</a>")
+    P.append("<a class='eod' href='eod.html'>📊 Báo cáo %GTC cuối ngày (chi tiết nhân viên) →</a>")
 
-    P.append("<h2>🗺 Theo tỉnh</h2><table><tr><th>Tỉnh</th><th>Chưa gán</th><th>Đang chạy</th><th>Giao hôm nay</th></tr>")
-    for pv, v in sorted(prov.items(), key=lambda kv: -kv[1]["backlog"]):
-        P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>"
-                 % (_esc(PROV_NAME.get(pv, pv)), _n(v["backlog"]), _n(v["ontrip"]), _n(v["giao_today"])))
+    P.append("<h2>🗺 Theo tỉnh (%GTC thấp → cao)</h2><table><tr><th>Tỉnh</th><th>Chưa gán</th><th>Đang chạy</th><th>GTC</th><th>%GTC</th></tr>")
+    for pv, v in sorted(prov.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["att"]) if kv[1]["att"] else 999)):
+        pc = _pct(v["gtc"], v["att"])
+        P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
+                 % (_esc(PROV_NAME.get(pv, pv)), _n(v["backlog"]), _n(v["ontrip"]), _n(v["gtc"]),
+                    _cls(pc), pc if pc is not None else "—"))
     P.append("</table>")
 
-    P.append("<h2>🏤 Bưu cục — tồn chưa gán cao nhất</h2>")
+    P.append("<h2>🏤 Bưu cục — %GTC thấp → cao</h2>")
     P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'>")
-    for r in sorted(rows, key=lambda x: -x["backlog"]):
-        if r["backlog"] == 0 and r["ontrip"] == 0 and r["giao_today"] == 0:
-            continue
-        prog = round(r["ot_upd"] * 100 / r["ot_order"], 1) if r["ot_order"] else None
+    bcs = [r for r in rows if r["backlog"] or r["ontrip"] or r["att"]]
+    for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["att"]) if x["att"] else 999, -x["backlog"])):
+        pc = _pct(r["gtc"], r["att"])
         keys = (r["name"] + " " + " ".join(d["name"] for d in r["drivers"])).lower()
         P.append("<details class='bcrow' data-k=\"%s\">" % _esc(keys))
-        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>⏳<b style='color:var(--warn)'>%s</b> chưa gán · 🚚%s · giao %s</span></summary>"
-                 % (_esc(r["name"]), _n(r["backlog"]), _n(r["ontrip"]), _n(r["giao_today"])))
+        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>⏳<b style='color:var(--warn)'>%s</b> · 🚚%s · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
+                 % (_esc(r["name"]), _n(r["backlog"]), _n(r["ontrip"]), _n(r["gtc"]),
+                    _cls(pc), pc if pc is not None else "—"))
         P.append("<div class='dtl'>")
-        if r["drivers"]:
-            P.append("<table><tr><th>Nhân viên (đang chạy)</th><th>Đơn</th><th>Đã giao</th><th>Tiến độ</th></tr>")
-            for d in sorted(r["drivers"], key=lambda x: (x["upd"] / x["order"] if x["order"] else 1)):
-                pc = round(d["upd"] * 100 / d["order"], 1) if d["order"] else None
+        drv = [d for d in r["drivers"] if d["att"] > 0 or d["gtc"] > 0]
+        if drv:
+            P.append("<table><tr><th>Nhân viên</th><th>GTC</th><th>Đã xử lý</th><th>%GTC</th></tr>")
+            for d in sorted(drv, key=lambda x: -x["gtc"]):
+                pc2 = _pct(d["gtc"], d["att"])
                 P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
-                         % (_esc(d["name"]), _n(d["order"]), _n(d["upd"]), _pcls(pc),
-                            pc if pc is not None else "—"))
+                         % (_esc(d["name"]), _n(d["gtc"]), _n(d["att"]), _cls(pc2),
+                            pc2 if pc2 is not None else "—"))
             P.append("</table>")
         else:
-            P.append("<div class='sub'>Không có chuyến đang chạy.</div>")
+            P.append("<div class='sub'>Chưa có đơn giao hôm nay.</div>")
         P.append("</div></details>")
-    P.append("<div class='foot'>Số liệu LIVE tại thời điểm cập nhật · nhanh.ghn.vn · %%GTC đầy đủ ở báo cáo 23h</div>")
+    P.append("<div class='foot'>GTC = giao thành công (isSucceeded) · %GTC = GTC/đã xử lý · số LIVE tới thời điểm cập nhật · nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();document.querySelectorAll('.bcrow').forEach(function(e){e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
     P.append("</div></body></html>")
     return "\n".join(P)
@@ -217,9 +217,11 @@ def main():
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
-    logger.info("Live: %d bưu cục · chưa gán %d · đang chạy %d chuyến · đã giao %d",
-                len(rows), sum(r["backlog"] for r in rows),
-                sum(r["ontrip"] for r in rows), sum(r["giao_today"] for r in rows))
+    tg = sum(r["gtc"] for r in rows)
+    ta = sum(r["att"] for r in rows)
+    logger.info("Live: %d bưu cục · chưa gán %d · đang chạy %d · GTC %d · %%GTC %s",
+                len(rows), sum(r["backlog"] for r in rows), sum(r["ontrip"] for r in rows),
+                tg, _pct(tg, ta))
 
 
 if __name__ == "__main__":
