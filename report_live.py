@@ -114,10 +114,10 @@ def gen_html(rows):
     for r in rows:
         for k in R:
             R[k] += r[k]
-        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "gtc": 0, "att": 0})
-        for k in ("backlog", "ontrip", "gtc", "att"):
+        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "gtc": 0, "total": 0})
+        for k in ("backlog", "ontrip", "gtc", "total"):
             p[k] += r[k]
-    reg_pct = _pct(R["gtc"], R["att"])
+    reg_pct = _pct(R["gtc"], R["total"])
 
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
@@ -164,8 +164,8 @@ summary::-webkit-details-marker{display:none}
     P.append("<a class='eod' href='eod.html'>📊 Báo cáo %GTC cuối ngày (chi tiết nhân viên) →</a>")
 
     P.append("<h2>🗺 Theo tỉnh (%GTC thấp → cao)</h2><table><tr><th>Tỉnh</th><th>Chưa gán</th><th>Đang chạy</th><th>GTC</th><th>%GTC</th></tr>")
-    for pv, v in sorted(prov.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["att"]) if kv[1]["att"] else 999)):
-        pc = _pct(v["gtc"], v["att"])
+    for pv, v in sorted(prov.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
+        pc = _pct(v["gtc"], v["total"])
         P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
                  % (_esc(PROV_NAME.get(pv, pv)), _n(v["backlog"]), _n(v["ontrip"]), _n(v["gtc"]),
                     _cls(pc), pc if pc is not None else "—"))
@@ -173,28 +173,28 @@ summary::-webkit-details-marker{display:none}
 
     P.append("<h2>🏤 Bưu cục — %GTC thấp → cao</h2>")
     P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'>")
-    bcs = [r for r in rows if r["backlog"] or r["ontrip"] or r["att"]]
-    for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["att"]) if x["att"] else 999, -x["backlog"])):
-        pc = _pct(r["gtc"], r["att"])
+    bcs = [r for r in rows if r["backlog"] or r["ontrip"] or r["total"]]
+    for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999, -x["backlog"])):
+        pc = _pct(r["gtc"], r["total"])
         keys = (r["name"] + " " + " ".join(d["name"] for d in r["drivers"])).lower()
         P.append("<details class='bcrow' data-k=\"%s\">" % _esc(keys))
         P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>⏳<b style='color:var(--warn)'>%s</b> · 🚚%s · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
                  % (_esc(r["name"]), _n(r["backlog"]), _n(r["ontrip"]), _n(r["gtc"]),
                     _cls(pc), pc if pc is not None else "—"))
         P.append("<div class='dtl'>")
-        drv = [d for d in r["drivers"] if d["att"] > 0 or d["gtc"] > 0]
+        drv = [d for d in r["drivers"] if d["total"] > 0]
         if drv:
-            P.append("<table><tr><th>Nhân viên</th><th>GTC</th><th>Đã xử lý</th><th>%GTC</th></tr>")
+            P.append("<table><tr><th>Nhân viên</th><th>Tổng gán</th><th>GTC</th><th>%GTC</th></tr>")
             for d in sorted(drv, key=lambda x: -x["gtc"]):
-                pc2 = _pct(d["gtc"], d["att"])
+                pc2 = _pct(d["gtc"], d["total"])
                 P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
-                         % (_esc(d["name"]), _n(d["gtc"]), _n(d["att"]), _cls(pc2),
+                         % (_esc(d["name"]), _n(d["total"]), _n(d["gtc"]), _cls(pc2),
                             pc2 if pc2 is not None else "—"))
             P.append("</table>")
         else:
             P.append("<div class='sub'>Chưa có đơn giao hôm nay.</div>")
         P.append("</div></details>")
-    P.append("<div class='foot'>GTC = giao thành công (isSucceeded) · %GTC = GTC/đã xử lý · số LIVE tới thời điểm cập nhật · nhanh.ghn.vn</div>")
+    P.append("<div class='foot'>GTC = giao thành công · %GTC = GTC / tổng đơn gán giao · số LIVE tới thời điểm cập nhật · nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();document.querySelectorAll('.bcrow').forEach(function(e){e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
     P.append("</div></body></html>")
     return "\n".join(P)
