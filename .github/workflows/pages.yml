@@ -1,4 +1,4 @@
-name: Dashboard giao hàng TBB (Pages · 7h sáng)
+name: Báo cáo %GTC cuối ngày TBB (23h)
 
 on:
   workflow_dispatch:
