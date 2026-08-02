@@ -73,7 +73,9 @@ async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem):
 
 async def _trip_success(session, token, hub_id, trip_code, sem):
     async with sem:
-        d = await _post(session, "/lastmile/trip/get-trip-items", {"tripCode": trip_code}, hub_id, token)
+        d = await _post(session, "/lastmile/trip/get-trip-items",
+                        {"tripCode": trip_code, "offset": 0, "limit": 1000, "page": 1, "size": 1000},
+                        hub_id, token)
     items = [x for x in (d.get("data") or []) if x.get("type") == "DELIVER"]
     total = len(items)
     success = sum(1 for x in items if x.get("isSucceeded") is True)

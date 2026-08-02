@@ -75,7 +75,8 @@ async def fetch_live(token):
                     try:
                         async with sem:
                             d = await _post(session, "/lastmile/trip/get-trip-items",
-                                            {"tripCode": t["tripCode"]}, hid, token)
+                                            {"tripCode": t["tripCode"], "offset": 0,
+                                             "limit": 1000, "page": 1, "size": 1000}, hid, token)
                         its = [x for x in (d.get("data") or []) if x.get("type") == "DELIVER"]
                         gtc = sum(1 for x in its if x.get("isSucceeded") is True)
                         att = sum(1 for x in its if x.get("isUpdated") is True)
