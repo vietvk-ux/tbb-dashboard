@@ -89,6 +89,8 @@ h1{font-size:18px;margin:2px 0}.sub{color:#9aa0b4;font-size:12px;margin-bottom:1
 .kpi{background:#191d2e;border:1px solid #2a2f45;border-radius:12px;padding:12px}
 .kpi .v{font-size:22px;font-weight:700}.kpi .l{color:#9aa0b4;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
 .big{grid-column:span 2;text-align:center}.big .v{font-size:34px}
+.danger{background:#241316;border:1px solid #7f1d1d;border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.danger h2{margin:0 0 6px;color:#ef4444}
 h2{font-size:14px;margin:18px 0 8px;color:#c7cbe0}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:7px 6px;text-align:right;border-bottom:1px solid #2a2f45}
@@ -121,6 +123,31 @@ details[open] summary{border-bottom:1px solid #2a2f45}
     total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
     P.append("<div class='kpi big'><div class='l'>⏳ Chưa gán giao (chờ xếp chuyến · %s)</div><div class='v' style='color:var(--warn)'>%s đơn</div></div>"
              % (_esc(backlog_time), _n(total_backlog)))
+    P.append("</div>")
+
+    # ⚠️ Nhóm nhân viên nguy hiểm cần chú ý (GTC thấp + nhiều đơn hỏng, ≥20 đơn)
+    MIN, NGUONG = 20, 60.0
+    danger = [dr for dr in agg["drivers"]
+              if dr["total"] >= MIN and dr["gtc"] is not None and dr["gtc"] < NGUONG]
+    danger.sort(key=lambda x: (-(x["total"] - x["success"]), x["gtc"]))  # nhiều đơn hỏng nhất trước
+    P.append("<div class='danger'>")
+    P.append("<h2>⚠️ NHÓM NHÂN VIÊN NGUY HIỂM CẦN CHÚ Ý</h2>")
+    if not danger:
+        P.append("<div class='sub'>✅ Không có nhân viên nào %%GTC dưới %d%% (≥%d đơn). Vùng ổn định.</div>"
+                 % (int(NGUONG), MIN))
+    else:
+        tot_gtb = sum(dr["total"] - dr["success"] for dr in danger)
+        tot_cod = sum(dr.get("gtb_cod", 0) for dr in danger)
+        top3 = " · ".join("%s (%s)" % (dr["driver_name"], dr["bc"]) for dr in danger[:3])
+        P.append("<div class='sub'><b>%d nhân viên</b> %%GTC &lt;%d%% (≥%d đơn) → <b style='color:var(--bad)'>%s đơn giao hỏng</b>, kẹt <b>%.0f triệu</b> COD.<br>🔥 Nguy hiểm nhất: <b>%s</b> — cần đốc thúc/kiểm tra ngay.</div>"
+                 % (len(danger), int(NGUONG), MIN, _n(tot_gtb), tot_cod / 1e6, _esc(top3)))
+        P.append("<table><tr><th>#</th><th>Nhân viên</th><th>Bưu cục</th><th>Đơn</th><th>Hỏng</th><th>%GTC</th></tr>")
+        for i, dr in enumerate(danger[:15], 1):
+            gtb = dr["total"] - dr["success"]
+            P.append("<tr><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td style='color:var(--bad);font-weight:700'>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
+                     % (i, _esc(dr["driver_name"]), _esc(dr["bc"]), _n(dr["total"]), _n(gtb),
+                        _cls(dr["gtc"]), dr["gtc"]))
+        P.append("</table>")
     P.append("</div>")
 
     # Theo tỉnh
