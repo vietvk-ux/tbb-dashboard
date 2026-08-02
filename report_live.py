@@ -95,27 +95,27 @@ async def fetch_live(token):
                     h_att += att
                     h_total += tot
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
-                        "ontrip": len(ontrip), "gtc": h_gtc, "att": h_att, "total": h_total,
-                        "drivers": list(drivers.values())}
+                        "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
+                        "att": h_att, "total": h_total, "drivers": list(drivers.values())}
             except TokenExpiredError:
                 raise
             except Exception as e:
                 logger.warning("Hub %s lỗi: %s", name, str(e)[:100])
                 return {"name": name, "prov": _prov(name), "backlog": 0, "ontrip": 0,
-                        "gtc": 0, "att": 0, "total": 0, "drivers": []}
+                        "fin": 0, "gtc": 0, "att": 0, "total": 0, "drivers": []}
 
         return await asyncio.gather(*[one(h) for h in hubs])
 
 
 def gen_html(rows):
     now = datetime.now(VN)
-    R = {"backlog": 0, "ontrip": 0, "gtc": 0, "att": 0, "total": 0}
+    R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0}
     prov = {}
     for r in rows:
         for k in R:
             R[k] += r[k]
-        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "gtc": 0, "total": 0})
-        for k in ("backlog", "ontrip", "gtc", "total"):
+        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "total": 0})
+        for k in ("backlog", "ontrip", "fin", "gtc", "total"):
             p[k] += r[k]
     reg_pct = _pct(R["gtc"], R["total"])
 
@@ -165,12 +165,12 @@ summary::-webkit-details-marker{display:none}
     P.append("</div>")
     P.append("<a class='eod' href='eod.html'>📊 Báo cáo %GTC cuối ngày (chi tiết nhân viên) →</a>")
 
-    P.append("<h2>🗺 Theo tỉnh (%GTC thấp → cao)</h2><table><tr><th>Tỉnh</th><th>Đã gán</th><th>Chưa gán</th><th>GTC</th><th>%GTC</th></tr>")
+    P.append("<h2>🗺 Theo tỉnh (%GTC thấp → cao)</h2><table><tr><th>Tỉnh</th><th>Chuyến</th><th>Đã gán</th><th>Chưa gán</th><th>GTC</th><th>%GTC</th></tr>")
     for pv, v in sorted(prov.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
         pc = _pct(v["gtc"], v["total"])
-        P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
-                 % (_esc(PROV_NAME.get(pv, pv)), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
-                    _cls(pc), pc if pc is not None else "—"))
+        P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
+                 % (_esc(PROV_NAME.get(pv, pv)), _n(v["ontrip"] + v["fin"]), _n(v["total"]),
+                    _n(v["backlog"]), _n(v["gtc"]), _cls(pc), pc if pc is not None else "—"))
     P.append("</table>")
 
     P.append("<h2>🏤 Bưu cục — %GTC thấp → cao</h2>")
@@ -180,9 +180,9 @@ summary::-webkit-details-marker{display:none}
         pc = _pct(r["gtc"], r["total"])
         keys = (r["name"] + " " + " ".join(d["name"] for d in r["drivers"])).lower()
         P.append("<details class='bcrow' data-k=\"%s\">" % _esc(keys))
-        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>📥%s · ⏳<b style='color:var(--warn)'>%s</b> · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
-                 % (_esc(r["name"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
-                    _cls(pc), pc if pc is not None else "—"))
+        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>🚚%s · 📥%s · ⏳<b style='color:var(--warn)'>%s</b> · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
+                 % (_esc(r["name"]), _n(r["ontrip"] + r["fin"]), _n(r["total"]), _n(r["backlog"]),
+                    _n(r["gtc"]), _cls(pc), pc if pc is not None else "—"))
         P.append("<div class='dtl'>")
         drv = [d for d in r["drivers"] if d["total"] > 0]
         if drv:
