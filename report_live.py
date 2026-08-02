@@ -43,6 +43,12 @@ def _cls(p):
     return "bad" if p < 50 else ("warn" if p < 80 else "good")
 
 
+def _bar(pct, cls):
+    """Thanh tiến độ %GTC trực quan."""
+    w = pct if pct is not None else 0
+    return "<div class='bar'><i class='%s' style='width:%s%%'></i></div>" % (cls, w)
+
+
 async def fetch_live(token):
     today = datetime.now(VN).date()
     ymd = today.year * 10000 + today.month * 100 + today.day
@@ -139,87 +145,198 @@ def gen_html(rows):
             p[k] += r[k]
     reg_pct = _pct(R["gtc"], R["total"])
 
+    can_giao = R["total"] + R["backlog"]
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
-    P.append("<meta name='viewport' content='width=device-width,initial-scale=1'>")
+    P.append("<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>")
     P.append("<meta name='robots' content='noindex,nofollow'>")
     P.append("<meta http-equiv='refresh' content='300'>")
+    P.append("<meta name='theme-color' content='#0a0d18'>")
     P.append("<title>TBB trực tiếp · %s</title>" % now.strftime("%H:%M"))
-    P.append("""<style>
-:root{--bg:#0f1220;--card:#191d2e;--mut:#9aa0b4;--good:#22c55e;--warn:#f59e0b;--bad:#ef4444;--line:#2a2f45}
-*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1220;color:#e8eaf0}
-.wrap{max-width:760px;margin:0 auto;padding:14px}
-h1{font-size:18px;margin:2px 0}.sub{color:#9aa0b4;font-size:12px;margin-bottom:12px}
-.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;animation:pulse 1.6s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
-.kpi{background:#191d2e;border:1px solid #2a2f45;border-radius:12px;padding:12px}
-.kpi .v{font-size:24px;font-weight:700}.kpi .l{color:#9aa0b4;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
-.big{grid-column:span 2;text-align:center}.big .v{font-size:32px}
-a.eod{display:block;text-align:center;padding:11px;border:1px solid #2a2f45;border-radius:10px;background:#191d2e;color:#e8eaf0;text-decoration:none;margin-bottom:14px}
-h2{font-size:14px;margin:18px 0 8px;color:#c7cbe0}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:7px 6px;text-align:right;border-bottom:1px solid #2a2f45}
-th:first-child,td:first-child{text-align:left}
-th{color:#9aa0b4;font-weight:600;font-size:11px}
-.pill{display:inline-block;min-width:42px;padding:2px 7px;border-radius:20px;font-weight:700;font-size:12px;color:#0b0e17}
-.good{background:#22c55e}.warn{background:#f59e0b}.bad{background:#ef4444}.na{background:#4b5168;color:#e8eaf0}
-details{background:#191d2e;border:1px solid #2a2f45;border-radius:12px;margin:8px 0}
-summary{padding:11px 12px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:8px}
-summary::-webkit-details-marker{display:none}
-.bc-name{font-weight:600}.bc-meta{color:#9aa0b4;font-size:12px}
-.dtl{padding:0 12px 10px}.foot{color:#9aa0b4;font-size:11px;text-align:center;margin:20px 0}
-.search{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2a2f45;background:#191d2e;color:#e8eaf0;font-size:14px;margin-bottom:8px}
-</style></head><body><div class='wrap'>""")
-    P.append("<h1><span class='live'></span>TBB TRỰC TIẾP</h1>")
-    P.append("<div class='sub'>Cập nhật <b>%s %s</b> · tự làm mới 5 phút/lần</div>"
-             % (now.strftime("%H:%M"), now.strftime("%d/%m")))
-    can_giao = R["total"] + R["backlog"]
-    P.append("<div class='kpis'>")
-    P.append("<div class='kpi'><div class='l'>📥 Đã gán lên chuyến</div><div class='v'>%s</div></div>" % _n(R["total"]))
-    P.append("<div class='kpi'><div class='l'>⏳ Chưa gán giao (chờ xếp chuyến)</div><div class='v' style='color:var(--warn)'>%s</div></div>" % _n(R["backlog"]))
-    P.append("<div class='kpi'><div class='l'>🚚 Chuyến đang chạy</div><div class='v'>%s</div></div>" % _n(R["ontrip"]))
-    P.append("<div class='kpi'><div class='l'>📦 Đơn GTC hôm nay (tới hiện tại)</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(R["gtc"]))
-    P.append("<div class='kpi big'><div class='l'>🎯 %%GTC toàn vùng · tổng cần giao %s đơn</div><div class='v' style='color:var(--%s)'>%s%%</div></div>"
-             % (_n(can_giao), _cls(reg_pct), reg_pct if reg_pct is not None else "—"))
-    P.append("</div>")
-    P.append("<a class='eod' href='eod.html'>📊 Báo cáo %GTC cuối ngày (chi tiết nhân viên) →</a>")
+    P.append(_CSS)
+    P.append("<div class='wrap'>")
 
-    P.append("<h2>🗺 Theo tỉnh (%GTC thấp → cao)</h2><table><tr><th>Tỉnh</th><th>Chuyến</th><th>Đã gán</th><th>Chưa gán</th><th>GTC</th><th>%GTC</th></tr>")
+    # ===== Header dính =====
+    P.append("<header class='top'>"
+             "<div class='brand'><span class='live'></span>TBB TRỰC TIẾP</div>"
+             "<div class='ts'>%s · %s</div></header>"
+             % (now.strftime("%H:%M"), now.strftime("%d/%m")))
+
+    # ===== Hero %GTC =====
+    P.append("<section class='hero %s'>" % _cls(reg_pct))
+    P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG TÂY BẮC BỘ</div>")
+    P.append("<div class='hpct'>%s<span>%%</span></div>"
+             % (reg_pct if reg_pct is not None else "—"))
+    P.append(_bar(reg_pct, _cls(reg_pct)))
+    P.append("<div class='hsub'>%s / %s đơn giao thành công · cần giao %s</div>"
+             % (_n(R["gtc"]), _n(R["total"]), _n(can_giao)))
+    P.append("</section>")
+
+    # ===== Dải chỉ số =====
+    P.append("<section class='strip'>")
+    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📥 Đã gán</div></div>" % _n(R["total"]))
+    P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>⏳ Chưa gán</div></div>" % _n(R["backlog"]))
+    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🏃 Đang chạy</div></div>" % _n(R["ontrip"]))
+    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ GTC nay</div></div>" % _n(R["gtc"]))
+    P.append("</section>")
+
+    P.append("<a class='eod' href='eod.html'><span>📊 Báo cáo %GTC cuối ngày</span>"
+             "<span class='arw'>chi tiết nhân viên →</span></a>")
+
+    # ===== Theo tỉnh =====
+    P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")
+    P.append("<section class='provs'>")
     for pv, v in sorted(prov.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
         pc = _pct(v["gtc"], v["total"])
-        P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
-                 % (_esc(PROV_NAME.get(pv, pv)), _n(v["ontrip"] + v["fin"]), _n(v["total"]),
-                    _n(v["backlog"]), _n(v["gtc"]), _cls(pc), pc if pc is not None else "—"))
-    P.append("</table>")
+        cls = _cls(pc)
+        P.append("<div class='prow %s'>" % cls)
+        P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(pv, pv))))
+        P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
+        P.append(_bar(pc, cls))
+        P.append("<div class='pmeta'>🏃 %s · 📥 %s · ⏳ %s · ✅ %s</div>"
+                 % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"])))
+        P.append("</div>")
+    P.append("</section>")
 
-    P.append("<h2>🏤 Bưu cục — %GTC thấp → cao</h2>")
-    P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'>")
+    # ===== Bưu cục =====
+    P.append("<div class='sec'>🏤 Bưu cục · %GTC thấp → cao</div>")
+    P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'></div>")
+    P.append("<div id='empty' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
     bcs = [r for r in rows if r["backlog"] or r["ontrip"] or r["total"]]
     for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999, -x["backlog"])):
         pc = _pct(r["gtc"], r["total"])
+        cls = _cls(pc)
         keys = (r["name"] + " " + " ".join(d["name"] for d in r["drivers"])).lower()
-        P.append("<details class='bcrow' data-k=\"%s\">" % _esc(keys))
-        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>🏃%s·🏁%s · 📥%s · ⏳<b style='color:var(--warn)'>%s</b> · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
-                 % (_esc(r["name"]), _n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]),
-                    _n(r["gtc"]), _cls(pc), pc if pc is not None else "—"))
-        P.append("<div class='dtl'>")
+        P.append("<details class='bc %s' data-k=\"%s\">" % (cls, _esc(keys)))
+        P.append("<summary>")
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+                 "<span class='pill %s'>%s%%</span></div>"
+                 % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
+        P.append(_bar(pc, cls))
+        P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
+                 "<span class='w'>⏳ %s</span><span>✅ %s</span></div>"
+                 % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"])))
+        P.append("</summary>")
         drv = r["drivers"]  # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao)
+        P.append("<div class='dtl'>")
         if drv:
-            P.append("<table><tr><th>Nhân viên</th><th>Chuyến</th><th>Tổng gán</th><th>GTC</th><th>%GTC</th></tr>")
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
             for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
                 pc2 = _pct(d["gtc"], d["total"])
-                P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
+                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                          % (_esc(d["name"]), _n(d.get("chuyen", 0)), _n(d["total"]), _n(d["gtc"]),
                             _cls(pc2), pc2 if pc2 is not None else "—"))
-            P.append("</table>")
+            P.append("</tbody></table>")
         else:
-            P.append("<div class='sub'>Chưa có chuyến hôm nay.</div>")
+            P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
         P.append("</div></details>")
-    P.append("<div class='foot'>🏃 chuyến đang chạy · 🏁 chuyến kết thúc hôm nay · 📥 đã gán · ⏳ chưa gán<br>GTC = giao thành công · %GTC = GTC / tổng đơn gán · số LIVE (gồm cả chuyến đã kết thúc trong ngày) · nhanh.ghn.vn</div>")
-    P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();document.querySelectorAll('.bcrow').forEach(function(e){e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
+
+    P.append("<div class='foot'>🏃 đang chạy · 🏁 kết thúc hôm nay · 📥 đã gán · ⏳ chưa gán · ✅ GTC<br>"
+             "%GTC = GTC / tổng đơn gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
+             "số LIVE gồm cả chuyến đã kết thúc trong ngày · nguồn nhanh.ghn.vn</div>")
+    P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
+             "document.querySelectorAll('.bc').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
+             "e.style.display=s?'':'none';if(s)n++;});"
+             "document.getElementById('empty').style.display=n?'none':'block';}</script>")
     P.append("</div></body></html>")
     return "\n".join(P)
+
+
+_CSS = """<style>
+:root{
+ --bg:#0a0d18;--bg2:#0e1220;--card:#161b2d;--card2:#1b2136;--line:#272d45;
+ --mut:#8b92ab;--txt:#eef0f7;--good:#2fd07a;--warn:#f7b955;--bad:#f2585f;--ink:#0a0d18
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+ background:linear-gradient(180deg,#0b0f1c 0%,#0a0d18 240px,#0a0d18 100%);color:var(--txt);
+ -webkit-font-smoothing:antialiased;font-size:15px;line-height:1.35}
+.wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+ padding:12px 2px 10px;background:linear-gradient(180deg,#0a0d18 70%,rgba(10,13,24,0));margin-bottom:4px}
+.brand{font-weight:800;letter-spacing:.06em;font-size:15px;display:flex;align-items:center;gap:8px}
+.ts{color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+.live{width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(47,208,122,.6);animation:pulse 1.8s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,208,122,.55)}70%{box-shadow:0 0 0 7px rgba(47,208,122,0)}100%{box-shadow:0 0 0 0 rgba(47,208,122,0)}}
+
+.hero{border-radius:20px;padding:20px 18px 18px;margin:4px 0 12px;position:relative;overflow:hidden;
+ background:radial-gradient(120% 90% at 100% 0,rgba(255,255,255,.05),transparent),var(--card);
+ border:1px solid var(--line)}
+.hero.good{box-shadow:0 10px 30px -12px rgba(47,208,122,.35)}
+.hero.warn{box-shadow:0 10px 30px -12px rgba(247,185,85,.32)}
+.hero.bad{box-shadow:0 10px 30px -12px rgba(242,88,95,.32)}
+.hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.hpct{font-size:64px;font-weight:850;line-height:1;margin:8px 0 12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
+.hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
+.hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
+
+.bar{height:7px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;transition:width .5s}
+.bar i.good{background:linear-gradient(90deg,#25b56b,#2fd07a)}
+.bar i.warn{background:linear-gradient(90deg,#e39a2e,#f7b955)}
+.bar i.bad{background:linear-gradient(90deg,#d8434b,#f2585f)}
+.bar i.na{background:#4b5168}
+
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 6px;text-align:center}
+.sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.sv.good{color:var(--good)}.sv.warn{color:var(--warn)}
+.sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
+
+.eod{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--txt);
+ background:linear-gradient(135deg,#20264a,#191f38);border:1px solid #313a63;border-radius:14px;
+ padding:14px 16px;margin-bottom:8px;font-weight:700;font-size:14px}
+.eod .arw{color:#aeb6e0;font-size:12px;font-weight:600}
+.eod:active{transform:scale(.99)}
+
+.sec{font-size:12px;font-weight:700;letter-spacing:.05em;color:#b9c0da;text-transform:uppercase;margin:20px 4px 10px}
+
+.provs{display:flex;flex-direction:column;gap:8px}
+.prow{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:14px;padding:12px 14px;
+ display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center}
+.prow.good{border-left-color:var(--good)}.prow.warn{border-left-color:var(--warn)}.prow.bad{border-left-color:var(--bad)}
+.pl{display:flex;align-items:center;gap:9px;font-size:15px}
+.prow .bar{grid-column:1/-1}
+.pmeta{grid-column:1/-1;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:#4b5168}
+.dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+
+.pill{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:3px 9px;border-radius:99px;
+ font-weight:800;font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.3}
+.pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
+.pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}
+.pill.na{background:#3a4160;color:var(--mut)}
+
+.sbar{position:sticky;top:44px;z-index:10;padding:6px 0 10px;background:linear-gradient(180deg,#0a0d18 80%,rgba(10,13,24,0))}
+.search{width:100%;padding:12px 14px;border-radius:13px;border:1px solid var(--line);background:var(--card);
+ color:var(--txt);font-size:15px;outline:none}
+.search:focus{border-color:#3a4470}
+.empty{color:var(--mut);text-align:center;padding:20px;font-size:13px}
+
+.bc{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:14px;margin:8px 0;overflow:hidden}
+.bc.good{border-left-color:var(--good)}.bc.warn{border-left-color:var(--warn)}.bc.bad{border-left-color:var(--bad)}
+.bc summary{padding:12px 14px;cursor:pointer;list-style:none;display:flex;flex-direction:column;gap:9px}
+.bc summary::-webkit-details-marker{display:none}
+.bc[open]{background:var(--card2)}
+.bch{display:flex;align-items:center;gap:9px}
+.bcn{font-weight:700;font-size:15px;flex:1;min-width:0}
+.bcm{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+.bcm .w{color:var(--warn)}
+.dtl{padding:2px 12px 12px}
+.none{color:var(--mut);font-size:12.5px;padding:6px 2px 10px}
+
+table.drv{width:100%;border-collapse:collapse;font-size:13px}
+table.drv th,table.drv td{padding:8px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+table.drv th{color:var(--mut);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line)}
+table.drv th:first-child,table.drv td:first-child{text-align:left}
+table.drv tbody tr:last-child td{border-bottom:none}
+td.nv{font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:24px 0 4px}
+</style></head><body>"""
 
 
 def main():
