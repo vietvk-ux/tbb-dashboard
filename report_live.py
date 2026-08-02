@@ -182,8 +182,8 @@ summary::-webkit-details-marker{display:none}
         pc = _pct(r["gtc"], r["total"])
         keys = (r["name"] + " " + " ".join(d["name"] for d in r["drivers"])).lower()
         P.append("<details class='bcrow' data-k=\"%s\">" % _esc(keys))
-        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>🚚%s · 📥%s · ⏳<b style='color:var(--warn)'>%s</b> · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
-                 % (_esc(r["name"]), _n(r["ontrip"] + r["fin"]), _n(r["total"]), _n(r["backlog"]),
+        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>🏃%s·🏁%s · 📥%s · ⏳<b style='color:var(--warn)'>%s</b> · GTC %s · <span class='pill %s'>%s%%</span></span></summary>"
+                 % (_esc(r["name"]), _n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]),
                     _n(r["gtc"]), _cls(pc), pc if pc is not None else "—"))
         P.append("<div class='dtl'>")
         drv = r["drivers"]  # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao)
@@ -198,7 +198,7 @@ summary::-webkit-details-marker{display:none}
         else:
             P.append("<div class='sub'>Chưa có chuyến hôm nay.</div>")
         P.append("</div></details>")
-    P.append("<div class='foot'>GTC = giao thành công · %GTC = GTC / tổng đơn gán giao · số LIVE tới thời điểm cập nhật · nhanh.ghn.vn</div>")
+    P.append("<div class='foot'>🏃 chuyến đang chạy · 🏁 chuyến kết thúc hôm nay · 📥 đã gán · ⏳ chưa gán<br>GTC = giao thành công · %GTC = GTC / tổng đơn gán · số LIVE (gồm cả chuyến đã kết thúc trong ngày) · nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();document.querySelectorAll('.bcrow').forEach(function(e){e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
     P.append("</div></body></html>")
     return "\n".join(P)
