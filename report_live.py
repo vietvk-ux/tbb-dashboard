@@ -70,32 +70,50 @@ async def fetch_live(token):
                 ontrip = await _list("ON_TRIP")
                 fin = [t for t in await _list("FINISHED") if t.get("endDateIndex") == ymd]
 
-                async def _it(t):
+                async def _it(t, is_ontrip):
                     dn = t.get("driverName") or "—"
                     try:
                         async with sem:
                             d = await _post(session, "/lastmile/trip/get-trip-items",
                                             {"tripCode": t["tripCode"], "offset": 0,
                                              "limit": 1000, "page": 1, "size": 1000}, hid, token)
-                        its = [x for x in (d.get("data") or []) if x.get("type") == "DELIVER"]
-                        gtc = sum(1 for x in its if x.get("isSucceeded") is True)
-                        att = sum(1 for x in its if x.get("isUpdated") is True)
-                        return (dn, gtc, att, len(its))
+                        # (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?)
+                        recs = [(x.get("orderCode"), dn, x.get("isSucceeded") is True,
+                                 x.get("isUpdated") is True, is_ontrip)
+                                for x in (d.get("data") or []) if x.get("type") == "DELIVER"]
+                        return (dn, recs)
                     except Exception:
-                        return (dn, 0, 0, 0)
+                        return (dn, [])
 
-                res = await asyncio.gather(*[_it(t) for t in (ontrip + fin)])
+                res = await asyncio.gather(
+                    *([_it(t, True) for t in ontrip] + [_it(t, False) for t in fin]))
                 drivers = {}
-                h_gtc = h_att = h_total = 0
-                for dn, gtc, att, tot in res:
+                # Mỗi chuyến (dù trùng đơn) vẫn tính là 1 chuyến của tài xế
+                for dn, _recs in res:
                     d = drivers.setdefault(dn, {"name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0})
                     d["chuyen"] += 1
-                    d["gtc"] += gtc
-                    d["att"] += att
-                    d["total"] += tot
-                    h_gtc += gtc
-                    h_att += att
-                    h_total += tot
+                # GỘP theo MÃ ĐƠN: 1 đơn gán nhiều chuyến chỉ tính 1 lần.
+                # Ưu tiên bản ghi: đã giao > đã xử lý > chuyến đang chạy (đơn còn treo
+                # tính cho chuyến hiện tại). GTC=đơn giao xong ở BẤT KỲ chuyến nào.
+                best = {}
+                for dn, recs in res:
+                    for oc, drv, succ, att, ot in recs:
+                        if not oc:
+                            continue
+                        score = (4 if succ else 0) + (2 if att else 0) + (1 if ot else 0)
+                        cur = best.get(oc)
+                        if cur is None or score > cur[0]:
+                            best[oc] = (score, drv, succ, att)
+                for oc, (score, drv, succ, att) in best.items():
+                    d = drivers.setdefault(drv, {"name": drv, "chuyen": 0, "gtc": 0, "att": 0, "total": 0})
+                    d["total"] += 1
+                    if succ:
+                        d["gtc"] += 1
+                    if att:
+                        d["att"] += 1
+                h_total = sum(d["total"] for d in drivers.values())
+                h_gtc = sum(d["gtc"] for d in drivers.values())
+                h_att = sum(d["att"] for d in drivers.values())
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "drivers": list(drivers.values())}

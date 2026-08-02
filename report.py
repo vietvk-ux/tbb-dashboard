@@ -71,21 +71,24 @@ async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem):
             for t in (d.get("data") or []) if t.get("endDateIndex") == yyyymmdd]
 
 
-async def _trip_success(session, token, hub_id, trip_code, sem):
+async def _trip_items(session, token, hub_id, trip_code, sem):
+    """Trả về danh sách item DELIVER (mức đơn) để aggregate GỘP theo mã đơn.
+    1 đơn gán nhiều chuyến (giao hỏng → gán lại) chỉ tính 1 lần ở bước aggregate."""
     async with sem:
         d = await _post(session, "/lastmile/trip/get-trip-items",
                         {"tripCode": trip_code, "offset": 0, "limit": 1000, "page": 1, "size": 1000},
                         hub_id, token)
-    items = [x for x in (d.get("data") or []) if x.get("type") == "DELIVER"]
-    total = len(items)
-    success = sum(1 for x in items if x.get("isSucceeded") is True)
-    # COD trên đơn GTB (giao thất bại) = tiền kẹt, cần theo dõi
-    gtb_cod = sum(float(x.get("collectAmount") or 0) for x in items if x.get("isSucceeded") is not True)
-    # VNGH (TikTok Shop) — track riêng để tính %GTC riêng
-    vngh_items = [x for x in items if (x.get("orderCode") or "").startswith("VNGH")]
-    vngh_total = len(vngh_items)
-    vngh_success = sum(1 for x in vngh_items if x.get("isSucceeded") is True)
-    return total, success, gtb_cod, vngh_total, vngh_success
+    recs = []
+    for x in (d.get("data") or []):
+        if x.get("type") != "DELIVER":
+            continue
+        recs.append({
+            "code": x.get("orderCode") or "",
+            "succ": x.get("isSucceeded") is True,
+            "att": x.get("isUpdated") is True,
+            "cod": float(x.get("collectAmount") or 0),  # COD (dùng cho đơn GTB)
+        })
+    return recs
 
 
 async def fetch_report(token, target_date):
@@ -104,9 +107,8 @@ async def fetch_report(token, target_date):
 
         async def per_trip(t):
             try:
-                total, success, gtb_cod, vngh_t, vngh_s = await _trip_success(session, token, t["hub_id"], t["tripCode"], sem)
-                return {**t, "deliver_total": total, "deliver_success": success, "gtb_cod": gtb_cod,
-                        "vngh_total": vngh_t, "vngh_success": vngh_s}
+                items = await _trip_items(session, token, t["hub_id"], t["tripCode"], sem)
+                return {**t, "items": items}
             except TokenExpiredError:
                 raise
             except Exception as e:
@@ -120,38 +122,71 @@ async def fetch_report(token, target_date):
 def aggregate(payload):
     ok = [t for t in payload["trips"] if "error" not in t]
     err_count = len(payload["trips"]) - len(ok)
-    provs, bcs, drivers = {}, {}, {}
+
+    def pcode_of(bc):
+        return bc[bc.find("(")+1:bc.find(")")] if "(" in bc else "?"
+
+    # 1) GỘP theo MÃ ĐƠN trong từng bưu cục: 1 đơn gán nhiều chuyến chỉ tính 1 lần.
+    #    Ưu tiên bản ghi: đã giao (4) > đã xử lý (2) > còn lại. GTC = giao xong ở
+    #    BẤT KỲ chuyến nào; đơn còn treo credit cho chuyến thắng (đã xử lý gần nhất).
+    best = {}
     for t in ok:
-        pcode = t["bc"][t["bc"].find("(")+1:t["bc"].find(")")] if "(" in t["bc"] else "?"
-        pr = provs.setdefault(pcode, {"prov": pcode, "trips": 0, "total": 0, "success": 0, "bcs": set()})
-        pr["trips"] += 1; pr["total"] += t["deliver_total"]; pr["success"] += t["deliver_success"]
-        pr["bcs"].add(t["bc"])
-        br = bcs.setdefault(t["bc"], {"bc": t["bc"], "trips": 0, "total": 0, "success": 0})
-        br["trips"] += 1; br["total"] += t["deliver_total"]; br["success"] += t["deliver_success"]
-        # Driver — key = driver_id + bc. LOẠI chuyến 0 đơn deliver (chuyến khống)
-        # để không nhiễu aggregate NV.
-        if t["deliver_total"] == 0:
-            continue
-        dkey = f"{t.get('driver_id','')}|{t['bc']}"
-        dr = drivers.setdefault(dkey, {"driver_id": t.get("driver_id",""), "driver_name": t.get("driver_name","—"),
-                                        "bc": t["bc"], "prov": pcode,
-                                        "trips": 0, "total": 0, "success": 0, "gtb_cod": 0.0})
-        dr["trips"] += 1; dr["total"] += t["deliver_total"]; dr["success"] += t["deliver_success"]
-        dr["gtb_cod"] += t.get("gtb_cod", 0)
+        pc = pcode_of(t["bc"])
+        for it in t.get("items", []):
+            code = it["code"]
+            if not code:
+                continue
+            score = (4 if it["succ"] else 0) + (2 if it["att"] else 0)
+            key = (t["bc"], code)
+            cur = best.get(key)
+            if cur is None or score > cur["score"]:
+                best[key] = {"score": score, "bc": t["bc"], "prov": pc,
+                             "driver_id": t.get("driver_id", ""), "driver_name": t.get("driver_name", "—"),
+                             "succ": it["succ"], "cod": it["cod"], "vngh": code.startswith("VNGH")}
+
+    # 2) Đếm số chuyến (bc/prov/driver) — chuyến có ≥1 đơn deliver
+    prov_trips, bc_trips, drv_trips = {}, {}, {}
+    for t in ok:
+        pc = pcode_of(t["bc"])
+        bc_trips[t["bc"]] = bc_trips.get(t["bc"], 0) + 1
+        prov_trips[pc] = prov_trips.get(pc, 0) + 1
+        if t.get("items"):
+            dkey = f"{t.get('driver_id','')}|{t['bc']}"
+            drv_trips[dkey] = drv_trips.get(dkey, 0) + 1
+
+    # 3) Tổng hợp từ đơn đã gộp (unique)
+    provs, bcs, drivers = {}, {}, {}
+    for rec in best.values():
+        pc, bc = rec["prov"], rec["bc"]
+        pr = provs.setdefault(pc, {"prov": pc, "total": 0, "success": 0, "bcs": set()})
+        pr["total"] += 1; pr["success"] += 1 if rec["succ"] else 0; pr["bcs"].add(bc)
+        br = bcs.setdefault(bc, {"bc": bc, "prov": pc, "total": 0, "success": 0})
+        br["total"] += 1; br["success"] += 1 if rec["succ"] else 0
+        dkey = f"{rec['driver_id']}|{bc}"
+        dr = drivers.setdefault(dkey, {"driver_id": rec["driver_id"], "driver_name": rec["driver_name"],
+                                       "bc": bc, "prov": pc, "total": 0, "success": 0, "gtb_cod": 0.0})
+        dr["total"] += 1
+        if rec["succ"]:
+            dr["success"] += 1
+        else:
+            dr["gtb_cod"] += rec["cod"]
+
     def gtc(v): return round(v["success"]/v["total"]*100, 1) if v["total"] else None
-    prov_list = sorted([{"prov": v["prov"], "bc_count": len(v["bcs"]), "trips": v["trips"],
+    prov_list = sorted([{"prov": v["prov"], "bc_count": len(v["bcs"]), "trips": prov_trips.get(v["prov"], 0),
                           "total": v["total"], "success": v["success"], "gtc": gtc(v)}
                          for v in provs.values()], key=lambda x: -x["total"])
-    bc_list = sorted([{**v, "gtc": gtc(v)} for v in bcs.values()], key=lambda x: -x["total"])
-    driver_list = sorted([{**v, "gtc": gtc(v)} for v in drivers.values() if v["total"] > 0],
+    bc_list = sorted([{**v, "trips": bc_trips.get(v["bc"], 0), "gtc": gtc(v)} for v in bcs.values()],
+                     key=lambda x: -x["total"])
+    driver_list = sorted([{**v, "trips": drv_trips.get(f"{v['driver_id']}|{v['bc']}", 0), "gtc": gtc(v)}
+                          for v in drivers.values() if v["total"] > 0],
                          key=lambda x: (x["gtc"] if x["gtc"] is not None else 999))
     grand_total = sum(p["total"] for p in prov_list)
     grand_success = sum(p["success"] for p in prov_list)
-    grand_trips = sum(p["trips"] for p in prov_list)
+    grand_trips = sum(prov_trips.values())
     grand_gtc = round(grand_success/grand_total*100, 1) if grand_total else None
-    # VNGH aggregate
-    vngh_total = sum(t.get("vngh_total", 0) for t in ok)
-    vngh_success = sum(t.get("vngh_success", 0) for t in ok)
+    # VNGH aggregate (đã gộp mã đơn)
+    vngh_total = sum(1 for rec in best.values() if rec["vngh"])
+    vngh_success = sum(1 for rec in best.values() if rec["vngh"] and rec["succ"])
     vngh_gtc = round(vngh_success/vngh_total*100, 1) if vngh_total else None
     return {"date": payload["date"], "hub_count": payload["hub_count"], "errors": err_count,
             "grand": {"trips": grand_trips, "total": grand_total, "success": grand_success, "gtc": grand_gtc,
