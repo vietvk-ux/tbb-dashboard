@@ -139,9 +139,9 @@ details[open] summary{border-bottom:1px solid #2a2f45}
         tot_gtb = sum(dr["total"] - dr["success"] for dr in danger)
         tot_cod = sum(dr.get("gtb_cod", 0) for dr in danger)
         top3 = " · ".join("%s (%s)" % (dr["driver_name"], dr["bc"]) for dr in danger[:3])
-        P.append("<div class='sub'><b>%d nhân viên</b> %%GTC &lt;%d%% (≥%d đơn) → <b style='color:var(--bad)'>%s đơn giao hỏng</b>, kẹt <b>%.0f triệu</b> COD.<br>🔥 Nguy hiểm nhất: <b>%s</b> — cần đốc thúc/kiểm tra ngay.</div>"
+        P.append("<div class='sub'><b>%d nhân viên</b> %%GTC &lt;%d%% (≥%d đơn) → <b style='color:var(--bad)'>%s đơn GTB</b>, COD GTB <b>%.0f triệu</b>.<br>🔥 Nguy hiểm nhất: <b>%s</b> — cần đốc thúc/kiểm tra ngay.</div>"
                  % (len(danger), int(NGUONG), MIN, _n(tot_gtb), tot_cod / 1e6, _esc(top3)))
-        P.append("<table><tr><th>#</th><th>Nhân viên</th><th>Bưu cục</th><th>Đơn</th><th>Hỏng</th><th>%GTC</th></tr>")
+        P.append("<table><tr><th>#</th><th>Nhân viên</th><th>Bưu cục</th><th>Đơn</th><th>GTB</th><th>%GTC</th></tr>")
         for i, dr in enumerate(danger[:15], 1):
             gtb = dr["total"] - dr["success"]
             P.append("<tr><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td style='color:var(--bad);font-weight:700'>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
@@ -266,9 +266,9 @@ def main():
             dng.sort(key=lambda x: -(x["total"] - x["success"]))
             if dng:
                 d_gtb = sum(x["total"] - x["success"] for x in dng)
-                L += ["", "⚠️ **NHÂN VIÊN NGUY HIỂM: %d người** (%%GTC<45%%, ≥20đ) · %s đơn hỏng:" % (len(dng), _n(d_gtb))]
+                L += ["", "⚠️ **NHÂN VIÊN NGUY HIỂM: %d người** (%%GTC<45%%, ≥20đ) · %s đơn GTB:" % (len(dng), _n(d_gtb))]
                 for i, x in enumerate(dng[:5], 1):
-                    L.append("%d. %s (%s) — hỏng %s/%s đơn · %s%%"
+                    L.append("%d. %s (%s) — GTB %s/%s đơn · %s%%"
                              % (i, x["driver_name"], x["bc"], _n(x["total"] - x["success"]),
                                 _n(x["total"]), x["gtc"]))
             top_bl = sorted(backlog.items(), key=lambda kv: -kv[1].get("deliver", 0))[:5]
