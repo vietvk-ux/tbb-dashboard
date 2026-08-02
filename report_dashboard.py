@@ -62,6 +62,114 @@ async def fetch_backlog(token):
     return dict(rows)
 
 
+def _bar(pct, cls):
+    w = pct if pct is not None else 0
+    return "<div class='bar'><i class='%s' style='width:%s%%'></i></div>" % (cls, w)
+
+
+_CSS = """<style>
+:root{
+ --bg:#0a0d18;--card:#161b2d;--card2:#1b2136;--line:#272d45;
+ --mut:#8b92ab;--txt:#eef0f7;--good:#2fd07a;--warn:#f7b955;--bad:#f2585f;--ink:#0a0d18
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+ background:linear-gradient(180deg,#0b0f1c 0%,#0a0d18 240px,#0a0d18 100%);color:var(--txt);
+ -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;font-size:15px;line-height:1.35}
+.wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+ padding:12px 2px 10px;background:linear-gradient(180deg,#0a0d18 70%,rgba(10,13,24,0));margin-bottom:4px}
+.brand{font-weight:800;letter-spacing:.04em;font-size:15px;display:flex;align-items:center;gap:8px}
+.ts{color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums;text-align:right}
+
+.hero{border-radius:20px;padding:20px 18px 18px;margin:4px 0 12px;position:relative;overflow:hidden;
+ background:radial-gradient(120% 90% at 100% 0,rgba(255,255,255,.05),transparent),var(--card);border:1px solid var(--line)}
+.hero.good{box-shadow:0 10px 30px -12px rgba(47,208,122,.35)}
+.hero.warn{box-shadow:0 10px 30px -12px rgba(247,185,85,.32)}
+.hero.bad{box-shadow:0 10px 30px -12px rgba(242,88,95,.32)}
+.hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.hpct{font-size:64px;font-weight:850;line-height:1;margin:8px 0 12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
+.hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
+.hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
+
+.bar{height:7px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px}
+.bar i.good{background:linear-gradient(90deg,#25b56b,#2fd07a)}
+.bar i.warn{background:linear-gradient(90deg,#e39a2e,#f7b955)}
+.bar i.bad{background:linear-gradient(90deg,#d8434b,#f2585f)}
+.bar i.na{background:#4b5168}
+
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 6px;text-align:center}
+.sv{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
+.sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
+
+.banner{display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:14px;padding:13px 15px;margin-bottom:8px;
+ background:linear-gradient(135deg,rgba(247,185,85,.12),rgba(247,185,85,.05));border:1px solid rgba(247,185,85,.3)}
+.banner .bl{color:#e7c894;font-size:12.5px;font-weight:600}
+.banner .bv{font-size:20px;font-weight:800;color:var(--warn);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.danger{border-radius:16px;padding:14px 15px;margin:14px 0;background:linear-gradient(135deg,rgba(242,88,95,.13),rgba(242,88,95,.04));
+ border:1px solid rgba(242,88,95,.32);border-left:3px solid var(--bad)}
+.dhead{color:#ff7b81;font-weight:800;font-size:13.5px;letter-spacing:.02em;margin-bottom:7px}
+.dsub{color:#d7b3b5;font-size:12.5px;line-height:1.5;margin-bottom:10px}
+.dsub b{color:#fff}.dsub .rd{color:var(--bad)}
+.ok{color:var(--good);font-size:13px;font-weight:600}
+
+.sec{font-size:12px;font-weight:700;letter-spacing:.05em;color:#b9c0da;text-transform:uppercase;margin:20px 4px 10px}
+
+.provs{display:flex;flex-direction:column;gap:8px}
+.prow{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:14px;padding:12px 14px;
+ display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center}
+.prow.good{border-left-color:var(--good)}.prow.warn{border-left-color:var(--warn)}.prow.bad{border-left-color:var(--bad)}
+.pl{display:flex;align-items:center;gap:9px;font-size:15px}
+.prow .bar{grid-column:1/-1}
+.pmeta{grid-column:1/-1;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:#4b5168}
+.dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+
+.pill{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:3px 9px;border-radius:99px;
+ font-weight:800;font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.3}
+.pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
+.pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}
+.pill.na{background:#3a4160;color:var(--mut)}
+
+.sbar{position:sticky;top:44px;z-index:10;padding:6px 0 10px;background:linear-gradient(180deg,#0a0d18 80%,rgba(10,13,24,0))}
+.search{width:100%;padding:12px 14px;border-radius:13px;border:1px solid var(--line);background:var(--card);color:var(--txt);font-size:15px;outline:none}
+.search:focus{border-color:#3a4470}
+.empty{color:var(--mut);text-align:center;padding:20px;font-size:13px}
+
+.bc{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:14px;margin:8px 0;overflow:hidden}
+.bc.good{border-left-color:var(--good)}.bc.warn{border-left-color:var(--warn)}.bc.bad{border-left-color:var(--bad)}
+.bc summary{padding:12px 14px;cursor:pointer;list-style:none;display:flex;flex-direction:column;gap:9px}
+.bc summary::-webkit-details-marker{display:none}
+.bc[open]{background:var(--card2)}
+.bch{display:flex;align-items:center;gap:9px}
+.bcn{font-weight:700;font-size:15px;flex:1;min-width:0}
+.bcm{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+.bcm .w{color:var(--warn)}.bcm .b{color:var(--bad)}
+.dtl{padding:2px 12px 12px}
+.note{color:var(--mut);font-size:12px;margin:2px 0 8px}
+
+table.drv{width:100%;border-collapse:collapse;font-size:13px}
+table.drv th,table.drv td{padding:8px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+table.drv th{color:var(--mut);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line)}
+table.drv th:first-child,table.drv td:first-child{text-align:left}
+table.drv tbody tr:last-child td{border-bottom:none}
+td.nv{font-weight:600;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+table.drv th.lft{text-align:left}
+td.nv .sc{color:var(--mut);font-size:11px;font-weight:500;margin-top:1px;overflow:hidden;text-overflow:ellipsis}
+td.rd{color:var(--bad);font-weight:700}
+.rank{color:var(--mut);font-weight:700;width:22px}
+
+.foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:24px 0 4px}
+</style></head><body>"""
+
+
 def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     backlog = backlog or {}
     g = agg["grand"]
@@ -75,122 +183,130 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     for dr in agg["drivers"]:
         by_bc.setdefault(dr["bc"], []).append(dr)
 
+    total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
-    P.append("<meta name='viewport' content='width=device-width,initial-scale=1'>")
+    P.append("<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>")
     P.append("<meta name='robots' content='noindex,nofollow'>")
+    P.append("<meta name='theme-color' content='#0a0d18'>")
     P.append("<title>Báo cáo giao hàng TBB · %s</title>" % d.strftime("%d/%m"))
-    P.append("""<style>
-:root{--bg:#0f1220;--card:#191d2e;--tx:#e8eaf0;--mut:#9aa0b4;--good:#22c55e;--warn:#f59e0b;--bad:#ef4444;--line:#2a2f45}
-*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1220;color:#e8eaf0;-webkit-text-size-adjust:100%}
-.wrap{max-width:760px;margin:0 auto;padding:14px}
-h1{font-size:18px;margin:2px 0}.sub{color:#9aa0b4;font-size:12px;margin-bottom:12px}
-.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
-.kpi{background:#191d2e;border:1px solid #2a2f45;border-radius:12px;padding:12px}
-.kpi .v{font-size:22px;font-weight:700}.kpi .l{color:#9aa0b4;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
-.big{grid-column:span 2;text-align:center}.big .v{font-size:34px}
-.danger{background:#241316;border:1px solid #7f1d1d;border-radius:12px;padding:12px 14px;margin-bottom:14px}
-.danger h2{margin:0 0 6px;color:#ef4444}
-h2{font-size:14px;margin:18px 0 8px;color:#c7cbe0}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:7px 6px;text-align:right;border-bottom:1px solid #2a2f45}
-th:first-child,td:first-child{text-align:left}
-th{color:#9aa0b4;font-weight:600;font-size:11px;position:sticky;top:0;background:#0f1220}
-.pill{display:inline-block;min-width:46px;padding:2px 7px;border-radius:20px;font-weight:700;font-size:12px;color:#0b0e17}
-.good{background:#22c55e}.warn{background:#f59e0b}.bad{background:#ef4444}.na{background:#4b5168;color:#e8eaf0}
-details{background:#191d2e;border:1px solid #2a2f45;border-radius:12px;margin:8px 0;overflow:hidden}
-summary{padding:11px 12px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
-summary::-webkit-details-marker{display:none}
-.bc-name{font-weight:600}.bc-meta{color:#9aa0b4;font-size:12px}
-details[open] summary{border-bottom:1px solid #2a2f45}
-.dtl{padding:2px 12px 10px}
-.foot{color:#9aa0b4;font-size:11px;text-align:center;margin:20px 0 8px}
-.search{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2a2f45;background:#191d2e;color:#e8eaf0;font-size:14px;margin-bottom:8px}
-</style></head><body><div class='wrap'>""")
+    P.append(_CSS)
+    P.append("<div class='wrap'>")
 
-    P.append("<h1>📦 Giao hàng Vùng Tây Bắc Bộ</h1>")
-    P.append("<div class='sub'>Ngày <b>%s</b> · %d bưu cục · %d chuyến · cập nhật %s</div>"
-             % (d.strftime("%d/%m/%Y"), agg["hub_count"], g["trips"], gen_at))
+    # ===== Header dính =====
+    P.append("<header class='top'><div class='brand'>📦 BÁO CÁO CUỐI NGÀY</div>"
+             "<div class='ts'>%s<br>%d BC · %d chuyến</div></header>"
+             % (d.strftime("%d/%m/%Y"), agg["hub_count"], g["trips"]))
 
+    # ===== Hero %GTC =====
     gtc = g["gtc"] if g["gtc"] is not None else 0
-    P.append("<div class='kpis'>")
-    P.append("<div class='kpi big'><div class='l'>%%GTC toàn vùng</div><div class='v' style='color:var(--%s)'>%s%%</div></div>"
-             % (_cls(g["gtc"]), gtc))
-    P.append("<div class='kpi'><div class='l'>Đơn giao</div><div class='v'>%s</div></div>" % _n(g["total"]))
-    P.append("<div class='kpi'><div class='l'>Giao thành công</div><div class='v' style='color:var(--good)'>%s</div></div>" % _n(g["success"]))
-    P.append("<div class='kpi'><div class='l'>Giao thất bại</div><div class='v' style='color:var(--bad)'>%s</div></div>" % _n(total_gtb))
-    P.append("<div class='kpi'><div class='l'>COD GTB</div><div class='v'>%.0f tr</div></div>" % (total_cod / 1e6))
-    total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
-    P.append("<div class='kpi big'><div class='l'>⏳ Chưa gán giao (chờ xếp chuyến · %s)</div><div class='v' style='color:var(--warn)'>%s đơn</div></div>"
-             % (_esc(backlog_time), _n(total_backlog)))
-    P.append("</div>")
+    P.append("<section class='hero %s'>" % _cls(g["gtc"]))
+    P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG TÂY BẮC BỘ</div>")
+    P.append("<div class='hpct'>%s<span>%%</span></div>" % gtc)
+    P.append(_bar(g["gtc"], _cls(g["gtc"])))
+    P.append("<div class='hsub'>%s / %s đơn giao thành công · GTB %s đơn</div>"
+             % (_n(g["success"]), _n(g["total"]), _n(total_gtb)))
+    P.append("</section>")
 
-    # ⚠️ Nhóm nhân viên nguy hiểm cần chú ý (GTC thấp + nhiều đơn hỏng, ≥20 đơn)
+    # ===== Dải chỉ số =====
+    P.append("<section class='strip'>")
+    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📦 Đơn giao</div></div>" % _n(g["total"]))
+    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ Giao TC</div></div>" % _n(g["success"]))
+    P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>❌ GTB</div></div>" % _n(total_gtb))
+    P.append("<div class='st'><div class='sv'>%.0f<span style=\"font-size:12px\">tr</span></div><div class='sl'>💰 COD GTB</div></div>" % (total_cod / 1e6))
+    P.append("</section>")
+
+    # ===== Banner chưa gán giao =====
+    P.append("<div class='banner'><div class='bl'>⏳ Chưa gán giao<br><span style='opacity:.75;font-weight:500'>chờ xếp chuyến · %s</span></div>"
+             "<div class='bv'>%s đơn</div></div>" % (_esc(backlog_time), _n(total_backlog)))
+
+    # ===== ⚠️ Nhóm nhân viên nguy hiểm (GTC thấp + nhiều đơn hỏng, ≥20 đơn) =====
     MIN, NGUONG = 20, 50.0
     danger = [dr for dr in agg["drivers"]
               if dr["total"] >= MIN and dr["gtc"] is not None and dr["gtc"] < NGUONG]
     danger.sort(key=lambda x: (-(x["total"] - x["success"]), x["gtc"]))  # nhiều đơn hỏng nhất trước
-    P.append("<div class='danger'>")
-    P.append("<h2>⚠️ NHÓM NHÂN VIÊN NGUY HIỂM CẦN CHÚ Ý</h2>")
+    P.append("<section class='danger'>")
+    P.append("<div class='dhead'>⚠️ NHÓM NHÂN VIÊN NGUY HIỂM CẦN CHÚ Ý</div>")
     if not danger:
-        P.append("<div class='sub'>✅ Không có nhân viên nào %%GTC dưới %d%% (≥%d đơn). Vùng ổn định.</div>"
+        P.append("<div class='ok'>✅ Không có nhân viên nào %%GTC dưới %d%% (≥%d đơn). Vùng ổn định.</div>"
                  % (int(NGUONG), MIN))
     else:
         tot_gtb = sum(dr["total"] - dr["success"] for dr in danger)
         tot_cod = sum(dr.get("gtb_cod", 0) for dr in danger)
         top3 = " · ".join("%s (%s)" % (dr["driver_name"], dr["bc"]) for dr in danger[:3])
-        P.append("<div class='sub'><b>%d nhân viên</b> %%GTC &lt;%d%% (≥%d đơn) → <b style='color:var(--bad)'>%s đơn GTB</b>, COD GTB <b>%.0f triệu</b>.<br>🔥 Nguy hiểm nhất: <b>%s</b> — cần đốc thúc/kiểm tra ngay.</div>"
+        P.append("<div class='dsub'><b>%d nhân viên</b> %%GTC &lt;%d%% (≥%d đơn) → <b class='rd'>%s đơn GTB</b>, COD GTB <b>%.0f triệu</b>.<br>🔥 Nguy hiểm nhất: <b>%s</b> — cần đốc thúc/kiểm tra ngay.</div>"
                  % (len(danger), int(NGUONG), MIN, _n(tot_gtb), tot_cod / 1e6, _esc(top3)))
-        P.append("<table><tr><th>#</th><th>Nhân viên</th><th>Bưu cục</th><th>Đơn</th><th>GTB</th><th>%GTC</th></tr>")
+        P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th><th>Đơn</th><th>GTB</th><th>%GTC</th></tr></thead><tbody>")
         for i, dr in enumerate(danger[:15], 1):
             gtb = dr["total"] - dr["success"]
-            P.append("<tr><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td style='color:var(--bad);font-weight:700'>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
+            P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td><td class='rd'>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                      % (i, _esc(dr["driver_name"]), _esc(dr["bc"]), _n(dr["total"]), _n(gtb),
                         _cls(dr["gtc"]), dr["gtc"]))
-        P.append("</table>")
-    P.append("</div>")
+        P.append("</tbody></table>")
+    P.append("</section>")
 
-    # Theo tỉnh
-    P.append("<h2>🗺 Theo tỉnh (GTC thấp → cao)</h2><table><tr><th>Tỉnh</th><th>BC</th><th>Chuyến</th><th>Đơn</th><th>%GTC</th></tr>")
+    # ===== Theo tỉnh =====
+    P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")
+    P.append("<section class='provs'>")
     for p in sorted(agg["provinces"], key=lambda x: (x["gtc"] if x["gtc"] is not None else 999)):
-        P.append("<tr><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
-                 % (_esc(PROV_NAME.get(p["prov"], p["prov"])), p["bc_count"], p["trips"], _n(p["total"]),
-                    _cls(p["gtc"]), p["gtc"] if p["gtc"] is not None else "—"))
-    P.append("</table>")
+        pc = p["gtc"]
+        cls = _cls(pc)
+        P.append("<div class='prow %s'>" % cls)
+        P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(p["prov"], p["prov"]))))
+        P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
+        P.append(_bar(pc, cls))
+        P.append("<div class='pmeta'>🏤 %d BC · 🚚 %d chuyến · 📦 %s đơn · ✅ %s</div>"
+                 % (p["bc_count"], p["trips"], _n(p["total"]), _n(p["success"])))
+        P.append("</div>")
+    P.append("</section>")
 
-    # 61 bưu cục — bảng + drill nhân viên
-    P.append("<h2>🏤 Tất cả bưu cục (%d) — GTC thấp → cao</h2>" % len(agg["bcs"]))
-    P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput=\"filt()\">")
+    # ===== 61 bưu cục — card + drill nhân viên =====
+    P.append("<div class='sec'>🏤 Tất cả bưu cục (%d) · %%GTC thấp → cao</div>" % len(agg["bcs"]))
+    P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput=\"filt()\"></div>")
+    P.append("<div id='empty' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
     bcs = sorted(agg["bcs"], key=lambda x: (x["gtc"] if x["gtc"] is not None else 999, -x["total"]))
     for b in bcs:
         drivers = sorted(by_bc.get(b["bc"], []),
                          key=lambda x: (x["gtc"] if x["gtc"] is not None else 999))
-        P.append("<details class='bcrow' data-k=\"%s\">" % _esc((b["bc"] + " " + " ".join(dr["driver_name"] for dr in drivers)).lower()))
+        cls = _cls(b["gtc"])
+        keys = (b["bc"] + " " + " ".join(dr["driver_name"] for dr in drivers)).lower()
         bl = backlog.get(b["bc"], {})
         bl_d = bl.get("deliver", 0)
-        blstr = ("⏳<b style='color:var(--warn)'>%s</b> chờ gán · " % _n(bl_d)) if bl_d else ""
-        P.append("<summary><span class='bc-name'>%s</span><span class='bc-meta'>%s%s đơn · GTB %s · <span class='pill %s'>%s%%</span></span></summary>"
-                 % (_esc(b["bc"]), blstr, _n(b["total"]), _n(b["total"] - b["success"]), _cls(b["gtc"]),
-                    b["gtc"] if b["gtc"] is not None else "—"))
+        P.append("<details class='bc %s' data-k=\"%s\">" % (cls, _esc(keys)))
+        P.append("<summary>")
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+                 "<span class='pill %s'>%s%%</span></div>"
+                 % (cls, _esc(b["bc"]), cls, b["gtc"] if b["gtc"] is not None else "—"))
+        P.append(_bar(b["gtc"], cls))
+        blchip = ("<span class='w'>⏳ %s</span>" % _n(bl_d)) if bl_d else ""
+        P.append("<div class='bcm'><span>📦 %s</span><span>✅ %s</span><span class='b'>❌ %s</span>%s</div>"
+                 % (_n(b["total"]), _n(b["success"]), _n(b["total"] - b["success"]), blchip))
+        P.append("</summary>")
         P.append("<div class='dtl'>")
         if bl_d or bl.get("pick") or bl.get("return"):
-            P.append("<div class='sub' style='margin:2px 0 8px'>⏳ Chưa gán chuyến: <b>%s</b> giao · %s lấy · %s trả</div>"
+            P.append("<div class='note'>⏳ Chưa gán chuyến: <b>%s</b> giao · %s lấy · %s trả</div>"
                      % (_n(bl_d), _n(bl.get("pick", 0)), _n(bl.get("return", 0))))
-        P.append("<table><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>GTB</th><th>%GTC</th></tr>")
-        for dr in drivers:
-            P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
-                     % (_esc(dr["driver_name"]), _n(dr["total"]), _n(dr["success"]),
-                        _n(dr["total"] - dr["success"]), _cls(dr["gtc"]),
-                        dr["gtc"] if dr["gtc"] is not None else "—"))
-        P.append("</table></div></details>")
+        if drivers:
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>GTB</th><th>%GTC</th></tr></thead><tbody>")
+            for dr in drivers:
+                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                         % (_esc(dr["driver_name"]), _n(dr["total"]), _n(dr["success"]),
+                            _n(dr["total"] - dr["success"]), _cls(dr["gtc"]),
+                            dr["gtc"] if dr["gtc"] is not None else "—"))
+            P.append("</tbody></table>")
+        else:
+            P.append("<div class='note'>Không có nhân viên.</div>")
+        P.append("</div></details>")
 
     if agg["errors"]:
-        P.append("<div class='sub'>⚠️ %d chuyến không lấy được chi tiết (API lỗi tạm thời)</div>" % agg["errors"])
-    P.append("<div class='foot'>%%GTC = giao thành công / tổng đơn giao · Tổng hợp tự động từ nhanh.ghn.vn</div>")
-    P.append("""<script>
-function filt(){var q=document.getElementById('q').value.toLowerCase().trim();
-document.querySelectorAll('.bcrow').forEach(function(e){e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}
-</script></div></body></html>""")
+        P.append("<div class='note' style='text-align:center'>⚠️ %d chuyến không lấy được chi tiết (API lỗi tạm thời)</div>" % agg["errors"])
+    P.append("<div class='foot'>%GTC = giao thành công / tổng đơn giao · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
+             "GTB = giao thất bại · COD GTB = tiền thu hộ kẹt ở đơn GTB · nguồn nhanh.ghn.vn</div>")
+    P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
+             "document.querySelectorAll('.bc').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
+             "e.style.display=s?'':'none';if(s)n++;});"
+             "document.getElementById('empty').style.display=n?'none':'block';}</script>")
+    P.append("</div></body></html>")
     return "\n".join(P)
 
 
