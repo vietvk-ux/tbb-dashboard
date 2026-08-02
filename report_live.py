@@ -87,7 +87,8 @@ async def fetch_live(token):
                 drivers = {}
                 h_gtc = h_att = h_total = 0
                 for dn, gtc, att, tot in res:
-                    d = drivers.setdefault(dn, {"name": dn, "gtc": 0, "att": 0, "total": 0})
+                    d = drivers.setdefault(dn, {"name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0})
+                    d["chuyen"] += 1
                     d["gtc"] += gtc
                     d["att"] += att
                     d["total"] += tot
@@ -184,17 +185,17 @@ summary::-webkit-details-marker{display:none}
                  % (_esc(r["name"]), _n(r["ontrip"] + r["fin"]), _n(r["total"]), _n(r["backlog"]),
                     _n(r["gtc"]), _cls(pc), pc if pc is not None else "—"))
         P.append("<div class='dtl'>")
-        drv = [d for d in r["drivers"] if d["total"] > 0]
+        drv = r["drivers"]  # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao)
         if drv:
-            P.append("<table><tr><th>Nhân viên</th><th>Tổng gán</th><th>GTC</th><th>%GTC</th></tr>")
-            for d in sorted(drv, key=lambda x: -x["gtc"]):
+            P.append("<table><tr><th>Nhân viên</th><th>Chuyến</th><th>Tổng gán</th><th>GTC</th><th>%GTC</th></tr>")
+            for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
                 pc2 = _pct(d["gtc"], d["total"])
-                P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
-                         % (_esc(d["name"]), _n(d["total"]), _n(d["gtc"]), _cls(pc2),
-                            pc2 if pc2 is not None else "—"))
+                P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill %s'>%s%%</span></td></tr>"
+                         % (_esc(d["name"]), _n(d.get("chuyen", 0)), _n(d["total"]), _n(d["gtc"]),
+                            _cls(pc2), pc2 if pc2 is not None else "—"))
             P.append("</table>")
         else:
-            P.append("<div class='sub'>Chưa có đơn giao hôm nay.</div>")
+            P.append("<div class='sub'>Chưa có chuyến hôm nay.</div>")
         P.append("</div></details>")
     P.append("<div class='foot'>GTC = giao thành công · %GTC = GTC / tổng đơn gán giao · số LIVE tới thời điểm cập nhật · nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();document.querySelectorAll('.bcrow').forEach(function(e){e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
