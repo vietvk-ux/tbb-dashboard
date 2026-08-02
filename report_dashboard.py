@@ -260,6 +260,17 @@ def main():
                  "🔴 5 bưu cục %GTC thấp nhất:"]
             for i, b in enumerate(worst, 1):
                 L.append("%d. %s — %s%%" % (i, b["bc"], b["gtc"]))
+            # ⚠️ Nhóm nhân viên nguy hiểm
+            dng = [x for x in agg["drivers"]
+                   if x["total"] >= 20 and x["gtc"] is not None and x["gtc"] < 60]
+            dng.sort(key=lambda x: -(x["total"] - x["success"]))
+            if dng:
+                d_gtb = sum(x["total"] - x["success"] for x in dng)
+                L += ["", "⚠️ **NHÂN VIÊN NGUY HIỂM: %d người** (%%GTC<60%%, ≥20đ) · %s đơn hỏng:" % (len(dng), _n(d_gtb))]
+                for i, x in enumerate(dng[:5], 1):
+                    L.append("%d. %s (%s) — hỏng %s/%s đơn · %s%%"
+                             % (i, x["driver_name"], x["bc"], _n(x["total"] - x["success"]),
+                                _n(x["total"]), x["gtc"]))
             top_bl = sorted(backlog.items(), key=lambda kv: -kv[1].get("deliver", 0))[:5]
             if top_bl and top_bl[0][1].get("deliver", 0) > 0:
                 L += ["", "⏳ 5 bưu cục tồn chưa gán giao nhiều nhất:"]
