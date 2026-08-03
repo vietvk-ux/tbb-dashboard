@@ -184,7 +184,9 @@ padding:12px 4px;background:linear-gradient(180deg,var(--bg) 70%,transparent);ba
 .tabs{display:flex;gap:8px;margin:2px 0 10px}
 .tabs a{flex:1;text-align:center;padding:9px;border-radius:11px;background:var(--card);border:1px solid var(--line);
 color:var(--tx);text-decoration:none;font-weight:700;font-size:13px}
-.tabs a.on{border-color:var(--acc);color:var(--acc)}
+.tabs a{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tabs a.on{border-color:var(--acc);color:var(--acc);background:rgba(56,189,248,.1)}
+.panel{display:none}.panel.on{display:block}
 .hero{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center;margin:4px 0 12px}
 .hero.tr{border-color:rgba(56,189,248,.4)}
 .hlbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
@@ -222,8 +224,19 @@ summary::-webkit-details-marker{display:none}
 .bcr{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .tot{font-size:19px;font-weight:800}
 details[open] summary{border-bottom:1px solid var(--line)}
-.dtl{padding:4px 10px 10px}
-.dtl .cap{font-size:12px;font-weight:700;color:#cbd0ea;margin:10px 2px 2px}
+.dtl{padding:4px 10px 12px}
+.dtl .cap{font-size:12px;font-weight:700;color:#cbd0ea;margin:12px 2px 4px}
+.trow{padding:7px 0;border-bottom:1px solid var(--line)}
+.trow:last-child{border-bottom:none}
+.trh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.trh .nm{font-weight:700;font-size:14px}
+.trh .rt{display:flex;align-items:center;gap:8px}
+.trh .rt .t{color:var(--tx);font-weight:700;font-size:14px}
+.bar{display:flex;height:7px;border-radius:6px;overflow:hidden;margin:6px 0 5px;background:#0e1220}
+.bar i{display:block;min-width:2px}
+.bar i.good{background:var(--good)}.bar i.warn{background:var(--warn)}.bar i.orng{background:var(--orng)}.bar i.bad{background:var(--bad)}
+.bk{font-size:11.5px;color:var(--mut);display:flex;flex-wrap:wrap;gap:2px 12px}
+.bk i{font-style:normal;opacity:.8}.bk b{color:var(--tx);font-weight:700}
 .eod{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);
 border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:12px;color:var(--tx);text-decoration:none;font-weight:600}
 .eod .arw{color:var(--mut);font-size:12.5px;font-weight:500}
@@ -299,29 +312,30 @@ def render_summary(entries, key, types, hero_lbl, tr=False):
     return P
 
 
-def render_detail_table(parsed, types):
-    """Bảng chi tiết: loại × 4 nhóm khung giờ + cột 🔴 Đỏ (quá hạn, chính xác theo bucket) + Tổng."""
-    P = ["<div class='scroll'><table><tr><th>Loại</th>"]
-    for gl in GROUP_LABELS:
-        P.append("<th>%s</th>" % _esc(gl))
-    P.append("<th>🔴 Đỏ</th><th>Tổng</th></tr>")
+def render_detail_compact(parsed, types):
+    """Chi tiết gọn cho mobile: mỗi loại 1 dòng — tên · tổng · pill đỏ, thanh phân bố tuổi,
+    và các mốc khung giờ khác 0 (tự xuống dòng, KHÔNG cuộn ngang)."""
+    P = []
     for ot, _, short in types:
         tot = parsed.get(ot, {}).get("total", 0)
         if tot <= 0:
             continue
-        tg = type_group_counts(parsed, ot)
-        P.append("<tr><td>%s</td>" % _esc(short))
-        for val in tg:
-            P.append("<td>%s</td>" % (_n(val) if val else "<span class='muted'>–</span>"))
-        # cột đỏ: chính xác theo ngưỡng của từng loại
-        if ot in RED_BUCKETS:
-            red = _red_type(parsed, ot)
-            rc = ("<span class='pill bad'>%s</span>" % _n(red)) if red > 0 else "<span class='muted'>0</span>"
-        else:
-            rc = "<span class='muted'>·</span>"   # Lấy / Ưu tiên: không có ngưỡng đỏ
-        P.append("<td>%s</td>" % rc)
-        P.append("<td><b>%s</b></td></tr>" % _n(tot))
-    P.append("</table></div>")
+        tg = type_group_counts(parsed, ot)  # [<24h, 24–72h, 72–120h, >120h]
+        red = _red_type(parsed, ot) if ot in RED_BUCKETS else None
+        redpill = ("<span class='pill bad'>🔴 %s</span>" % _n(red)) if red else ""
+        P.append("<div class='trow'>")
+        P.append("<div class='trh'><span class='nm'>%s</span>"
+                 "<span class='rt'><span class='t'>%s</span>%s</span></div>"
+                 % (_esc(short), _n(tot), redpill))
+        # thanh phân bố tuổi (segment tỉ lệ, bỏ segment = 0)
+        segs = "".join("<i class='%s' style='flex:%d'></i>" % (cls, tg[i])
+                       for i, (_, _, cls) in enumerate(GROUPS) if tg[i] > 0)
+        P.append("<div class='bar'>%s</div>" % segs)
+        # các mốc khác 0
+        bk = "".join("<span><i>%s</i> <b>%s</b></span>" % (_esc(GROUPS[i][0]), _n(tg[i]))
+                     for i in range(4) if tg[i] > 0)
+        P.append("<div class='bk'>%s</div>" % bk)
+        P.append("</div>")
     return "".join(P)
 
 
@@ -376,25 +390,32 @@ def build_html(entries, hub_count):
              "<div class='ts'>%s<br>%d/%d bưu cục</div></header>"
              % (now.strftime("%H:%M · %d/%m/%Y"), len(active), hub_count))
 
-    # tab nhảy nhanh
-    P.append("<div class='tabs'><a class='on' href='#do'>🚨 Đơn đỏ</a>"
-             "<a href='#lgt'>📦 Lấy·Giao·Trả</a>"
-             "<a href='#luanchuyen'>🔁 Luân chuyển</a></div>")
+    # tab CHUYỂN MỤC (mặc định mở mục Đơn đỏ)
+    P.append("<div class='tabs'>"
+             "<a class='on' data-t='do' onclick=\"tab('do')\">🚨 Đơn đỏ</a>"
+             "<a data-t='lgt' onclick=\"tab('lgt')\">📦 Lấy·Giao·Trả</a>"
+             "<a data-t='luanchuyen' onclick=\"tab('luanchuyen')\">🔁 Luân chuyển</a></div>")
 
-    # ===== 🚨 ĐƠN ĐỎ QUÁ HẠN (ưu tiên) =====
-    P.append("<div class='sec first' id='do'>🚨 Đơn đỏ — quá hạn cần xử lý</div>")
+    # ===== 🚨 ĐƠN ĐỎ QUÁ HẠN (mặc định hiện) =====
+    P.append("<div class='panel on' id='panel-do'>")
+    P.append("<div class='sec first'>🚨 Đơn đỏ — quá hạn cần xử lý</div>")
     P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;36h · LC trả&gt;48h · danh sách BC dưới sắp theo tổng đỏ</div>")
     P += render_red_section(entries)
+    P.append("</div>")
 
     # ===== BÁO CÁO 1: LẤY-GIAO-TRẢ =====
-    P.append("<div class='sec' id='lgt'>📦 Tồn Lấy · Giao · Trả</div>")
+    P.append("<div class='panel' id='panel-lgt'>")
+    P.append("<div class='sec first'>📦 Tồn Lấy · Giao · Trả</div>")
     P.append("<div class='secsub'>Đơn còn tồn tại bưu cục, chưa xử lý (mọi trạng thái)</div>")
     P += render_summary(entries, "lgt", LGT_TYPES, "📦 Tổng tồn Lấy · Giao · Trả toàn vùng")
+    P.append("</div>")
 
     # ===== BÁO CÁO 2: LUÂN CHUYỂN =====
-    P.append("<div class='sec' id='luanchuyen'>🔁 Tồn đọng luân chuyển</div>")
+    P.append("<div class='panel' id='panel-luanchuyen'>")
+    P.append("<div class='sec first'>🔁 Tồn đọng luân chuyển</div>")
     P.append("<div class='secsub'>Đơn luân chuyển giao / trả tồn tại kho (mọi trạng thái đóng kiện)</div>")
     P += render_summary(entries, "tr", TR_TYPES, "🔁 Tổng tồn luân chuyển toàn vùng", tr=True)
+    P.append("</div>")
 
     # ===== DANH SÁCH BƯU CỤC (sắp theo TỔNG ĐƠN ĐỎ) =====
     P.append("<div class='sec' id='bc'>🏤 Tất cả bưu cục (%d)</div>" % len(active))
@@ -426,16 +447,21 @@ def build_html(entries, hub_count):
                  % (_n(lgt_tot), _n(tr_tot)))
         if lgt_tot > 0:
             P.append("<div class='cap'>📦 Lấy · Giao · Trả</div>")
-            P.append(render_detail_table(e["lgt"], LGT_TYPES))
+            P.append(render_detail_compact(e["lgt"], LGT_TYPES))
         if tr_tot > 0:
             P.append("<div class='cap'>🔁 Luân chuyển</div>")
-            P.append(render_detail_table(e["tr"], TR_TYPES))
+            P.append(render_detail_compact(e["tr"], TR_TYPES))
         P.append("</div></details>")
 
     P.append("<div class='foot'>Nguồn: nhanh.ghn.vn · (1) Đơn tồn tại bưu cục chưa xử lý (mọi trạng thái) · "
              "(2) Tồn đọng luân chuyển giao/trả<br>"
              "Số cập nhật lúc chạy · trang tự làm mới mỗi 5 phút · dữ liệu làm mới ~30 phút/lần</div>")
-    P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();"
+    P.append("<script>"
+             "function tab(t){"
+             "document.querySelectorAll('.panel').forEach(function(p){p.classList.toggle('on',p.id=='panel-'+t);});"
+             "document.querySelectorAll('.tabs a').forEach(function(a){a.classList.toggle('on',a.dataset.t==t);});"
+             "window.scrollTo(0,0);}"
+             "function filt(){var q=document.getElementById('q').value.toLowerCase().trim();"
              "document.querySelectorAll('details.bc').forEach(function(e){"
              "e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
     P.append("</div></body></html>")
