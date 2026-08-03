@@ -1,7 +1,7 @@
 """
 Trang TỒN ĐỌNG (mobile) toàn Vùng TBB — 61 bưu cục. Gồm 2 báo cáo:
-  1) Lấy · Giao · Trả  — POST /core/oss/v1/report/get-general-info · order_type=DAILY_TRIP_NONE
-     (trang nhanh.ghn.vn /lastmile/report/backlog-lgt, view "Chưa có chuyến đi trong ngày")
+  1) Lấy · Giao · Trả  — POST /core/oss/v1/report/get-general-info · order_type=ALL, view_mode=WARD
+     (trang /lastmile/report/backlog-lgt, view "Trạng thái đơn" = mọi đơn còn tồn chưa xử lý tại BC)
   2) Luân chuyển       — POST /core/oss/v1/report/get-backlog-transport-info · body {hub_ids}
      (trang /lastmile/report/backlog-rotation, tổng mọi trạng thái đóng kiện)
 Cả 2 endpoint trả cùng shape general_infos[]{order_type,total_order,order_inventories[]{duration}}.
@@ -100,7 +100,7 @@ async def _hub_fetch(session, token, hub, sem):
         lgt, tr = {}, {}
         try:
             d = await _post(session, EP_LGT,
-                            {"hub_ids": [code], "view_mode": "WARD", "order_type": "DAILY_TRIP_NONE"},
+                            {"hub_ids": [code], "view_mode": "WARD", "order_type": "ALL"},
                             code, token)
             data = d.get("data") or []
             if data:
@@ -302,7 +302,7 @@ def build_html(entries, hub_count):
 
     # ===== BÁO CÁO 1: LẤY-GIAO-TRẢ =====
     P.append("<div class='sec first' id='lgt'>📦 Tồn Lấy · Giao · Trả</div>")
-    P.append("<div class='secsub'>Đơn chưa có chuyến đi trong ngày</div>")
+    P.append("<div class='secsub'>Đơn còn tồn tại bưu cục, chưa xử lý (mọi trạng thái)</div>")
     P += render_summary(entries, "lgt", LGT_TYPES, "📦 Tổng tồn Lấy · Giao · Trả toàn vùng")
 
     # ===== BÁO CÁO 2: LUÂN CHUYỂN =====
@@ -342,7 +342,7 @@ def build_html(entries, hub_count):
             P.append(render_detail_table(e["tr"], TR_TYPES, None))
         P.append("</div></details>")
 
-    P.append("<div class='foot'>Nguồn: nhanh.ghn.vn · (1) Tồn \"chưa có chuyến đi trong ngày\" · "
+    P.append("<div class='foot'>Nguồn: nhanh.ghn.vn · (1) Đơn tồn tại bưu cục chưa xử lý (mọi trạng thái) · "
              "(2) Tồn đọng luân chuyển giao/trả<br>"
              "Số cập nhật lúc chạy · trang tự làm mới mỗi 5 phút · dữ liệu làm mới ~30 phút/lần</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();"
