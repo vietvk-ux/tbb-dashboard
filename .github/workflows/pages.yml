@@ -11,9 +11,9 @@ on:
         description: 'Gửi GTalk? 1=có, 0=không (test)'
         required: false
         default: '1'
-  schedule:
-    # 23:00 VN = 16:00 UTC — tự cập nhật cuối ngày (repo public nên dùng được schedule GitHub)
-    - cron: '0 16 * * *'
+  # ĐÃ BỎ schedule GitHub (cron '0 16 * * *') vì hay trễ 30-70' (tối 02/08 trễ tới 00:08).
+  # Chuyển sang cron-job.org kích workflow_dispatch lúc 23:00 VN — đúng giờ tuyệt đối.
+  # Job cron-job.org: POST .../actions/workflows/pages.yml/dispatches body {"ref":"main","inputs":{"send":"1"}}
 
 permissions:
   contents: read
