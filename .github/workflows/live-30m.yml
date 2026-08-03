@@ -36,6 +36,11 @@ jobs:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_live.py
+      - name: Tạo trang tồn đọng (backlog.html)
+        env:
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+          DASH_SLUG: 9c7e4b21a6f0
+        run: python report_backlog_web.py
       - name: Giữ lại báo cáo %GTC cuối ngày (eod.html)
         run: |
           curl -sf "https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html" \

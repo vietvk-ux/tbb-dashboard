@@ -54,6 +54,11 @@ jobs:
           GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
           GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
         run: python report_dashboard.py
+      - name: Trang tồn đọng (backlog.html)
+        env:
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+          DASH_SLUG: 9c7e4b21a6f0
+        run: python report_backlog_web.py
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs

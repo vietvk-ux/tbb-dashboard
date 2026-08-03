@@ -182,6 +182,8 @@ def gen_html(rows):
 
     P.append("<a class='eod' href='eod.html'><span>📊 Báo cáo %GTC cuối ngày</span>"
              "<span class='arw'>chi tiết nhân viên →</span></a>")
+    P.append("<a class='eod' href='backlog.html'><span>📦 Tồn đọng Lấy · Giao · Trả</span>"
+             "<span class='arw'>theo khung giờ →</span></a>")
 
     # ===== Theo tỉnh =====
     P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")
