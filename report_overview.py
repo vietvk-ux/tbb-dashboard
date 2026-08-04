@@ -62,14 +62,26 @@ def build_msg(rows):
             L.append("%d. %s — *%s* đơn (GTC %s%%)" % (i, r["name"], _n(r["backlog"]),
                                                        pc if pc is not None else "—"))
 
-    # Top 5 BC %GTC thấp (đủ sản lượng ≥ 30 đơn)
+    # Top 10 BC %GTC thấp (đủ sản lượng ≥ 30 đơn)
     elig = [r for r in rows if r["total"] >= 30]
-    worst = sorted(elig, key=lambda x: _pct(x["gtc"], x["total"]))[:5]
+    worst = sorted(elig, key=lambda x: _pct(x["gtc"], x["total"]))[:10]
     if worst:
-        L += ["", "━━━━━━━━━━━━━━━━━━", "🔴 *TOP 5 BC %GTC THẤP NHẤT*"]
+        L += ["", "━━━━━━━━━━━━━━━━━━", "🔴 *TOP 10 BC %GTC THẤP NHẤT*"]
         for i, r in enumerate(worst, 1):
             pc = _pct(r["gtc"], r["total"])
             L.append("%d. %s — *%s%%* (%s/%s)" % (i, r["name"], pc, _n(r["gtc"]), _n(r["total"])))
+
+    # Top 15 nhân viên %GTC thấp nhất vùng (đủ sản lượng ≥ 20 đơn)
+    drv = []
+    for r in rows:
+        for d in r.get("drivers", []):
+            if d.get("total", 0) >= 20:
+                drv.append((d["name"], r["name"], d["total"], d["gtc"]))
+    worst_d = sorted(drv, key=lambda x: _pct(x[3], x[2]))[:15]
+    if worst_d:
+        L += ["", "━━━━━━━━━━━━━━━━━━", "👤🔴 *TOP 15 NHÂN VIÊN %GTC THẤP NHẤT VÙNG* (≥20 đơn)"]
+        for i, (nm, bc, tot, g) in enumerate(worst_d, 1):
+            L.append("%d. %s · %s — *%s%%* (%s/%s)" % (i, nm, bc, _pct(g, tot), _n(g), _n(tot)))
 
     L += ["", "📱 Xem chi tiết realtime (cập nhật 15'):", DASH_URL,
           "", "_🤖 Báo cáo tự động · mỗi 2 tiếng 9h–21h_"]
