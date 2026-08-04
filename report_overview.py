@@ -71,17 +71,25 @@ def build_msg(rows):
             pc = _pct(r["gtc"], r["total"])
             L.append("%d. %s — *%s%%* (%s/%s)" % (i, r["name"], pc, _n(r["gtc"]), _n(r["total"])))
 
-    # Top 15 nhân viên %GTC thấp nhất vùng (đủ sản lượng ≥ 20 đơn)
-    drv = []
+    # Nhân viên toàn vùng
+    drv_all = []
     for r in rows:
         for d in r.get("drivers", []):
-            if d.get("total", 0) >= 20:
-                drv.append((d["name"], r["name"], d["total"], d["gtc"]))
-    worst_d = sorted(drv, key=lambda x: _pct(x[3], x[2]))[:15]
+            drv_all.append((d["name"], r["name"], d["total"], d["gtc"]))
+
+    # Top 15 nhân viên %GTC thấp nhất vùng (đủ sản lượng ≥ 20 đơn)
+    worst_d = sorted([x for x in drv_all if x[2] >= 20], key=lambda x: _pct(x[3], x[2]))[:15]
     if worst_d:
         L += ["", "━━━━━━━━━━━━━━━━━━", "👤🔴 *TOP 15 NHÂN VIÊN %GTC THẤP NHẤT VÙNG* (≥20 đơn)"]
         for i, (nm, bc, tot, g) in enumerate(worst_d, 1):
             L.append("%d. %s · %s — *%s%%* (%s/%s)" % (i, nm, bc, _pct(g, tot), _n(g), _n(tot)))
+
+    # Top 10 nhân viên GTB (giao thất bại = gán - GTC) cao nhất vùng
+    gtb_top = sorted(drv_all, key=lambda x: -(x[2] - x[3]))[:10]
+    if gtb_top and (gtb_top[0][2] - gtb_top[0][3]) > 0:
+        L += ["", "━━━━━━━━━━━━━━━━━━", "👤📛 *TOP 10 NHÂN VIÊN GTB CAO NHẤT VÙNG* (giao thất bại)"]
+        for i, (nm, bc, tot, g) in enumerate(gtb_top, 1):
+            L.append("%d. %s · %s — *%s* GTB (%s/%s · %s%%)" % (i, nm, bc, _n(tot - g), _n(g), _n(tot), _pct(g, tot)))
 
     L += ["", "📱 Xem chi tiết realtime (cập nhật 15'):", DASH_URL,
           "", "_🤖 Báo cáo tự động · mỗi 2 tiếng 9h–21h_"]
