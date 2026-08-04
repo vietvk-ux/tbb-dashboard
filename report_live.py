@@ -201,11 +201,11 @@ def gen_html(rows):
     P.append("</section>")
 
     # ===== Bưu cục =====
-    P.append("<div class='sec'>🏤 Bưu cục · %GTC thấp → cao</div>")
+    P.append("<div class='sec'>🏤 Bưu cục · Tồn chưa gán giao cao → thấp</div>")
     P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'></div>")
     P.append("<div id='empty' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
     bcs = [r for r in rows if r["backlog"] or r["ontrip"] or r["total"]]
-    for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999, -x["backlog"])):
+    for r in sorted(bcs, key=lambda x: (-x["backlog"], _pct(x["gtc"], x["total"]) if x["total"] else 999)):
         pc = _pct(r["gtc"], r["total"])
         cls = _cls(pc)
         keys = (r["name"] + " " + " ".join(d["name"] for d in r["drivers"])).lower()
