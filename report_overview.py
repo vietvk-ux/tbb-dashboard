@@ -22,6 +22,17 @@ def _ico(pct):
     return "🔴" if pct < 50 else ("🟡" if pct < 80 else "🟢")
 
 
+def _bar(pct, width=14):
+    """Thanh %GTC trực quan bằng ký tự."""
+    if pct is None:
+        return "▱" * width
+    f = max(0, min(width, round(pct / 100.0 * width)))
+    return "▰" * f + "▱" * (width - f)
+
+
+DIV = "━━━━━━━━━━━━━━━━"
+
+
 def build_msg(rows):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "gtc": 0, "total": 0}
@@ -34,42 +45,42 @@ def build_msg(rows):
     reg = _pct(R["gtc"], R["total"])
     can_giao = R["total"] + R["backlog"]
 
+    reg_txt = ("%s" % reg) if reg is not None else "—"
     L = [
-        "📊 *TỔNG QUAN VẬN HÀNH · VÙNG TÂY BẮC BỘ*",
-        "🕐 Cập nhật *%s*" % now.strftime("%H:%M · %d/%m/%Y"),
+        "📊 *BÁO CÁO TỔNG QUAN — VÙNG TÂY BẮC BỘ*",
+        "🕐 %s" % now.strftime("%H:%M · %d/%m/%Y"),
         "",
-        "━━━━━━━━━━━━━━━━━━",
-        "▶️ *TOÀN VÙNG*",
-        "🎯 %%GTC đến hiện tại: *%s%%* %s" % (reg if reg is not None else "—", _ico(reg)),
-        "   ✅ Giao thành công: *%s* / %s đơn" % (_n(R["gtc"]), _n(R["total"])),
-        "   ⏳ Chưa gán giao: *%s* — cần đẩy gán chuyến" % _n(R["backlog"]),
-        "   🏃 Đang chạy: %s chuyến · 📦 Cần giao: %s" % (_n(R["ontrip"] if "ontrip" in R else 0), _n(can_giao)),
+        "🎯 *%%GTC TOÀN VÙNG:  %s%%*  %s" % (reg_txt, _ico(reg)),
+        "%s" % _bar(reg),
+        "✅ Giao thành công:  *%s* / %s đơn" % (_n(R["gtc"]), _n(R["total"])),
+        "⏳ Chưa gán giao:  *%s* đơn   ·   🏃 Đang chạy:  %s chuyến" % (_n(R["backlog"]), _n(R["ontrip"])),
+        "📦 Tổng cần giao:  *%s* đơn" % _n(can_giao),
     ]
 
     # Theo tỉnh
-    L += ["", "━━━━━━━━━━━━━━━━━━", "🗺 *THEO TỈNH* (%GTC thấp → cao)"]
+    L += ["", DIV, "🗺 *%GTC THEO TỈNH*  (thấp → cao)", ""]
     for pv, v in sorted(prov.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
         pc = _pct(v["gtc"], v["total"])
-        L.append("%s *%s*: %s%% · chưa gán %s"
+        L.append("%s  *%s* — %s%%   ·   chưa gán %s"
                  % (_ico(pc), PROV_NAME.get(pv, pv), pc if pc is not None else "—", _n(v["backlog"])))
 
     # Top 5 BC chưa gán cao
     top_bl = sorted([r for r in rows if r["backlog"] > 0], key=lambda x: -x["backlog"])[:5]
     if top_bl:
-        L += ["", "━━━━━━━━━━━━━━━━━━", "⏳ *TOP 5 BC TỒN CHƯA GÁN CAO*"]
+        L += ["", DIV, "🔥 *ĐIỂM NÓNG — TỒN CHƯA GÁN GIAO*", ""]
         for i, r in enumerate(top_bl, 1):
             pc = _pct(r["gtc"], r["total"])
-            L.append("%d. %s — *%s* đơn (GTC %s%%)" % (i, r["name"], _n(r["backlog"]),
-                                                       pc if pc is not None else "—"))
+            L.append("%d.  *%s*  —  %s đơn  (GTC %s%%)" % (i, r["name"], _n(r["backlog"]),
+                                                          pc if pc is not None else "—"))
 
     # Top 10 BC %GTC thấp (đủ sản lượng ≥ 30 đơn)
     elig = [r for r in rows if r["total"] >= 30]
     worst = sorted(elig, key=lambda x: _pct(x["gtc"], x["total"]))[:10]
     if worst:
-        L += ["", "━━━━━━━━━━━━━━━━━━", "🔴 *TOP 10 BC %GTC THẤP NHẤT*"]
+        L += ["", DIV, "🔴 *10 BƯU CỤC %GTC THẤP NHẤT*", ""]
         for i, r in enumerate(worst, 1):
             pc = _pct(r["gtc"], r["total"])
-            L.append("%d. %s — *%s%%* (%s/%s)" % (i, r["name"], pc, _n(r["gtc"]), _n(r["total"])))
+            L.append("%d.  %s  —  *%s%%*  (%s/%s)" % (i, r["name"], pc, _n(r["gtc"]), _n(r["total"])))
 
     # Nhân viên toàn vùng
     drv_all = []
@@ -80,19 +91,19 @@ def build_msg(rows):
     # Top 15 nhân viên %GTC thấp nhất vùng (đủ sản lượng ≥ 20 đơn)
     worst_d = sorted([x for x in drv_all if x[2] >= 20], key=lambda x: _pct(x[3], x[2]))[:15]
     if worst_d:
-        L += ["", "━━━━━━━━━━━━━━━━━━", "👤🔴 *TOP 15 NHÂN VIÊN %GTC THẤP NHẤT VÙNG* (≥20 đơn)"]
+        L += ["", DIV, "👤🔴 *15 NHÂN VIÊN %GTC THẤP NHẤT*  (≥20 đơn)", ""]
         for i, (nm, bc, tot, g) in enumerate(worst_d, 1):
-            L.append("%d. %s · %s — *%s%%* (%s/%s)" % (i, nm, bc, _pct(g, tot), _n(g), _n(tot)))
+            L.append("%d.  %s  —  *%s%%*  (%s/%s · %s)" % (i, nm, _pct(g, tot), _n(g), _n(tot), bc))
 
     # Top 10 nhân viên GTB (giao thất bại = gán - GTC) cao nhất vùng
     gtb_top = sorted(drv_all, key=lambda x: -(x[2] - x[3]))[:10]
     if gtb_top and (gtb_top[0][2] - gtb_top[0][3]) > 0:
-        L += ["", "━━━━━━━━━━━━━━━━━━", "👤📛 *TOP 10 NHÂN VIÊN GTB CAO NHẤT VÙNG* (giao thất bại)"]
+        L += ["", DIV, "📛 *10 NHÂN VIÊN GIAO THẤT BẠI NHIỀU NHẤT*", ""]
         for i, (nm, bc, tot, g) in enumerate(gtb_top, 1):
-            L.append("%d. %s · %s — *%s* GTB (%s/%s · %s%%)" % (i, nm, bc, _n(tot - g), _n(g), _n(tot), _pct(g, tot)))
+            L.append("%d.  %s  —  *%s GTB*  (%s/%s · %s)" % (i, nm, _n(tot - g), _n(g), _n(tot), bc))
 
-    L += ["", "📱 Xem chi tiết realtime (cập nhật 15'):", DASH_URL,
-          "", "_🤖 Báo cáo tự động · mỗi 2 tiếng 9h–21h_"]
+    L += ["", DIV, "📱 Chi tiết realtime (cập nhật mỗi 15'):", DASH_URL,
+          "", "🤖 _Báo cáo tự động · 2 tiếng/lần · 9h–21h · Vùng TBB_"]
     return "\n".join(L)
 
 
