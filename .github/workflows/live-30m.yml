@@ -1,11 +1,11 @@
-name: Trang trực tiếp TBB (mỗi 30 phút)
+name: Trang trực tiếp TBB (mỗi 15 phút)
 
 on:
   workflow_dispatch:
   schedule:
-    # Mỗi 30' (:15, :45) trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h).
-    # Tránh trùng job 23h (:00). Lịch GitHub best-effort — có thể trễ/bỏ lượt.
-    - cron: '15,45 23,0-16 * * *'
+    # Mỗi 15' trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h).
+    # Đây chỉ là BACKUP — lịch chính do cron-job.org kích (GitHub schedule hay bỏ lượt).
+    - cron: '*/15 23,0-16 * * *'
 
 permissions:
   contents: read
