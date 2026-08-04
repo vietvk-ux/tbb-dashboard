@@ -1,0 +1,35 @@
+name: Tổng quan TBB (2 tiếng/lần 9h-21h)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Chạy thử (không gửi)? 1=thử, để trống=gửi thật'
+        required: false
+        default: ''
+  schedule:
+    # 9,11,13,15,17,19,21h VN = UTC 2,4,6,8,10,12,14. Lịch GitHub best-effort (có thể trễ).
+    - cron: '0 2,4,6,8,10,12,14 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  overview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Gửi báo cáo tổng quan
+        env:
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+          GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
+          GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
+          OVERVIEW_DRY: ${{ github.event.inputs.dry }}
+        run: python report_overview.py
