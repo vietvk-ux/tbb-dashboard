@@ -22,7 +22,8 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false   # pages.yml chậm (~15') — KHÔNG để bị live-30m cancel giữa chừng;
+                              # job khác chỉ xếp hàng chờ. (Fix eod.html kẹt 03/08 do bị cancel 23h.)
 
 jobs:
   build-deploy:
