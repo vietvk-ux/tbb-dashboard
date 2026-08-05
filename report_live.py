@@ -8,6 +8,7 @@ Env: NHANH_TOKEN. Xuất: docs/<slug>/index.html (+ live.html).
 from __future__ import annotations
 import asyncio
 import html
+import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -358,6 +359,22 @@ def main():
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
+
+    # JSON dữ liệu cho BOT đọc trực tiếp (khớp 100% trang) — cạnh dashboard
+    payload = {
+        "generated": datetime.now(VN).strftime("%H:%M · %d/%m/%Y"),
+        "region": {"backlog": sum(r["backlog"] for r in rows),
+                   "ontrip": sum(r["ontrip"] for r in rows),
+                   "gtc": sum(r["gtc"] for r in rows),
+                   "total": sum(r["total"] for r in rows)},
+        "bcs": [{"name": r["name"], "prov": r["prov"], "backlog": r["backlog"],
+                 "ontrip": r["ontrip"], "fin": r["fin"], "gtc": r["gtc"], "total": r["total"],
+                 "drivers": [{"name": d["name"], "chuyen": d["chuyen"],
+                              "gtc": d["gtc"], "total": d["total"]} for d in r["drivers"]]}
+                for r in rows],
+    }
+    with open(os.path.join(outdir, "live.json"), "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False)
     tg = sum(r["gtc"] for r in rows)
     ta = sum(r["att"] for r in rows)
     logger.info("Live: %d bưu cục · chưa gán %d · đang chạy %d · GTC %d · %%GTC %s",
