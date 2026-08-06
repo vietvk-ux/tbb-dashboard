@@ -21,9 +21,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false   # pages.yml chậm (~15') — KHÔNG để bị live-30m cancel giữa chừng;
-                              # job khác chỉ xếp hàng chờ. (Fix eod.html kẹt 03/08 do bị cancel 23h.)
+  group: pages-eod            # GROUP RIÊNG (không dùng chung "pages" với live-30m) → live-30m
+  cancel-in-progress: true    # KHÔNG cancel/chen được pages.yml nữa. (Fix eod.html kẹt do bị hủy 23h.)
+                              # 2 workflow vẫn deploy chung env github-pages — GitHub tự xếp hàng deploy.
 
 jobs:
   build-deploy:
