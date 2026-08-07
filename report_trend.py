@@ -50,6 +50,18 @@ def _get_safe(url, key, path):
         return []
 
 
+def _get_all(url, key, path, page=1000):
+    """Lấy HẾT dòng qua phân trang (Supabase chặn 1000 dòng/request)."""
+    out, offset = [], 0
+    sep = "&" if "?" in path else "?"
+    while True:
+        chunk = _get(url, key, "%s%slimit=%d&offset=%d" % (path, sep, page, offset))
+        out.extend(chunk)
+        if len(chunk) < page:
+            return out
+        offset += page
+
+
 def fetch_trend(days=90):
     url = os.environ.get("SUPABASE_URL", "").strip()
     key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
@@ -60,7 +72,7 @@ def fetch_trend(days=90):
     vung = _get(url, key, "bao_cao_vung?ngay=gte.%s&order=ngay.asc&select=*" % since)
     # %GTC 30 ngày theo bưu cục (tốt/kém) — dùng cho bảng. limit cao tránh cắt dòng.
     since30 = (datetime.now(VN).date() - timedelta(days=30)).isoformat()
-    bc = _get(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,gtc,gtb,don_giao&limit=5000" % since30)
+    bc = _get_all(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,gtc,gtb,don_giao" % since30)
     # Xếp hạng %GTC nhân viên tuần/tháng (view v_nv_tuan, v_nv_thang; chưa tạo → [])
     return {
         "vung": vung, "bc30": bc,
