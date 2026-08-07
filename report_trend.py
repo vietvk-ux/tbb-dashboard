@@ -68,6 +68,7 @@ def fetch_trend(days=90):
         "tuan_bot": _get_safe(url, key, "v_nv_tuan?order=pct_cur.asc,dg_cur.desc&limit=8"),
         "thang_top": _get_safe(url, key, "v_nv_thang?order=pct_cur.desc,dg_cur.desc&limit=8"),
         "thang_bot": _get_safe(url, key, "v_nv_thang?order=pct_cur.asc,dg_cur.desc&limit=8"),
+        "nangsuat": _get_safe(url, key, "v_nv_nangsuat?order=nang_suat.desc&limit=15"),
     }
 
 
@@ -184,6 +185,22 @@ def _rank_card(label, note, top_rows, bot_rows):
     return "<div class='sec'>%s</div><section class='card'>%s</section>" % (label, inner)
 
 
+def _ns_card(rows):
+    if not rows:
+        inner = "<div class='none'>Chưa đủ dữ liệu — chạy view v_nv_nangsuat rồi đợi có dữ liệu.</div>"
+    else:
+        trs = []
+        for r in rows:
+            trs.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td>"
+                       "<td>%s</td><td>%s</td><td class='ns'>%s</td></tr>"
+                       % (_esc(r.get("ten_nv")), _esc(r.get("buu_cuc")),
+                          _n(r.get("so_don_gtc")), _n(r.get("so_ngay_lam")), r.get("nang_suat")))
+        inner = ("<table class='t'><thead><tr><th>Nhân viên</th><th>GTC</th><th>Ngày</th>"
+                 "<th>NS/ngày</th></tr></thead><tbody>" + "".join(trs) + "</tbody></table>")
+    return ("<div class='sec' style='color:var(--good)'>⚡ Năng suất GTC nhân viên · GTC/ngày làm (30 ngày)</div>"
+            "<section class='card'>%s</section>" % inner)
+
+
 # ---------- Trang ----------
 
 def gen_html(data):
@@ -285,6 +302,9 @@ def gen_html(data):
     P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · THÁNG (30 ngày gần nhất)", "≥ 1 tháng dữ liệu",
                         data.get("thang_top") or [], data.get("thang_bot") or []))
 
+    # Năng suất GTC = đơn GTC / số ngày làm việc
+    P.append(_ns_card(data.get("nangsuat") or []))
+
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Số liệu lịch sử lưu tại Supabase · cập nhật mỗi tối 23h · Vùng Tây Bắc Bộ</div>")
@@ -357,6 +377,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .mh.up{color:var(--good)}.mh.down{color:var(--bad)}
 td.up{color:var(--good);font-weight:800}td.down{color:var(--bad);font-weight:800}
 td.dmut{color:var(--mut)}
+td.ns{font-weight:800;color:var(--good)}
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:3px 8px;border-radius:99px;font-weight:800;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
 .pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
 .pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}.pill.na{background:#3a4160;color:var(--mut)}

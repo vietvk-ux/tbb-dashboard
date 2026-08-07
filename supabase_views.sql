@@ -91,3 +91,20 @@ from cur c
 join base b on c.driver_id = b.driver_id and c.buu_cuc = b.buu_cuc
 where c.dg >= 20 and b.dg >= 20
   and (c.gtc*100.0/nullif(c.dg,0)) <= (b.gtc*100.0/nullif(b.dg,0)) - 20;
+
+-- =====================================================================
+-- NĂNG SUẤT GTC nhân viên (30 ngày): năng_suất = tổng đơn GTC / số NGÀY LÀM VIỆC
+-- (số ngày có đơn giao). Xếp hạng ai giao được nhiều đơn thành công/ngày nhất.
+-- =====================================================================
+drop view if exists v_nv_nangsuat;
+create view v_nv_nangsuat as
+select driver_id, buu_cuc, max(ten_nv) as ten_nv, max(tinh) as tinh,
+       sum(gtc) as so_don_gtc,
+       sum(don_giao) as tong_don,
+       count(distinct ngay) filter (where don_giao > 0) as so_ngay_lam,
+       round(sum(gtc)::numeric
+             / nullif(count(distinct ngay) filter (where don_giao > 0), 0), 1) as nang_suat
+from bao_cao_nhan_vien
+where ngay >= current_date - 30
+group by driver_id, buu_cuc
+having count(distinct ngay) filter (where don_giao > 0) >= 1;
