@@ -139,8 +139,8 @@ def gen_html(rows):
     for r in rows:
         for k in R:
             R[k] += r[k]
-        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "total": 0})
-        for k in ("backlog", "ontrip", "fin", "gtc", "total"):
+        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0})
+        for k in ("backlog", "ontrip", "fin", "gtc", "att", "total"):
             p[k] += r[k]
     reg_pct = _pct(R["gtc"], R["total"])
 
@@ -177,6 +177,7 @@ def gen_html(rows):
     P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>⏳ Chưa gán</div></div>" % _n(R["backlog"]))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🏃 Đang chạy</div></div>" % _n(R["ontrip"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ GTC nay</div></div>" % _n(R["gtc"]))
+    P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>❌ GTB thao tác</div></div>" % _n(R["att"] - R["gtc"]))
     P.append("</section>")
 
     P.append("<a class='eod' href='eod.html'><span>📊 Báo cáo %GTC cuối ngày</span>"
@@ -194,8 +195,9 @@ def gen_html(rows):
         P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(pv, pv))))
         P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏃 %s · 📥 %s · ⏳ %s · ✅ %s</div>"
-                 % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"])))
+        P.append("<div class='pmeta'>🏃 %s · 📥 %s · ⏳ %s · ✅ %s · <span class='gtb'>❌ %s</span></div>"
+                 % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
+                    _n(v["att"] - v["gtc"])))
         P.append("</div>")
     P.append("</section>")
 
@@ -283,10 +285,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bar i.bad{background:linear-gradient(90deg,#d8434b,#f2585f)}
 .bar i.na{background:#4b5168}
 
-.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px}
 .st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 6px;text-align:center}
 .sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
-.sv.good{color:var(--good)}.sv.warn{color:var(--warn)}
+.sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
 .sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
 
 .eod{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--txt);
@@ -329,7 +331,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bcn{font-weight:700;font-size:15px;flex:1;min-width:0}
 .bcm{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 .bcm .w{color:var(--warn)}
-.bcm .gtb,b.gtb{color:var(--bad);font-weight:700}
+.gtb{color:var(--bad);font-weight:700}
 .dtl{padding:2px 12px 12px}
 .none{color:var(--mut);font-size:12.5px;padding:6px 2px 10px}
 
