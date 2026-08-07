@@ -14,7 +14,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
-from report import _get_hubs, _post, CONCURRENCY, TokenExpiredError
+from report import _get_hubs, _post, _fetch_all_items, CONCURRENCY, TokenExpiredError
 
 logger = logging.getLogger("live")
 VN = timezone(timedelta(hours=7))
@@ -81,13 +81,11 @@ async def fetch_live(token):
                     dn = t.get("driverName") or "—"
                     try:
                         async with sem:
-                            d = await _post(session, "/lastmile/trip/get-trip-items",
-                                            {"tripCode": t["tripCode"], "offset": 0,
-                                             "limit": 1000, "page": 1, "size": 1000}, hid, token)
+                            items = await _fetch_all_items(session, token, hid, t["tripCode"])
                         # (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?)
                         recs = [(x.get("orderCode"), dn, x.get("isSucceeded") is True,
                                  x.get("isUpdated") is True, is_ontrip)
-                                for x in (d.get("data") or []) if x.get("type") == "DELIVER"]
+                                for x in items if x.get("type") == "DELIVER"]
                         return (dn, recs)
                     except Exception:
                         return (dn, [])

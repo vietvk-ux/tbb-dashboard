@@ -71,15 +71,28 @@ async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem):
             for t in (d.get("data") or []) if t.get("endDateIndex") == yyyymmdd]
 
 
+async def _fetch_all_items(session, token, hub_id, trip_code):
+    """Lấy TẤT CẢ item của 1 chuyến — PHÂN TRANG vì API get-trip-items cap 1000 item/lần.
+    Chuyến >1000 item (auto lấy nhiều, vd 1247 lấy + 141 giao) sẽ MẤT đơn DELIVER nếu chỉ lấy 1 trang."""
+    out = []
+    for page in range(1, 11):  # tối đa 10 trang (10k item) — đủ an toàn
+        d = await _post(session, "/lastmile/trip/get-trip-items",
+                        {"tripCode": trip_code, "offset": (page - 1) * 1000,
+                         "limit": 1000, "page": page, "size": 1000}, hub_id, token)
+        items = d.get("data") or []
+        out.extend(items)
+        if len(items) < 1000:
+            break
+    return out
+
+
 async def _trip_items(session, token, hub_id, trip_code, sem):
     """Trả về danh sách item DELIVER (mức đơn) để aggregate GỘP theo mã đơn.
     1 đơn gán nhiều chuyến (giao hỏng → gán lại) chỉ tính 1 lần ở bước aggregate."""
     async with sem:
-        d = await _post(session, "/lastmile/trip/get-trip-items",
-                        {"tripCode": trip_code, "offset": 0, "limit": 1000, "page": 1, "size": 1000},
-                        hub_id, token)
+        items = await _fetch_all_items(session, token, hub_id, trip_code)
     recs = []
-    for x in (d.get("data") or []):
+    for x in items:
         if x.get("type") != "DELIVER":
             continue
         recs.append({
