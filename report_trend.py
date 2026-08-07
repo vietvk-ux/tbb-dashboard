@@ -296,18 +296,38 @@ def gen_html(data):
                      % (_esc(r["bc"]), _n(r["gtb"]), _cls(r["gtc"]), r["gtc"]))
         P.append("</tbody></table></section>")
 
-    # Xếp hạng %GTC nhân viên theo tuần & tháng (Δ so kỳ trước khi có)
+    # (Bảng nhân viên chuyển sang trang riêng "Năng suất nhân viên")
+    P.append("<a class='eod' href='nhanvien.html'><span>⚡ Năng suất &amp; xếp hạng nhân viên</span>"
+             "<span class='arw'>chi tiết →</span></a>")
+    P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
+             "<span class='arw'>%GTC hôm nay →</span></a>")
+    P.append("<div class='foot'>Số liệu lịch sử lưu tại Supabase · cập nhật mỗi tối 23h · Vùng Tây Bắc Bộ</div>")
+    P.append("</div></body></html>")
+    return "\n".join(P)
+
+
+def gen_nhanvien_html(data):
+    now = datetime.now(VN)
+    P = [_HEAD, "<div class='wrap'>",
+         "<header class='top'><div class='brand'>⚡ NĂNG SUẤT NHÂN VIÊN</div>"
+         "<div class='ts' style='white-space:nowrap'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m")]
+    if not data:
+        P.append("<div class='empty'>⚙️ Chưa cấu hình database (Supabase).<br>"
+                 "Thêm secret rồi đợi có dữ liệu.</div>")
+        P.append("</div></body></html>")
+        return "\n".join(P)
+    # Năng suất GTC = đơn GTC / số ngày làm việc (mục chính)
+    P.append(_ns_card(data.get("nangsuat") or []))
+    # Xếp hạng %GTC nhân viên tuần / tháng
     P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · TUẦN (7 ngày gần nhất)", "≥ 1 tuần dữ liệu",
                         data.get("tuan_top") or [], data.get("tuan_bot") or []))
     P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · THÁNG (30 ngày gần nhất)", "≥ 1 tháng dữ liệu",
                         data.get("thang_top") or [], data.get("thang_bot") or []))
-
-    # Năng suất GTC = đơn GTC / số ngày làm việc
-    P.append(_ns_card(data.get("nangsuat") or []))
-
+    P.append("<a class='eod' href='trend.html'><span>📈 Xu hướng theo ngày</span>"
+             "<span class='arw'>biểu đồ %GTC →</span></a>")
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
-    P.append("<div class='foot'>Số liệu lịch sử lưu tại Supabase · cập nhật mỗi tối 23h · Vùng Tây Bắc Bộ</div>")
+    P.append("<div class='foot'>NS = đơn GTC / số ngày làm việc · số liệu lưu tại Supabase · cập nhật mỗi tối 23h</div>")
     P.append("</div></body></html>")
     return "\n".join(P)
 
@@ -325,7 +345,10 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "trend.html"), "w", encoding="utf-8") as f:
         f.write(gen_html(data))
-    logger.info("Đã tạo trend.html (%d ngày dữ liệu).", len(data["vung"]) if data and data.get("vung") else 0)
+    with open(os.path.join(outdir, "nhanvien.html"), "w", encoding="utf-8") as f:
+        f.write(gen_nhanvien_html(data))
+    logger.info("Đã tạo trend.html + nhanvien.html (%d ngày dữ liệu).",
+                len(data["vung"]) if data and data.get("vung") else 0)
 
 
 _HEAD = """<!doctype html><html lang='vi'><head><meta charset='utf-8'>
