@@ -14,7 +14,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
-from report import (fetch_report, aggregate, send_gtalk, TokenExpiredError,
+from report import (fetch_report, aggregate, dedup_orders, send_gtalk, TokenExpiredError,
                     _get_hubs, _post, CONCURRENCY)
 
 logger = logging.getLogger("dash")
@@ -353,6 +353,14 @@ def main():
                   f, ensure_ascii=False)
     logger.info("Xong · %d bưu cục · %d nhân viên · GTC %s%%",
                 len(agg["bcs"]), len(agg["drivers"]), agg["grand"]["gtc"])
+
+    # Đồng bộ vào database Supabase (chỉ chạy nếu đã cấu hình secret; lỗi DB KHÔNG
+    # làm hỏng báo cáo/trang web).
+    try:
+        import db_sync
+        db_sync.sync(d.isoformat(), agg, dedup_orders(payload), backlog, backlog_time)
+    except Exception as e:
+        logger.warning("Đồng bộ Supabase lỗi (bỏ qua): %s", str(e)[:200])
 
     # Gửi tóm tắt + link dashboard vào GTalk
     if os.environ.get("DASH_SEND", "").lower() in ("1", "true", "yes"):

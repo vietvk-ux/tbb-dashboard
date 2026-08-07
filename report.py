@@ -207,6 +207,34 @@ def aggregate(payload):
             "provinces": prov_list, "bcs": bc_list, "drivers": driver_list}
 
 
+def dedup_orders(payload):
+    """Trả về danh sách ĐƠN đã GỘP MÃ (unique theo (bưu cục, mã đơn)) để lưu chi
+    tiết vào database. Cùng logic ưu tiên như aggregate(): đã giao(4) > đã xử lý(2)
+    > còn lại; đơn gán nhiều chuyến chỉ giữ 1 bản (chuyến thắng)."""
+    ok = [t for t in payload["trips"] if "error" not in t]
+
+    def pcode_of(bc):
+        return bc[bc.find("(")+1:bc.find(")")] if "(" in bc else "?"
+
+    best = {}
+    for t in ok:
+        pc = pcode_of(t["bc"])
+        for it in t.get("items", []):
+            code = it["code"]
+            if not code:
+                continue
+            score = (4 if it["succ"] else 0) + (2 if it["att"] else 0)
+            key = (t["bc"], code)
+            cur = best.get(key)
+            if cur is None or score > cur["score"]:
+                best[key] = {"score": score, "bc": t["bc"], "prov": pc, "ma_don": code,
+                             "ma_chuyen": t.get("tripCode", ""),
+                             "driver_id": t.get("driver_id", ""), "driver_name": t.get("driver_name", "—"),
+                             "succ": it["succ"], "att": it["att"], "cod": it["cod"],
+                             "vngh": code.startswith("VNGH")}
+    return list(best.values())
+
+
 def format_report(agg, include_cod=False):
     d = agg["date"].strftime("%d/%m/%Y")
     g = agg["grand"]

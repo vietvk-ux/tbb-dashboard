@@ -53,6 +53,9 @@ jobs:
           DASH_SEND: ${{ github.event.inputs.send || '1' }}
           GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
           GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
+          # Database Supabase (để trống thì tự bỏ qua, không lỗi)
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python report_dashboard.py
       - name: Trang tồn đọng (backlog.html)
         env:
