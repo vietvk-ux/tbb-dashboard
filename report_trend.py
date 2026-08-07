@@ -58,12 +58,12 @@ def fetch_trend(days=90):
         return None
     since = (datetime.now(VN).date() - timedelta(days=days)).isoformat()
     vung = _get(url, key, "bao_cao_vung?ngay=gte.%s&order=ngay.asc&select=*" % since)
-    # %GTC trung bình 7 ngày theo bưu cục (tốt/kém) — dùng cho bảng
-    since7 = (datetime.now(VN).date() - timedelta(days=7)).isoformat()
-    bc = _get(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,pct_gtc,gtb,don_giao" % since7)
+    # %GTC 30 ngày theo bưu cục (tốt/kém) — dùng cho bảng. limit cao tránh cắt dòng.
+    since30 = (datetime.now(VN).date() - timedelta(days=30)).isoformat()
+    bc = _get(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,gtc,gtb,don_giao&limit=5000" % since30)
     # Xếp hạng %GTC nhân viên tuần/tháng (view v_nv_tuan, v_nv_thang; chưa tạo → [])
     return {
-        "vung": vung, "bc7": bc,
+        "vung": vung, "bc30": bc,
         "tuan_top": _get_safe(url, key, "v_nv_tuan?order=pct_cur.desc,dg_cur.desc&limit=8"),
         "tuan_bot": _get_safe(url, key, "v_nv_tuan?order=pct_cur.asc,dg_cur.desc&limit=8"),
         "thang_top": _get_safe(url, key, "v_nv_thang?order=pct_cur.desc,dg_cur.desc&limit=8"),
@@ -267,21 +267,21 @@ def gen_html(data):
                  % _line(vung, "chua_gan", 0, (max(cg) // 100 + 1) * 100, "warn", 140))
 
     # Bảng bưu cục %GTC TB 7 ngày
-    bc7 = data.get("bc7") or []
-    if bc7:
+    bc30 = data.get("bc30") or []
+    if bc30:
         agg = {}
-        for r in bc7:
-            a = agg.setdefault(r["buu_cuc"], {"bc": r["buu_cuc"], "tinh": r.get("tinh"), "s": 0.0, "c": 0, "gtb": 0, "dg": 0})
-            if r.get("pct_gtc") is not None:
-                a["s"] += r["pct_gtc"]; a["c"] += 1
+        for r in bc30:
+            a = agg.setdefault(r["buu_cuc"], {"bc": r["buu_cuc"], "tinh": r.get("tinh"), "sc": 0, "gtb": 0, "dg": 0})
+            a["sc"] += r.get("gtc") or 0        # đơn giao thành công
             a["gtb"] += r.get("gtb") or 0
-            a["dg"] += r.get("don_giao") or 0
-        rows = [{"bc": a["bc"], "tinh": a["tinh"], "gtc": round(a["s"] / a["c"], 1) if a["c"] else None,
+            a["dg"] += r.get("don_giao") or 0   # tổng đơn
+        rows = [{"bc": a["bc"], "tinh": a["tinh"],
+                 "gtc": round(a["sc"] * 100.0 / a["dg"], 1) if a["dg"] else None,
                  "gtb": a["gtb"], "dg": a["dg"]} for a in agg.values()]
         valid = [r for r in rows if r["gtc"] is not None]
         # 🏆 10 BC %GTC CAO NHẤT (xanh)
         best = sorted(valid, key=lambda x: -x["gtc"])[:10]
-        P.append("<div class='sec' style='color:var(--good)'>🏆 10 bưu cục %GTC cao nhất (TB 7 ngày)</div>")
+        P.append("<div class='sec' style='color:var(--good)'>🏆 10 bưu cục %GTC cao nhất (30 ngày)</div>")
         P.append("<section class='card'><table class='t'><thead><tr><th class='rk'>#</th><th>Bưu cục</th><th>Đơn</th><th>%GTC TB</th></tr></thead><tbody>")
         for i, r in enumerate(best, 1):
             P.append("<tr><td class='rk'>%d</td><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
@@ -289,7 +289,7 @@ def gen_html(data):
         P.append("</tbody></table></section>")
         # 🔻 10 BC %GTC THẤP NHẤT (đỏ)
         worst = sorted(valid, key=lambda x: x["gtc"])[:10]
-        P.append("<div class='sec' style='color:var(--bad)'>🔻 10 bưu cục %GTC thấp nhất (TB 7 ngày)</div>")
+        P.append("<div class='sec' style='color:var(--bad)'>🔻 10 bưu cục %GTC thấp nhất (30 ngày)</div>")
         P.append("<section class='card'><table class='t'><thead><tr><th class='rk'>#</th><th>Bưu cục</th><th>GTB</th><th>%GTC TB</th></tr></thead><tbody>")
         for i, r in enumerate(worst, 1):
             P.append("<tr><td class='rk'>%d</td><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
