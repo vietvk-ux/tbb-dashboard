@@ -254,14 +254,25 @@ def gen_html(data):
     if bc7:
         agg = {}
         for r in bc7:
-            a = agg.setdefault(r["buu_cuc"], {"bc": r["buu_cuc"], "tinh": r.get("tinh"), "s": 0.0, "c": 0, "gtb": 0})
+            a = agg.setdefault(r["buu_cuc"], {"bc": r["buu_cuc"], "tinh": r.get("tinh"), "s": 0.0, "c": 0, "gtb": 0, "dg": 0})
             if r.get("pct_gtc") is not None:
                 a["s"] += r["pct_gtc"]; a["c"] += 1
             a["gtb"] += r.get("gtb") or 0
-        rows = [{"bc": a["bc"], "tinh": a["tinh"], "gtc": round(a["s"] / a["c"], 1) if a["c"] else None, "gtb": a["gtb"]}
-                for a in agg.values()]
-        worst = sorted([r for r in rows if r["gtc"] is not None], key=lambda x: x["gtc"])[:10]
-        P.append("<div class='sec'>🔻 10 bưu cục %GTC thấp nhất (TB 7 ngày)</div>")
+            a["dg"] += r.get("don_giao") or 0
+        rows = [{"bc": a["bc"], "tinh": a["tinh"], "gtc": round(a["s"] / a["c"], 1) if a["c"] else None,
+                 "gtb": a["gtb"], "dg": a["dg"]} for a in agg.values()]
+        valid = [r for r in rows if r["gtc"] is not None]
+        # 🏆 10 BC %GTC CAO NHẤT (xanh)
+        best = sorted(valid, key=lambda x: -x["gtc"])[:10]
+        P.append("<div class='sec' style='color:var(--good)'>🏆 10 bưu cục %GTC cao nhất (TB 7 ngày)</div>")
+        P.append("<section class='card'><table class='t'><thead><tr><th>Bưu cục</th><th>Đơn</th><th>%GTC TB</th></tr></thead><tbody>")
+        for r in best:
+            P.append("<tr><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (_esc(r["bc"]), _n(r["dg"]), _cls(r["gtc"]), r["gtc"]))
+        P.append("</tbody></table></section>")
+        # 🔻 10 BC %GTC THẤP NHẤT (đỏ)
+        worst = sorted(valid, key=lambda x: x["gtc"])[:10]
+        P.append("<div class='sec' style='color:var(--bad)'>🔻 10 bưu cục %GTC thấp nhất (TB 7 ngày)</div>")
         P.append("<section class='card'><table class='t'><thead><tr><th>Bưu cục</th><th>GTB</th><th>%GTC TB</th></tr></thead><tbody>")
         for r in worst:
             P.append("<tr><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
