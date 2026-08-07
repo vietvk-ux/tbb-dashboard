@@ -63,14 +63,14 @@ jobs:
           else
             echo "iseod=0" >> "$GITHUB_OUTPUT"; echo "→ slot thường: giữ eod.html cũ"
           fi
-      - name: EOD — tạo eod.html + (tùy chọn) gửi %GTC cuối ngày vào nhóm
+      - name: EOD ~23:30 — CHỈ tạo eod.html (KHÔNG gửi nhóm; tin cuối ngày đã có 'Tổng quan cuối ngày' 23:05)
         if: steps.eodwin.outputs.iseod == '1'
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           EOD_DATE: ${{ github.event.inputs.eod_date }}
           DASH_SLUG: 9c7e4b21a6f0
           DASH_URL: https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html
-          DASH_SEND: ${{ github.event.inputs.send || '1' }}
+          DASH_SEND: '0'   # eod.html chỉ cập nhật trang, KHÔNG gửi nhóm (tránh trùng với 'Tổng quan cuối ngày' 23:05)
           GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
           GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
         run: python report_dashboard.py
