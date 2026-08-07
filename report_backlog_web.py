@@ -304,7 +304,7 @@ def render_detail_table(parsed, types):
     P = ["<div class='scroll'><table><tr><th>Loại</th>"]
     for gl in GROUP_LABELS:
         P.append("<th>%s</th>" % _esc(gl))
-    P.append("<th>🔴 Đỏ</th><th>Tổng</th></tr>")
+    P.append("<th>🔴 Backlog</th><th>Tổng</th></tr>")
     for ot, _, short in types:
         tot = parsed.get(ot, {}).get("total", 0)
         if tot <= 0:
@@ -335,7 +335,7 @@ def render_red_section(entries):
             tot[ot] += r[ot]
         grand += r["total"]
     P = ["<section class='hero' style='border-color:rgba(239,68,68,.55);background:rgba(239,68,68,.09)'>"]
-    P.append("<div class='hlbl'>🚨 Tổng đơn đỏ quá hạn toàn vùng</div>")
+    P.append("<div class='hlbl'>🚨 Tổng đơn backlog quá hạn toàn vùng</div>")
     P.append("<div class='hbig' style='color:var(--bad)'>%s</div>" % _n(grand))
     P.append("<div class='hsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;36h · LC trả&gt;48h</div>")
     P.append("</section>")
@@ -348,9 +348,9 @@ def render_red_section(entries):
     rows = [x for x in rows if x[1]["total"] > 0]
     rows.sort(key=lambda x: -x[1]["total"])
     if rows:
-        P.append("<div class='subh'>🔴 Top bưu cục đơn đỏ nhiều nhất</div>")
+        P.append("<div class='subh'>🔴 Top bưu cục đơn backlog nhiều nhất</div>")
         P.append("<div class='scroll'><table><tr><th>Bưu cục</th><th>Giao&gt;120</th><th>Trả&gt;120</th>"
-                 "<th>LCg&gt;36</th><th>LCt&gt;48</th><th>Tổng đỏ</th></tr>")
+                 "<th>LCg&gt;36</th><th>LCt&gt;48</th><th>Tổng backlog</th></tr>")
         for name, r in rows[:10]:
             P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
                      "<td><span class='pill bad'>%s</span></td></tr>"
@@ -377,13 +377,13 @@ def build_html(entries, hub_count):
              % (now.strftime("%H:%M · %d/%m/%Y"), len(active), hub_count))
 
     # tab nhảy nhanh
-    P.append("<div class='tabs'><a class='on' href='#do'>🚨 Đơn đỏ</a>"
+    P.append("<div class='tabs'><a class='on' href='#do'>🚨 Đơn backlog</a>"
              "<a href='#lgt'>📦 Lấy·Giao·Trả</a>"
              "<a href='#luanchuyen'>🔁 Luân chuyển</a></div>")
 
     # ===== 🚨 ĐƠN ĐỎ QUÁ HẠN (ưu tiên) =====
-    P.append("<div class='sec first' id='do'>🚨 Đơn đỏ — quá hạn cần xử lý</div>")
-    P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;36h · LC trả&gt;48h · danh sách BC dưới sắp theo tổng đỏ</div>")
+    P.append("<div class='sec first' id='do'>🚨 Đơn backlog — quá hạn cần xử lý</div>")
+    P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;36h · LC trả&gt;48h · danh sách BC dưới sắp theo tổng backlog</div>")
     P += render_red_section(entries)
 
     # ===== BÁO CÁO 1: LẤY-GIAO-TRẢ =====
@@ -398,7 +398,7 @@ def build_html(entries, hub_count):
 
     # ===== DANH SÁCH BƯU CỤC (sắp theo TỔNG ĐƠN ĐỎ) =====
     P.append("<div class='sec' id='bc'>🏤 Tất cả bưu cục (%d)</div>" % len(active))
-    P.append("<div class='secsub'>Sắp theo TỔNG ĐƠN ĐỎ nhiều → ít · bấm để xem chi tiết theo khung giờ</div>")
+    P.append("<div class='secsub'>Sắp theo TỔNG ĐƠN BACKLOG nhiều → ít · bấm để xem chi tiết theo khung giờ</div>")
     P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục / tỉnh...' oninput='filt()'>")
 
     def bc_sort_key(e):
@@ -414,7 +414,7 @@ def build_html(entries, hub_count):
         key = _esc((e["name"] + " " + PROV_NAME.get(e["prov"], e["prov"])).lower())
         # meta = các chỉ số đỏ khác 0
         parts = ["%s %s" % (short, _n(r[ot])) for ot, _, short in RED_LABELS if r[ot] > 0]
-        meta = " · ".join(parts) if parts else "không có đơn đỏ"
+        meta = " · ".join(parts) if parts else "không có đơn backlog"
         badge = ("<span class='pill bad'>%s</span>" % _n(r["total"])) if r["total"] > 0 \
             else "<span class='pill mut'>0</span>"
         P.append("<details class='bc' data-u='%s' data-k=\"%s\">" % (u, key))
