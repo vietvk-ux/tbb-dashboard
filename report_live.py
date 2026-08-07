@@ -215,24 +215,27 @@ def gen_html(rows):
                  % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
-                 "<span class='w'>⏳ %s</span><span>✅ %s</span></div>"
-                 % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"])))
+                 "<span class='w'>⏳ %s</span><span>✅ %s</span><span class='gtb'>❌ %s</span></div>"
+                 % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
+                    _n(r["att"] - r["gtc"])))
         P.append("</summary>")
         drv = r["drivers"]  # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao)
         P.append("<div class='dtl'>")
         if drv:
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>❌GTB</th><th>%GTC</th></tr></thead><tbody>")
             for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
                 pc2 = _pct(d["gtc"], d["total"])
-                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                gtb2 = d["att"] - d["gtc"]  # GTB đã thao tác (đã xử lý nhưng không thành công)
+                gtb_cell = ("<b class='gtb'>%s</b>" % _n(gtb2)) if gtb2 > 0 else "0"
+                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                          % (_esc(d["name"]), _n(d.get("chuyen", 0)), _n(d["total"]), _n(d["gtc"]),
-                            _cls(pc2), pc2 if pc2 is not None else "—"))
+                            gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—"))
             P.append("</tbody></table>")
         else:
             P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
         P.append("</div></details>")
 
-    P.append("<div class='foot'>🏃 đang chạy · 🏁 kết thúc hôm nay · 📥 đã gán · ⏳ chưa gán · ✅ GTC<br>"
+    P.append("<div class='foot'>🏃 đang chạy · 🏁 kết thúc hôm nay · 📥 đã gán · ⏳ chưa gán · ✅ GTC · ❌ GTB đã thao tác<br>"
              "%GTC = GTC / tổng đơn gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
              "số LIVE gồm cả chuyến đã kết thúc trong ngày · nguồn nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
@@ -326,6 +329,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bcn{font-weight:700;font-size:15px;flex:1;min-width:0}
 .bcm{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 .bcm .w{color:var(--warn)}
+.bcm .gtb,b.gtb{color:var(--bad);font-weight:700}
 .dtl{padding:2px 12px 12px}
 .none{color:var(--mut);font-size:12.5px;padding:6px 2px 10px}
 
