@@ -42,6 +42,14 @@ def _get(url, key, path):
     return r.json()
 
 
+def _get_safe(url, key, path):
+    """Như _get nhưng lỗi (vd view chưa tạo) → trả [] thay vì vỡ trang."""
+    try:
+        return _get(url, key, path)
+    except Exception:
+        return []
+
+
 def fetch_trend(days=90):
     url = os.environ.get("SUPABASE_URL", "").strip()
     key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
@@ -53,7 +61,14 @@ def fetch_trend(days=90):
     # %GTC trung bình 7 ngày theo bưu cục (tốt/kém) — dùng cho bảng
     since7 = (datetime.now(VN).date() - timedelta(days=7)).isoformat()
     bc = _get(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,pct_gtc,gtb,don_giao" % since7)
-    return {"vung": vung, "bc7": bc}
+    # Nhân viên cải thiện / giảm (từ view v_nv_tuan, v_nv_thang; chưa tạo view → [])
+    return {
+        "vung": vung, "bc7": bc,
+        "tuan_up": _get_safe(url, key, "v_nv_tuan?delta=gt.0&order=delta.desc&limit=8"),
+        "tuan_down": _get_safe(url, key, "v_nv_tuan?delta=lt.0&order=delta.asc&limit=8"),
+        "thang_up": _get_safe(url, key, "v_nv_thang?delta=gt.0&order=delta.desc&limit=8"),
+        "thang_down": _get_safe(url, key, "v_nv_thang?delta=lt.0&order=delta.asc&limit=8"),
+    }
 
 
 # ---------- Vẽ SVG ----------
@@ -132,6 +147,33 @@ def _bars(rows, days, height=150):
         xlabs.append("<text x='%.1f' y='%.1f' class='xt' text-anchor='%s'>%s</text>"
                      % (pl + i * gw + gw / 2, H - 3, anchor, dd))
     return "<svg viewBox='0 0 320 %d' class='chart'>%s%s</svg>" % (int(H), "".join(bars), "".join(xlabs))
+
+
+def _chg_table(rows, up):
+    trs = []
+    for r in rows:
+        d = r.get("delta") or 0
+        arrow = ("▲ %.1f" % abs(d)) if up else ("▼ %.1f" % abs(d))
+        pp = r.get("pct_prev"); pc = r.get("pct_cur")
+        trs.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td>"
+                   "<td>%s%%</td><td>%s%%</td><td class='%s'>%s</td></tr>"
+                   % (_esc(r.get("ten_nv")), _esc(r.get("buu_cuc")),
+                      pp if pp is not None else "—", pc if pc is not None else "—",
+                      "up" if up else "down", arrow))
+    return ("<table class='t'><thead><tr><th>Nhân viên</th><th>Trước</th><th>Nay</th><th>Δ %GTC</th></tr></thead>"
+            "<tbody>" + "".join(trs) + "</tbody></table>")
+
+
+def _change_card(label, note, up_rows, down_rows):
+    if not up_rows and not down_rows:
+        inner = "<div class='none'>Chưa đủ dữ liệu — cần %s (số sẽ hiện khi tích lũy đủ).</div>" % note
+    else:
+        inner = ""
+        if up_rows:
+            inner += "<div class='mh up'>📈 Cải thiện nhất</div>" + _chg_table(up_rows, True)
+        if down_rows:
+            inner += "<div class='mh down'>📉 Giảm nhiều nhất</div>" + _chg_table(down_rows, False)
+    return "<div class='sec'>%s</div><section class='card'>%s</section>" % (label, inner)
 
 
 # ---------- Trang ----------
@@ -218,6 +260,12 @@ def gen_html(data):
                      % (_esc(r["bc"]), _n(r["gtb"]), _cls(r["gtc"]), r["gtc"]))
         P.append("</tbody></table></section>")
 
+    # Nhân viên cải thiện / giảm theo tuần & tháng
+    P.append(_change_card("🔀 Thay đổi %GTC theo TUẦN (7 ngày vs tuần trước)", "≥ 2 tuần dữ liệu",
+                          data.get("tuan_up") or [], data.get("tuan_down") or []))
+    P.append(_change_card("🔀 Thay đổi %GTC theo THÁNG (30 ngày vs tháng trước)", "≥ 2 tháng dữ liệu",
+                          data.get("thang_up") or [], data.get("thang_down") or []))
+
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Số liệu lịch sử lưu tại Supabase · cập nhật mỗi tối 23h · Vùng Tây Bắc Bộ</div>")
@@ -284,7 +332,11 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .t th{color:var(--mut);font-weight:600;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid var(--line)}
 .t th:first-child,.t td:first-child{text-align:left}
 .t tbody tr:last-child td{border-bottom:none}
-.nv{font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv{font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv .sc{color:var(--mut);font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.mh{font-size:11.5px;font-weight:700;letter-spacing:.03em;padding:10px 2px 2px}
+.mh.up{color:var(--good)}.mh.down{color:var(--bad)}
+td.up{color:var(--good);font-weight:800}td.down{color:var(--bad);font-weight:800}
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:3px 8px;border-radius:99px;font-weight:800;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
 .pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
 .pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}.pill.na{background:#3a4160;color:var(--mut)}
