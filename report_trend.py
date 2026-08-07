@@ -61,13 +61,13 @@ def fetch_trend(days=90):
     # %GTC trung bình 7 ngày theo bưu cục (tốt/kém) — dùng cho bảng
     since7 = (datetime.now(VN).date() - timedelta(days=7)).isoformat()
     bc = _get(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,pct_gtc,gtb,don_giao" % since7)
-    # Nhân viên cải thiện / giảm (từ view v_nv_tuan, v_nv_thang; chưa tạo view → [])
+    # Xếp hạng %GTC nhân viên tuần/tháng (view v_nv_tuan, v_nv_thang; chưa tạo → [])
     return {
         "vung": vung, "bc7": bc,
-        "tuan_up": _get_safe(url, key, "v_nv_tuan?delta=gt.0&order=delta.desc&limit=8"),
-        "tuan_down": _get_safe(url, key, "v_nv_tuan?delta=lt.0&order=delta.asc&limit=8"),
-        "thang_up": _get_safe(url, key, "v_nv_thang?delta=gt.0&order=delta.desc&limit=8"),
-        "thang_down": _get_safe(url, key, "v_nv_thang?delta=lt.0&order=delta.asc&limit=8"),
+        "tuan_top": _get_safe(url, key, "v_nv_tuan?order=pct_cur.desc,dg_cur.desc&limit=8"),
+        "tuan_bot": _get_safe(url, key, "v_nv_tuan?order=pct_cur.asc,dg_cur.desc&limit=8"),
+        "thang_top": _get_safe(url, key, "v_nv_thang?order=pct_cur.desc,dg_cur.desc&limit=8"),
+        "thang_bot": _get_safe(url, key, "v_nv_thang?order=pct_cur.asc,dg_cur.desc&limit=8"),
     }
 
 
@@ -149,30 +149,38 @@ def _bars(rows, days, height=150):
     return "<svg viewBox='0 0 320 %d' class='chart'>%s%s</svg>" % (int(H), "".join(bars), "".join(xlabs))
 
 
-def _chg_table(rows, up):
+def _dcell(delta):
+    """Ô Δ so với kỳ trước — có kỳ trước mới hiện tăng/giảm, chưa có → dấu –."""
+    if delta is None:
+        return "<td class='dmut'>–</td>"
+    if delta > 0:
+        return "<td class='up'>▲ %.1f</td>" % delta
+    if delta < 0:
+        return "<td class='down'>▼ %.1f</td>" % abs(delta)
+    return "<td class='dmut'>0</td>"
+
+
+def _rank_table(rows):
     trs = []
     for r in rows:
-        d = r.get("delta") or 0
-        arrow = ("▲ %.1f" % abs(d)) if up else ("▼ %.1f" % abs(d))
-        pp = r.get("pct_prev"); pc = r.get("pct_cur")
+        pc = r.get("pct_cur")
         trs.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td>"
-                   "<td>%s%%</td><td>%s%%</td><td class='%s'>%s</td></tr>"
-                   % (_esc(r.get("ten_nv")), _esc(r.get("buu_cuc")),
-                      pp if pp is not None else "—", pc if pc is not None else "—",
-                      "up" if up else "down", arrow))
-    return ("<table class='t'><thead><tr><th>Nhân viên</th><th>Trước</th><th>Nay</th><th>Δ %GTC</th></tr></thead>"
+                   "<td>%s</td><td><span class='pill sm %s'>%s%%</span></td>%s</tr>"
+                   % (_esc(r.get("ten_nv")), _esc(r.get("buu_cuc")), _n(r.get("dg_cur")),
+                      _cls(pc), pc if pc is not None else "—", _dcell(r.get("delta"))))
+    return ("<table class='t'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>%GTC</th><th>Δ kỳ trước</th></tr></thead>"
             "<tbody>" + "".join(trs) + "</tbody></table>")
 
 
-def _change_card(label, note, up_rows, down_rows):
-    if not up_rows and not down_rows:
+def _rank_card(label, note, top_rows, bot_rows):
+    if not top_rows and not bot_rows:
         inner = "<div class='none'>Chưa đủ dữ liệu — cần %s (số sẽ hiện khi tích lũy đủ).</div>" % note
     else:
         inner = ""
-        if up_rows:
-            inner += "<div class='mh up'>📈 Cải thiện nhất</div>" + _chg_table(up_rows, True)
-        if down_rows:
-            inner += "<div class='mh down'>📉 Giảm nhiều nhất</div>" + _chg_table(down_rows, False)
+        if top_rows:
+            inner += "<div class='mh up'>🏆 %GTC cao nhất</div>" + _rank_table(top_rows)
+        if bot_rows:
+            inner += "<div class='mh down'>🔻 %GTC thấp nhất</div>" + _rank_table(bot_rows)
     return "<div class='sec'>%s</div><section class='card'>%s</section>" % (label, inner)
 
 
@@ -260,11 +268,11 @@ def gen_html(data):
                      % (_esc(r["bc"]), _n(r["gtb"]), _cls(r["gtc"]), r["gtc"]))
         P.append("</tbody></table></section>")
 
-    # Nhân viên cải thiện / giảm theo tuần & tháng
-    P.append(_change_card("🔀 Thay đổi %GTC theo TUẦN (7 ngày vs tuần trước)", "≥ 2 tuần dữ liệu",
-                          data.get("tuan_up") or [], data.get("tuan_down") or []))
-    P.append(_change_card("🔀 Thay đổi %GTC theo THÁNG (30 ngày vs tháng trước)", "≥ 2 tháng dữ liệu",
-                          data.get("thang_up") or [], data.get("thang_down") or []))
+    # Xếp hạng %GTC nhân viên theo tuần & tháng (Δ so kỳ trước khi có)
+    P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · TUẦN (7 ngày gần nhất)", "≥ 1 tuần dữ liệu",
+                        data.get("tuan_top") or [], data.get("tuan_bot") or []))
+    P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · THÁNG (30 ngày gần nhất)", "≥ 1 tháng dữ liệu",
+                        data.get("thang_top") or [], data.get("thang_bot") or []))
 
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
@@ -337,6 +345,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .mh{font-size:11.5px;font-weight:700;letter-spacing:.03em;padding:10px 2px 2px}
 .mh.up{color:var(--good)}.mh.down{color:var(--bad)}
 td.up{color:var(--good);font-weight:800}td.down{color:var(--bad);font-weight:800}
+td.dmut{color:var(--mut)}
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:3px 8px;border-radius:99px;font-weight:800;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
 .pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
 .pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}.pill.na{background:#3a4160;color:var(--mut)}
