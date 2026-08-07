@@ -60,3 +60,34 @@ select c.driver_id, c.buu_cuc, c.ten_nv, c.tinh,
 from cur c
 left join prev p on c.driver_id = p.driver_id and c.buu_cuc = p.buu_cuc
 where c.dg >= 80;
+
+-- =====================================================================
+-- CẢNH BÁO TỤT SÂU: %GTC ngày mới nhất giảm ≥20 điểm so TRUNG BÌNH 7 ngày
+-- trước của chính nhân viên đó (ngày này ≥20 đơn, nền 7 ngày ≥20 đơn).
+-- report_alert_drop.py đọc view này rồi gửi cảnh báo GTalk. Trống → không gửi.
+-- =====================================================================
+drop view if exists v_nv_tut;
+create view v_nv_tut as
+with latest as (select max(ngay) d from bao_cao_nhan_vien),
+cur as (
+  select n.driver_id, n.buu_cuc, max(n.ten_nv) ten_nv, max(n.tinh) tinh,
+         sum(n.don_giao) dg, sum(n.gtc) gtc
+  from bao_cao_nhan_vien n, latest l
+  where n.ngay = l.d
+  group by n.driver_id, n.buu_cuc
+),
+base as (
+  select n.driver_id, n.buu_cuc, sum(n.don_giao) dg, sum(n.gtc) gtc
+  from bao_cao_nhan_vien n, latest l
+  where n.ngay >= l.d - 7 and n.ngay < l.d
+  group by n.driver_id, n.buu_cuc
+)
+select c.driver_id, c.buu_cuc, c.ten_nv, c.tinh,
+       c.dg as dg_today,
+       round(c.gtc*100.0/nullif(c.dg,0),1) as pct_today,
+       round(b.gtc*100.0/nullif(b.dg,0),1) as pct_base,
+       round(c.gtc*100.0/nullif(c.dg,0) - b.gtc*100.0/nullif(b.dg,0),1) as delta
+from cur c
+join base b on c.driver_id = b.driver_id and c.buu_cuc = b.buu_cuc
+where c.dg >= 20 and b.dg >= 20
+  and (c.gtc*100.0/nullif(c.dg,0)) <= (b.gtc*100.0/nullif(b.dg,0)) - 20;

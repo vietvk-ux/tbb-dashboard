@@ -76,6 +76,14 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python report_dashboard.py
+      - name: Cảnh báo NV tụt sâu %GTC (chỉ EOD ~23:30; không ai tụt thì không gửi)
+        if: steps.eodwin.outputs.iseod == '1'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
+          GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
+        run: python report_alert_drop.py
       - name: Giữ lại eod.html (các slot khác)
         if: steps.eodwin.outputs.iseod != '1'
         run: |
