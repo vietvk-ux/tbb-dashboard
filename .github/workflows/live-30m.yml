@@ -54,12 +54,6 @@ jobs:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_backlog_web.py
-      - name: Tạo trang xu hướng (trend.html — đọc Supabase; thiếu secret thì tạo trang chờ)
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          DASH_SLUG: 9c7e4b21a6f0
-        run: python report_trend.py
       - name: Xác định EOD window (VN 23:25–23:44 → chỉ slot ~23:30)
         id: eodwin
         run: |
@@ -87,6 +81,12 @@ jobs:
         run: |
           curl -sf "https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html" \
             -o docs/9c7e4b21a6f0/eod.html || echo "chưa có eod.html (sẽ có sau bản 23:30 đầu tiên)"
+      - name: Tạo trang xu hướng (trend.html — SAU db_sync để có số mới nhất; thiếu secret thì tạo trang chờ)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DASH_SLUG: 9c7e4b21a6f0
+        run: python report_trend.py
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
