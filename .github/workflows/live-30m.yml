@@ -12,10 +12,7 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
+# concurrency tạm gỡ để phá kẹt group "pages" (07/08 sáng) — sẽ khôi phục sau khi live chạy lại
 jobs:
   live:
     runs-on: ubuntu-latest
