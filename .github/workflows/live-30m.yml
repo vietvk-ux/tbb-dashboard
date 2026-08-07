@@ -13,7 +13,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages              # DUY NHẤT workflow deploy Pages (đã bỏ pages.yml) → serialize an toàn.
+  group: tbb-pages-live     # TÊN MỚI (group "pages" cũ bị kẹt phantom 07/08). Chỉ live-30m deploy Pages.
   cancel-in-progress: false # slot ~23:30 (tạo eod chậm ~15') — slot 23:45 xếp hàng chờ, không đè.
 
 jobs:
