@@ -12,11 +12,14 @@ permissions:
   pages: write
   id-token: write
 
-# concurrency tạm gỡ để phá kẹt group "pages" (07/08 sáng) — sẽ khôi phục sau khi live chạy lại
+concurrency:
+  group: pages              # DUY NHẤT workflow deploy Pages (đã bỏ pages.yml) → serialize an toàn.
+  cancel-in-progress: false # slot ~23:30 (tạo eod chậm ~15') — slot 23:45 xếp hàng chờ, không đè.
+
 jobs:
   live:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25      # slot EOD (report_dashboard bóc %GTC từng đơn) nặng ~15-18'
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -38,10 +41,30 @@ jobs:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_backlog_web.py
-      - name: Giữ lại báo cáo %GTC cuối ngày (eod.html)
+      - name: Xác định EOD window (VN 23:25–23:44 → chỉ slot ~23:30)
+        id: eodwin
+        run: |
+          VNH=$(TZ=Asia/Ho_Chi_Minh date +%H); VNM=$(TZ=Asia/Ho_Chi_Minh date +%M)
+          if [ "$VNH" = "23" ] && [ "$VNM" -ge 25 ] && [ "$VNM" -le 44 ]; then
+            echo "iseod=1" >> "$GITHUB_OUTPUT"; echo "→ EOD window: tạo eod.html + gửi GTalk"
+          else
+            echo "iseod=0" >> "$GITHUB_OUTPUT"; echo "→ slot thường: giữ eod.html cũ"
+          fi
+      - name: EOD ~23:30 — tạo eod.html + gửi %GTC cuối ngày vào nhóm
+        if: steps.eodwin.outputs.iseod == '1'
+        env:
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+          DASH_SLUG: 9c7e4b21a6f0
+          DASH_URL: https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html
+          DASH_SEND: '1'
+          GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
+          GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
+        run: python report_dashboard.py
+      - name: Giữ lại eod.html (các slot khác)
+        if: steps.eodwin.outputs.iseod != '1'
         run: |
           curl -sf "https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html" \
-            -o docs/9c7e4b21a6f0/eod.html || echo "chưa có eod.html (sẽ có sau bản 23h đầu tiên)"
+            -o docs/9c7e4b21a6f0/eod.html || echo "chưa có eod.html (sẽ có sau bản 23:30 đầu tiên)"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
