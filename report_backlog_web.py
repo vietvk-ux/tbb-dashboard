@@ -10,7 +10,7 @@ Số LIVE tại thời điểm chạy. Refresh 30' qua workflow + trang tự rel
 Env: NHANH_TOKEN. Xuất: docs/<slug>/backlog.html (self-contained).
 """
 from __future__ import annotations
-import asyncio, html, logging, os
+import asyncio, html, json, logging, os
 from datetime import datetime, timezone, timedelta
 
 import aiohttp
@@ -458,6 +458,15 @@ def main():
     html_out = build_html(entries, hub_count)
     with open(os.path.join(outdir, "backlog.html"), "w", encoding="utf-8") as f:
         f.write(html_out)
+
+    # JSON cho BOT đọc trực tiếp (khớp trang backlog)
+    payload = {
+        "generated": datetime.now(VN).strftime("%H:%M · %d/%m/%Y"),
+        "bcs": [{"name": e["name"], "prov": e["prov"], "lgt": e["lgt"], "tr": e["tr"]}
+                for e in entries],
+    }
+    with open(os.path.join(outdir, "backlog.json"), "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False)
     lgt = sum(sec_total(e["lgt"], LGT_TYPES) for e in entries)
     tr = sum(sec_total(e["tr"], TR_TYPES) for e in entries)
     logger.info("Xong · LGT %d đơn · Luân chuyển %d đơn · %d bytes", lgt, tr, len(html_out))
