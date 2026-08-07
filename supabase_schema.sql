@@ -77,8 +77,10 @@ create index if not exists idx_ct_madon on chi_tiet_don (ma_don);
 create index if not exists idx_ct_nv    on chi_tiet_don (ten_nv);
 
 -- =====================================================================
--- (TÙY CHỌN) Dọn chi tiết đơn cũ hơn 90 ngày để tiết kiệm dung lượng gói free.
--- Bảng tổng hợp (vùng/bưu cục/nhân viên) rất nhẹ → giữ mãi. Chi tiết đơn nặng
--- (~30k dòng/ngày) → có thể chạy lệnh sau định kỳ nếu cần:
---   delete from chi_tiet_don where ngay < current_date - interval '90 days';
+-- Hệ thống TỰ ĐỘNG giữ chi tiết đơn 365 NGÀY (1 năm) sau mỗi lần sync
+-- (db_sync._cleanup_detail; đổi bằng env DB_KEEP_DETAIL_DAYS). Bảng tổng hợp
+-- (vùng/bưu cục/nhân viên) rất nhẹ → giữ mãi. Nếu muốn dọn thủ công:
+--   delete from chi_tiet_don where ngay < current_date - interval '365 days';
+-- ⚠️ Gói Free 500MB: chi tiết đơn ~30k dòng/ngày → 1 năm ~10-11 triệu dòng (~2GB)
+--    có thể VƯỢT free tier sau ~2-3 tháng. Xem lưu ý trong hướng dẫn.
 -- =====================================================================

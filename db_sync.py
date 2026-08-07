@@ -40,7 +40,7 @@ def _upsert(url, key, table, rows, on_conflict, batch=1000):
 
 
 def _cleanup_detail(url, key, keep_days):
-    """Xóa chi tiết đơn cũ hơn keep_days ngày để tiết kiệm dung lượng (giữ mặc định 90)."""
+    """Xóa chi tiết đơn cũ hơn keep_days ngày để tiết kiệm dung lượng (giữ mặc định 365 = 1 năm)."""
     if keep_days <= 0:
         return
     cutoff = (date.today() - timedelta(days=keep_days)).isoformat()
@@ -109,7 +109,7 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         } for o in orders]
         n = _upsert(url, key, "chi_tiet_don", od, "ngay,buu_cuc,ma_don")
         logger.info("Supabase: lưu %d đơn chi tiết (ngày %s).", n, date_iso)
-        # Giữ chi tiết đơn 90 ngày (đổi bằng env DB_KEEP_DETAIL_DAYS)
-        keep = int(os.environ.get("DB_KEEP_DETAIL_DAYS", "90") or "90")
+        # Giữ chi tiết đơn 365 ngày (1 năm) — đổi bằng env DB_KEEP_DETAIL_DAYS
+        keep = int(os.environ.get("DB_KEEP_DETAIL_DAYS", "365") or "365")
         _cleanup_detail(url, key, keep)
     return True
