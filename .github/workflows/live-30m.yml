@@ -2,6 +2,19 @@ name: Trang trực tiếp TBB (mỗi 15 phút)
 
 on:
   workflow_dispatch:
+    inputs:
+      force_eod:
+        description: 'Ép tạo eod.html (bỏ qua gate giờ)? 1=có'
+        required: false
+        default: ''
+      eod_date:
+        description: 'Ngày EOD YYYY-MM-DD (trống = tự tính)'
+        required: false
+        default: ''
+      send:
+        description: 'Gửi GTalk khi tạo eod? 1=có, 0=không'
+        required: false
+        default: '1'
   schedule:
     # Mỗi 15' trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h).
     # Đây chỉ là BACKUP — lịch chính do cron-job.org kích (GitHub schedule hay bỏ lượt).
@@ -45,18 +58,19 @@ jobs:
         id: eodwin
         run: |
           VNH=$(TZ=Asia/Ho_Chi_Minh date +%H); VNM=$(TZ=Asia/Ho_Chi_Minh date +%M)
-          if [ "$VNH" = "23" ] && [ "$VNM" -ge 25 ] && [ "$VNM" -le 44 ]; then
-            echo "iseod=1" >> "$GITHUB_OUTPUT"; echo "→ EOD window: tạo eod.html + gửi GTalk"
+          if [ "${{ github.event.inputs.force_eod }}" = "1" ] || { [ "$VNH" = "23" ] && [ "$VNM" -ge 25 ] && [ "$VNM" -le 44 ]; }; then
+            echo "iseod=1" >> "$GITHUB_OUTPUT"; echo "→ EOD: tạo eod.html"
           else
             echo "iseod=0" >> "$GITHUB_OUTPUT"; echo "→ slot thường: giữ eod.html cũ"
           fi
-      - name: EOD ~23:30 — tạo eod.html + gửi %GTC cuối ngày vào nhóm
+      - name: EOD — tạo eod.html + (tùy chọn) gửi %GTC cuối ngày vào nhóm
         if: steps.eodwin.outputs.iseod == '1'
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+          EOD_DATE: ${{ github.event.inputs.eod_date }}
           DASH_SLUG: 9c7e4b21a6f0
           DASH_URL: https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html
-          DASH_SEND: '1'
+          DASH_SEND: ${{ github.event.inputs.send || '1' }}
           GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
           GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
         run: python report_dashboard.py
