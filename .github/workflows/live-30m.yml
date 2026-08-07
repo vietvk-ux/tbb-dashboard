@@ -54,6 +54,12 @@ jobs:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_backlog_web.py
+      - name: Tạo trang xu hướng (trend.html — đọc Supabase; thiếu secret thì tạo trang chờ)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DASH_SLUG: 9c7e4b21a6f0
+        run: python report_trend.py
       - name: Xác định EOD window (VN 23:25–23:44 → chỉ slot ~23:30)
         id: eodwin
         run: |
@@ -73,6 +79,8 @@ jobs:
           DASH_SEND: '0'   # eod.html chỉ cập nhật trang, KHÔNG gửi nhóm (tránh trùng với 'Tổng quan cuối ngày' 23:05)
           GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
           GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python report_dashboard.py
       - name: Giữ lại eod.html (các slot khác)
         if: steps.eodwin.outputs.iseod != '1'

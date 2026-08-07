@@ -11,6 +11,7 @@
 from __future__ import annotations
 import logging
 import os
+from datetime import date, timedelta
 
 import requests
 
@@ -36,6 +37,23 @@ def _upsert(url, key, table, rows, on_conflict, batch=1000):
                                % (table, r.status_code, r.text[:250]))
         done += len(chunk)
     return done
+
+
+def _cleanup_detail(url, key, keep_days):
+    """Xóa chi tiết đơn cũ hơn keep_days ngày để tiết kiệm dung lượng (giữ mặc định 90)."""
+    if keep_days <= 0:
+        return
+    cutoff = (date.today() - timedelta(days=keep_days)).isoformat()
+    ep = "%s/rest/v1/chi_tiet_don?ngay=lt.%s" % (url, cutoff)
+    headers = {"apikey": key, "Authorization": "Bearer " + key, "Prefer": "return=minimal"}
+    try:
+        r = requests.delete(ep, headers=headers, timeout=60)
+        if r.status_code in (200, 204):
+            logger.info("Đã dọn chi_tiet_don cũ hơn %d ngày (trước %s).", keep_days, cutoff)
+        else:
+            logger.warning("Dọn chi_tiet_don lỗi %d: %s", r.status_code, r.text[:150])
+    except Exception as e:
+        logger.warning("Dọn chi_tiet_don lỗi: %s", str(e)[:150])
 
 
 def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detail=True):
@@ -91,4 +109,7 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         } for o in orders]
         n = _upsert(url, key, "chi_tiet_don", od, "ngay,buu_cuc,ma_don")
         logger.info("Supabase: lưu %d đơn chi tiết (ngày %s).", n, date_iso)
+        # Giữ chi tiết đơn 90 ngày (đổi bằng env DB_KEEP_DETAIL_DAYS)
+        keep = int(os.environ.get("DB_KEEP_DETAIL_DAYS", "90") or "90")
+        _cleanup_detail(url, key, keep)
     return True
