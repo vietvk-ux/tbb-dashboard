@@ -163,13 +163,13 @@ def _dcell(delta):
 
 def _rank_table(rows):
     trs = []
-    for r in rows:
+    for i, r in enumerate(rows, 1):
         pc = r.get("pct_cur")
-        trs.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td>"
+        trs.append("<tr><td class='rk'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
                    "<td>%s</td><td><span class='pill sm %s'>%s%%</span></td>%s</tr>"
-                   % (_esc(r.get("ten_nv")), _esc(r.get("buu_cuc")), _n(r.get("dg_cur")),
+                   % (i, _esc(r.get("ten_nv")), _esc(r.get("buu_cuc")), _n(r.get("dg_cur")),
                       _cls(pc), pc if pc is not None else "—", _dcell(r.get("delta"))))
-    return ("<table class='t'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>%GTC</th><th>Δ kỳ trước</th></tr></thead>"
+    return ("<table class='t'><thead><tr><th class='rk'>#</th><th>Nhân viên</th><th>Đơn</th><th>%GTC</th><th>Δ kỳ trước</th></tr></thead>"
             "<tbody>" + "".join(trs) + "</tbody></table>")
 
 
@@ -190,12 +190,12 @@ def _ns_card(rows):
         inner = "<div class='none'>Chưa đủ dữ liệu — chạy view v_nv_nangsuat rồi đợi có dữ liệu.</div>"
     else:
         trs = []
-        for r in rows:
-            trs.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td>"
+        for i, r in enumerate(rows, 1):
+            trs.append("<tr><td class='rk'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
                        "<td>%s</td><td>%s</td><td class='ns'>%s</td></tr>"
-                       % (_esc(r.get("ten_nv")), _esc(r.get("buu_cuc")),
+                       % (i, _esc(r.get("ten_nv")), _esc(r.get("buu_cuc")),
                           _n(r.get("so_don_gtc")), _n(r.get("so_ngay_lam")), r.get("nang_suat")))
-        inner = ("<table class='t'><thead><tr><th>Nhân viên</th><th>GTC</th><th>Ngày</th>"
+        inner = ("<table class='t'><thead><tr><th class='rk'>#</th><th>Nhân viên</th><th>GTC</th><th>Ngày</th>"
                  "<th>NS/ngày</th></tr></thead><tbody>" + "".join(trs) + "</tbody></table>")
     return ("<div class='sec' style='color:var(--good)'>⚡ Năng suất GTC nhân viên · GTC/ngày làm (30 ngày)</div>"
             "<section class='card'>%s</section>" % inner)
@@ -282,18 +282,18 @@ def gen_html(data):
         # 🏆 10 BC %GTC CAO NHẤT (xanh)
         best = sorted(valid, key=lambda x: -x["gtc"])[:10]
         P.append("<div class='sec' style='color:var(--good)'>🏆 10 bưu cục %GTC cao nhất (TB 7 ngày)</div>")
-        P.append("<section class='card'><table class='t'><thead><tr><th>Bưu cục</th><th>Đơn</th><th>%GTC TB</th></tr></thead><tbody>")
-        for r in best:
-            P.append("<tr><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
-                     % (_esc(r["bc"]), _n(r["dg"]), _cls(r["gtc"]), r["gtc"]))
+        P.append("<section class='card'><table class='t'><thead><tr><th class='rk'>#</th><th>Bưu cục</th><th>Đơn</th><th>%GTC TB</th></tr></thead><tbody>")
+        for i, r in enumerate(best, 1):
+            P.append("<tr><td class='rk'>%d</td><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (i, _esc(r["bc"]), _n(r["dg"]), _cls(r["gtc"]), r["gtc"]))
         P.append("</tbody></table></section>")
         # 🔻 10 BC %GTC THẤP NHẤT (đỏ)
         worst = sorted(valid, key=lambda x: x["gtc"])[:10]
         P.append("<div class='sec' style='color:var(--bad)'>🔻 10 bưu cục %GTC thấp nhất (TB 7 ngày)</div>")
-        P.append("<section class='card'><table class='t'><thead><tr><th>Bưu cục</th><th>GTB</th><th>%GTC TB</th></tr></thead><tbody>")
-        for r in worst:
-            P.append("<tr><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
-                     % (_esc(r["bc"]), _n(r["gtb"]), _cls(r["gtc"]), r["gtc"]))
+        P.append("<section class='card'><table class='t'><thead><tr><th class='rk'>#</th><th>Bưu cục</th><th>GTB</th><th>%GTC TB</th></tr></thead><tbody>")
+        for i, r in enumerate(worst, 1):
+            P.append("<tr><td class='rk'>%d</td><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (i, _esc(r["bc"]), _n(r["gtb"]), _cls(r["gtc"]), r["gtc"]))
         P.append("</tbody></table></section>")
 
     # (Bảng nhân viên chuyển sang trang riêng "Năng suất nhân viên")
@@ -394,8 +394,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .t th{color:var(--mut);font-weight:600;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid var(--line)}
 .t th:first-child,.t td:first-child{text-align:left}
 .t tbody tr:last-child td{border-bottom:none}
-.nv{font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv{font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 .nv .sc{color:var(--mut);font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.t td.rk,.t th.rk{color:var(--mut);font-weight:700;text-align:left;width:20px;padding-right:2px}
+.t td.nv{text-align:left}
 .mh{font-size:11.5px;font-weight:700;letter-spacing:.03em;padding:10px 2px 2px}
 .mh.up{color:var(--good)}.mh.down{color:var(--bad)}
 td.up{color:var(--good);font-weight:800}td.down{color:var(--bad);font-weight:800}
