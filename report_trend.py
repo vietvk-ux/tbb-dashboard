@@ -307,6 +307,14 @@ def gen_html(data):
             P.append("<tr><td class='rk'>%d</td><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                      % (i, _esc(r["bc"]), _n(r["gtb"]), _cls(r["gtc"]), r["gtc"]))
         P.append("</tbody></table></section>")
+        # 📦 10 BC SỐ ĐƠN cao nhất (sản lượng)
+        topvol = sorted(valid, key=lambda x: -x["dg"])[:10]
+        P.append("<div class='sec' style='color:#8ea2ff'>📦 10 bưu cục số đơn cao nhất (30 ngày)</div>")
+        P.append("<section class='card'><table class='t'><thead><tr><th class='rk'>#</th><th>Bưu cục</th><th>Đơn</th><th>%GTC TB</th></tr></thead><tbody>")
+        for i, r in enumerate(topvol, 1):
+            P.append("<tr><td class='rk'>%d</td><td class='nv'>%s</td><td class='vol'>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (i, _esc(r["bc"]), _n(r["dg"]), _cls(r["gtc"]), r["gtc"]))
+        P.append("</tbody></table></section>")
 
     # (Bảng nhân viên chuyển sang trang riêng "Năng suất nhân viên")
     P.append("<a class='eod' href='nhanvien.html'><span>⚡ Năng suất &amp; xếp hạng nhân viên</span>"
@@ -415,6 +423,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 td.up{color:var(--good);font-weight:800}td.down{color:var(--bad);font-weight:800}
 td.dmut{color:var(--mut)}
 td.ns{font-weight:800;color:var(--good)}
+td.vol{font-weight:800;color:#aeb6e0}
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:3px 8px;border-radius:99px;font-weight:800;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
 .pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
 .pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}.pill.na{background:#3a4160;color:var(--mut)}
