@@ -412,7 +412,8 @@ def gen_html(data):
 
 def gen_nhanvien_html(data):
     now = datetime.now(VN)
-    P = [_HEAD, "<div class='wrap'>",
+    P = [_HEAD.replace("<title>Xu hướng TBB</title>", "<title>Năng suất Nhân viên · TBB</title>"),
+         "<div class='wrap'>",
          "<header class='top'><div class='brand'>⚡ NĂNG SUẤT NHÂN VIÊN</div>"
          "<div class='ts' style='white-space:nowrap'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m")]
     if not data:
@@ -438,7 +439,8 @@ def gen_nhanvien_html(data):
 
 def gen_transit_html(transit):
     now = datetime.now(VN)
-    P = [_HEAD, "<div class='wrap'>",
+    P = [_HEAD.replace("<title>Xu hướng TBB</title>", "<title>Kho Chuyển Tiếp · TBB</title>"),
+         "<div class='wrap'>",
          "<header class='top'><div class='brand'>📦 KHO CHUYỂN TIẾP</div>"
          "<div class='ts' style='white-space:nowrap'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m")]
     if not transit:
