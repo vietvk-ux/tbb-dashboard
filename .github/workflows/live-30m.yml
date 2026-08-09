@@ -93,6 +93,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_trend.py
       - uses: actions/upload-pages-artifact@v3

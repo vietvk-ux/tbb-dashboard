@@ -7,17 +7,57 @@ Trang XU HƯỚNG (trend.html) — đọc số liệu lịch sử từ Supabase 
 - Ghi docs/<slug>/trend.html.
 """
 from __future__ import annotations
+import asyncio
 import html
 import logging
 import os
 from datetime import datetime, timedelta, timezone
 
+import aiohttp
 import requests
 
 logger = logging.getLogger("trend")
 VN = timezone(timedelta(hours=7))
 PROV_NAME = {"LCA": "Lào Cai", "YBA": "Yên Bái", "SLA": "Sơn La",
              "DBI": "Điện Biên", "LCH": "Lai Châu"}
+
+# 3 KHO CHUYỂN TIẾP (transit) — tồn đọng luân chuyển (live từ nhanh.ghn.vn)
+TRANSIT_HUBS = [("20791000", "Yên Bái"), ("20818000", "Lào Cai"), ("21321000", "Sơn La")]
+
+
+async def _fetch_transit_async(token):
+    import report_backlog_web as BL
+    from report import _post
+    timeout = aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=30)
+    giao_t = [("TRANSPORT_DELIVERY", "", "")]
+    tra_t = [("TRANSPORT_RETURN", "", "")]
+    async with aiohttp.ClientSession(timeout=timeout) as s:
+        out = []
+        for code, name in TRANSIT_HUBS:
+            try:
+                d = await _post(s, BL.EP_TR, {"hub_ids": [code]}, code, token)
+                p = BL.parse_hub((d.get("data") or [{}])[0])
+            except Exception:
+                p = {}
+            g = (p.get("TRANSPORT_DELIVERY") or {"total": 0})["total"]
+            r = (p.get("TRANSPORT_RETURN") or {"total": 0})["total"]
+            gg = BL.sec_groups(p, giao_t)
+            rg = BL.sec_groups(p, tra_t)
+            out.append({"name": name, "giao": g, "tra": r,
+                        "over120": gg[">120h"] + rg[">120h"]})
+        return out
+
+
+def fetch_transit():
+    """Tồn đọng luân chuyển 3 kho chuyển tiếp (live). Thiếu NHANH_TOKEN → None."""
+    token = os.environ.get("NHANH_TOKEN", "").strip()
+    if not token:
+        return None
+    try:
+        return asyncio.run(_fetch_transit_async(token))
+    except Exception as e:
+        logger.warning("Tồn đọng kho chuyển tiếp lỗi: %s", str(e)[:150])
+        return None
 
 
 def _esc(s):
@@ -213,6 +253,26 @@ def _ns_card(rows):
             "<section class='card'>%s</section>" % inner)
 
 
+def _transit_card(transit):
+    if not transit:
+        return ""
+    tg = sum(w["giao"] for w in transit)
+    tt = sum(w["tra"] for w in transit)
+    tov = sum(w["over120"] for w in transit)
+    P = ["<div class='sec' style='color:#8ea2ff'>📦 Backlog Tồn Đọng Luân Chuyển · Kho Chuyển Tiếp</div>",
+         "<section class='card'>",
+         "<div class='mh' style='color:#aeb6e0'>TỔNG %d kho: 🚚 %s giao · ↩️ %s trả%s</div>"
+         % (len(transit), _n(tg), _n(tt), (" · ⚠️ %s quá 120h" % _n(tov)) if tov else ""),
+         "<table class='t'><thead><tr><th>Kho chuyển tiếp</th><th>🚚 Giao</th><th>↩️ Trả</th><th>⚠️&gt;120h</th></tr></thead><tbody>"]
+    for w in transit:
+        ov = w["over120"]
+        ovc = ("<td class='down'>%s</td>" % _n(ov)) if ov else "<td class='dmut'>0</td>"
+        P.append("<tr><td class='nv'>%s</td><td class='vol'>%s</td><td>%s</td>%s</tr>"
+                 % (_esc(w["name"]), _n(w["giao"]), _n(w["tra"]), ovc))
+    P.append("</tbody></table></section>")
+    return "".join(P)
+
+
 # ---------- Trang ----------
 
 def gen_html(data):
@@ -326,7 +386,7 @@ def gen_html(data):
     return "\n".join(P)
 
 
-def gen_nhanvien_html(data):
+def gen_nhanvien_html(data, transit=None):
     now = datetime.now(VN)
     P = [_HEAD, "<div class='wrap'>",
          "<header class='top'><div class='brand'>⚡ NĂNG SUẤT NHÂN VIÊN</div>"
@@ -334,10 +394,13 @@ def gen_nhanvien_html(data):
     if not data:
         P.append("<div class='empty'>⚙️ Chưa cấu hình database (Supabase).<br>"
                  "Thêm secret rồi đợi có dữ liệu.</div>")
+        P.append(_transit_card(transit))
         P.append("</div></body></html>")
         return "\n".join(P)
     # Năng suất GTC = đơn GTC / số ngày làm việc (mục chính)
     P.append(_ns_card(data.get("nangsuat") or []))
+    # Backlog tồn đọng luân chuyển 3 kho chuyển tiếp (live)
+    P.append(_transit_card(transit))
     # Xếp hạng %GTC nhân viên tuần / tháng
     P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · TUẦN (7 ngày gần nhất)", "≥ 1 tuần dữ liệu",
                         data.get("tuan_top") or [], data.get("tuan_bot") or []))
@@ -363,12 +426,14 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
+    transit = fetch_transit()
     with open(os.path.join(outdir, "trend.html"), "w", encoding="utf-8") as f:
         f.write(gen_html(data))
     with open(os.path.join(outdir, "nhanvien.html"), "w", encoding="utf-8") as f:
-        f.write(gen_nhanvien_html(data))
-    logger.info("Đã tạo trend.html + nhanvien.html (%d ngày dữ liệu).",
-                len(data["vung"]) if data and data.get("vung") else 0)
+        f.write(gen_nhanvien_html(data, transit))
+    logger.info("Đã tạo trend.html + nhanvien.html (%d ngày · transit %s kho).",
+                len(data["vung"]) if data and data.get("vung") else 0,
+                len(transit) if transit else 0)
 
 
 _HEAD = """<!doctype html><html lang='vi'><head><meta charset='utf-8'>
