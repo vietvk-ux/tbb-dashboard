@@ -44,7 +44,8 @@ async def _fetch_transit_async(token):
             gg = BL.sec_groups(p, giao_t)
             rg = BL.sec_groups(p, tra_t)
             out.append({"name": name, "giao": g, "tra": r,
-                        "over120": gg[">120h"] + rg[">120h"]})
+                        "over120": gg[">120h"] + rg[">120h"],
+                        "giao_g": gg, "tra_g": rg})
         return out
 
 
@@ -256,14 +257,9 @@ def _ns_card(rows):
 def _transit_card(transit):
     if not transit:
         return ""
-    tg = sum(w["giao"] for w in transit)
-    tt = sum(w["tra"] for w in transit)
-    tov = sum(w["over120"] for w in transit)
-    P = ["<div class='sec' style='color:#8ea2ff'>📦 Backlog Tồn Đọng Luân Chuyển · Kho Chuyển Tiếp</div>",
-         "<section class='card'>",
-         "<div class='mh' style='color:#aeb6e0'>TỔNG %d kho: 🚚 %s giao · ↩️ %s trả%s</div>"
-         % (len(transit), _n(tg), _n(tt), (" · ⚠️ %s quá 120h" % _n(tov)) if tov else ""),
-         "<table class='t'><thead><tr><th>Kho chuyển tiếp</th><th>🚚 Giao</th><th>↩️ Trả</th><th>⚠️&gt;120h</th></tr></thead><tbody>"]
+    P = ["<div class='sec'>Tổng tồn theo kho</div>",
+         "<section class='card'><table class='t'><thead><tr><th>Kho chuyển tiếp</th>"
+         "<th>🚚 Giao</th><th>↩️ Trả</th><th>⚠️&gt;120h</th></tr></thead><tbody>"]
     for w in transit:
         ov = w["over120"]
         ovc = ("<td class='down'>%s</td>" % _n(ov)) if ov else "<td class='dmut'>0</td>"
@@ -271,6 +267,14 @@ def _transit_card(transit):
                  % (_esc(w["name"]), _n(w["giao"]), _n(w["tra"]), ovc))
     P.append("</tbody></table></section>")
     return "".join(P)
+
+
+def _grp_chips(groups):
+    """4 chip phân bố khung giờ: <24h · 24–72h · 72–120h · >120h."""
+    order = [("<24h", "g"), ("24–72h", "w"), ("72–120h", "o"), (">120h", "b")]
+    parts = ["<span class='gchip %s'>%s <b>%s</b></span>" % (c, lb, _n(groups.get(lb, 0)))
+             for lb, c in order]
+    return "<div class='gchips'>" + "".join(parts) + "</div>"
 
 
 # ---------- Trang ----------
@@ -386,7 +390,7 @@ def gen_html(data):
     return "\n".join(P)
 
 
-def gen_nhanvien_html(data, transit=None):
+def gen_nhanvien_html(data):
     now = datetime.now(VN)
     P = [_HEAD, "<div class='wrap'>",
          "<header class='top'><div class='brand'>⚡ NĂNG SUẤT NHÂN VIÊN</div>"
@@ -394,13 +398,10 @@ def gen_nhanvien_html(data, transit=None):
     if not data:
         P.append("<div class='empty'>⚙️ Chưa cấu hình database (Supabase).<br>"
                  "Thêm secret rồi đợi có dữ liệu.</div>")
-        P.append(_transit_card(transit))
         P.append("</div></body></html>")
         return "\n".join(P)
     # Năng suất GTC = đơn GTC / số ngày làm việc (mục chính)
     P.append(_ns_card(data.get("nangsuat") or []))
-    # Backlog tồn đọng luân chuyển 3 kho chuyển tiếp (live)
-    P.append(_transit_card(transit))
     # Xếp hạng %GTC nhân viên tuần / tháng
     P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · TUẦN (7 ngày gần nhất)", "≥ 1 tuần dữ liệu",
                         data.get("tuan_top") or [], data.get("tuan_bot") or []))
@@ -411,6 +412,41 @@ def gen_nhanvien_html(data, transit=None):
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>NS = đơn GTC / số ngày làm việc · số liệu lưu tại Supabase · cập nhật mỗi tối 23h</div>")
+    P.append("</div></body></html>")
+    return "\n".join(P)
+
+
+def gen_transit_html(transit):
+    now = datetime.now(VN)
+    P = [_HEAD, "<div class='wrap'>",
+         "<header class='top'><div class='brand'>📦 KHO CHUYỂN TIẾP</div>"
+         "<div class='ts' style='white-space:nowrap'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m")]
+    if not transit:
+        P.append("<div class='empty'>Chưa lấy được số tồn đọng luân chuyển "
+                 "(thiếu token hoặc lỗi API). Thử lại sau ít phút.</div>")
+        P.append("</div></body></html>")
+        return "\n".join(P)
+    tg = sum(w["giao"] for w in transit)
+    tt = sum(w["tra"] for w in transit)
+    tov = sum(w["over120"] for w in transit)
+    # Hero tổng
+    P.append("<section class='hero warn'>")
+    P.append("<div class='hlbl'>📦 TỒN ĐỌNG LUÂN CHUYỂN · %d KHO CHUYỂN TIẾP</div>" % len(transit))
+    P.append("<div class='hpct' style='font-size:46px'>%s<span> đơn</span></div>" % _n(tg + tt))
+    P.append("<div class='hsub'>🚚 %s giao · ↩️ %s trả%s</div>"
+             % (_n(tg), _n(tt), (" · ⚠️ %s quá 120h" % _n(tov)) if tov else ""))
+    P.append("</section>")
+    # Bảng tổng 3 kho
+    P.append(_transit_card(transit))
+    # Chi tiết khung giờ từng kho (đơn LC giao)
+    for w in transit:
+        P.append("<div class='sec'>🏭 Kho Chuyển Tiếp %s · phân bố tồn (LC giao)</div>" % _esc(w["name"]))
+        P.append("<section class='card'>%s"
+                 "<div class='note'>🚚 giao <b>%s</b> · ↩️ trả <b>%s</b></div></section>"
+                 % (_grp_chips(w.get("giao_g") or {}), _n(w["giao"]), _n(w["tra"])))
+    P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
+             "<span class='arw'>%GTC hôm nay →</span></a>")
+    P.append("<div class='foot'>Tồn đọng luân chuyển 3 kho chuyển tiếp · số LIVE từ nhanh.ghn.vn · tự cập nhật ~15'</div>")
     P.append("</div></body></html>")
     return "\n".join(P)
 
@@ -430,8 +466,10 @@ def main():
     with open(os.path.join(outdir, "trend.html"), "w", encoding="utf-8") as f:
         f.write(gen_html(data))
     with open(os.path.join(outdir, "nhanvien.html"), "w", encoding="utf-8") as f:
-        f.write(gen_nhanvien_html(data, transit))
-    logger.info("Đã tạo trend.html + nhanvien.html (%d ngày · transit %s kho).",
+        f.write(gen_nhanvien_html(data))
+    with open(os.path.join(outdir, "khochuyentiep.html"), "w", encoding="utf-8") as f:
+        f.write(gen_transit_html(transit))
+    logger.info("Đã tạo trend + nhanvien + khochuyentiep.html (%d ngày · transit %s kho).",
                 len(data["vung"]) if data and data.get("vung") else 0,
                 len(transit) if transit else 0)
 
@@ -489,6 +527,10 @@ td.up{color:var(--good);font-weight:800}td.down{color:var(--bad);font-weight:800
 td.dmut{color:var(--mut)}
 td.ns{font-weight:800;color:var(--good)}
 td.vol{font-weight:800;color:#aeb6e0}
+.gchips{display:flex;flex-wrap:wrap;gap:7px;margin:2px 0 6px}
+.gchip{font-size:12px;padding:5px 9px;border-radius:9px;background:rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+.gchip b{font-weight:800;margin-left:2px}
+.gchip.g{color:var(--good)}.gchip.w{color:var(--warn)}.gchip.o{color:#ff9d5c}.gchip.b{color:var(--bad)}
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:3px 8px;border-radius:99px;font-weight:800;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
 .pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
 .pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}.pill.na{background:#3a4160;color:var(--mut)}
