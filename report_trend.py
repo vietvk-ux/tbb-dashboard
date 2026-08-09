@@ -460,13 +460,13 @@ def gen_transit_html(transit):
     P.append(_transit_card(transit))
     # Chi tiết khung giờ từng kho (đơn LC giao)
     for w in transit:
-        P.append("<div class='sec'>🏭 Kho Chuyển Tiếp %s · số đơn từng mốc giờ</div>" % _esc(w["name"]))
+        P.append("<div class='sec'>🏭 Kho Chuyển Tiếp %s · phân bố tồn theo mốc giờ</div>" % _esc(w["name"]))
         P.append("<section class='card'>"
                  "<div class='note' style='margin:0 0 6px'>🚚 LC giao (%s đơn)</div>%s"
                  "<div class='note' style='margin:8px 0 6px'>↩️ LC trả (%s đơn)</div>%s"
                  "</section>"
-                 % (_n(w["giao"]), _bucket_chips(w.get("giao_bk")),
-                    _n(w["tra"]), _bucket_chips(w.get("tra_bk"))))
+                 % (_n(w["giao"]), _grp_chips(w.get("giao_g") or {}),
+                    _n(w["tra"]), _grp_chips(w.get("tra_g") or {})))
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Tồn đọng luân chuyển 3 kho chuyển tiếp · số LIVE từ nhanh.ghn.vn · tự cập nhật ~15'</div>")
