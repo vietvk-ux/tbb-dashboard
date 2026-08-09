@@ -43,9 +43,12 @@ async def _fetch_transit_async(token):
             r = (p.get("TRANSPORT_RETURN") or {"total": 0})["total"]
             gg = BL.sec_groups(p, giao_t)
             rg = BL.sec_groups(p, tra_t)
+            gbk = (p.get("TRANSPORT_DELIVERY") or {}).get("buckets") or {}
+            rbk = (p.get("TRANSPORT_RETURN") or {}).get("buckets") or {}
             out.append({"name": name, "giao": g, "tra": r,
                         "over120": gg[">120h"] + rg[">120h"],
-                        "giao_g": gg, "tra_g": rg})
+                        "giao_g": gg, "tra_g": rg,
+                        "giao_bk": gbk, "tra_bk": rbk})
         return out
 
 
@@ -277,6 +280,23 @@ def _grp_chips(groups):
     return "<div class='gchips'>" + "".join(parts) + "</div>"
 
 
+# 10 mốc giờ chi tiết (key API, nhãn, màu theo mức tuổi)
+_BUCKETS = [
+    ("0_6", "0–6h", "g"), ("6_12", "6–12h", "g"), ("12_24", "12–24h", "g"),
+    ("24_36", "24–36h", "w"), ("36_48", "36–48h", "w"), ("48_72", "48–72h", "w"),
+    ("72_96", "72–96h", "o"), ("96_120", "96–120h", "o"),
+    ("120_192", "120–192h", "b"), ("192", "192h+", "b"),
+]
+
+
+def _bucket_chips(buckets):
+    """10 chip số đơn từng mốc giờ chi tiết."""
+    buckets = buckets or {}
+    parts = ["<span class='gchip %s'>%s <b>%s</b></span>" % (c, lb, _n(buckets.get(k, 0)))
+             for k, lb, c in _BUCKETS]
+    return "<div class='gchips'>" + "".join(parts) + "</div>"
+
+
 # ---------- Trang ----------
 
 def gen_html(data):
@@ -440,10 +460,13 @@ def gen_transit_html(transit):
     P.append(_transit_card(transit))
     # Chi tiết khung giờ từng kho (đơn LC giao)
     for w in transit:
-        P.append("<div class='sec'>🏭 Kho Chuyển Tiếp %s · phân bố tồn (LC giao)</div>" % _esc(w["name"]))
-        P.append("<section class='card'>%s"
-                 "<div class='note'>🚚 giao <b>%s</b> · ↩️ trả <b>%s</b></div></section>"
-                 % (_grp_chips(w.get("giao_g") or {}), _n(w["giao"]), _n(w["tra"])))
+        P.append("<div class='sec'>🏭 Kho Chuyển Tiếp %s · số đơn từng mốc giờ</div>" % _esc(w["name"]))
+        P.append("<section class='card'>"
+                 "<div class='note' style='margin:0 0 6px'>🚚 LC giao (%s đơn)</div>%s"
+                 "<div class='note' style='margin:8px 0 6px'>↩️ LC trả (%s đơn)</div>%s"
+                 "</section>"
+                 % (_n(w["giao"]), _bucket_chips(w.get("giao_bk")),
+                    _n(w["tra"]), _bucket_chips(w.get("tra_bk"))))
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Tồn đọng luân chuyển 3 kho chuyển tiếp · số LIVE từ nhanh.ghn.vn · tự cập nhật ~15'</div>")
