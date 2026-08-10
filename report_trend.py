@@ -271,11 +271,11 @@ def _transit_card(transit):
 
 
 def _grp_chips(groups):
-    """4 chip phân bố khung giờ: <24h · 24–72h · 72–120h · >120h."""
+    """4 cột khung giờ: nhãn ở trên, số đơn ở dưới (<24h · 24–72h · 72–120h · >120h)."""
     order = [("<24h", "g"), ("24–72h", "w"), ("72–120h", "o"), (">120h", "b")]
-    parts = ["<span class='gchip %s'>%s <b>%s</b></span>" % (c, lb, _n(groups.get(lb, 0)))
-             for lb, c in order]
-    return "<div class='gchips'>" + "".join(parts) + "</div>"
+    cells = ["<div class='gcol %s'><div class='gl'>%s</div><div class='gv'>%s</div></div>"
+             % (c, lb, _n(groups.get(lb, 0))) for lb, c in order]
+    return "<div class='gcols'>" + "".join(cells) + "</div>"
 
 
 # 10 mốc giờ chi tiết (key API, nhãn, màu theo mức tuổi)
@@ -552,6 +552,11 @@ td.vol{font-weight:800;color:#aeb6e0}
 .gchip{font-size:12px;padding:5px 9px;border-radius:9px;background:rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
 .gchip b{font-weight:800;margin-left:2px}
 .gchip.g{color:var(--good)}.gchip.w{color:var(--warn)}.gchip.o{color:#ff9d5c}.gchip.b{color:var(--bad)}
+.gcols{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:2px 0 2px}
+.gcol{text-align:center;padding:8px 4px;border-radius:10px;background:rgba(255,255,255,.05)}
+.gcol .gl{font-size:11px;opacity:.85}
+.gcol .gv{font-size:17px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+.gcol.g{color:var(--good)}.gcol.w{color:var(--warn)}.gcol.o{color:#ff9d5c}.gcol.b{color:var(--bad)}
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:3px 8px;border-radius:99px;font-weight:800;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
 .pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
 .pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}.pill.na{background:#3a4160;color:var(--mut)}
