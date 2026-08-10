@@ -120,8 +120,6 @@ def fetch_trend(days=90):
     # Xếp hạng %GTC nhân viên tuần/tháng (view v_nv_tuan, v_nv_thang; chưa tạo → [])
     return {
         "vung": vung, "bc30": bc,
-        "tuan_top": _get_safe(url, key, "v_nv_tuan?order=pct_cur.desc,dg_cur.desc&limit=8"),
-        "tuan_bot": _get_safe(url, key, "v_nv_tuan?order=pct_cur.asc,dg_cur.desc&limit=8"),
         "thang_top": _get_safe(url, key, "v_nv_thang?order=pct_cur.desc,dg_cur.desc&limit=8"),
         "thang_bot": _get_safe(url, key, "v_nv_thang?order=pct_cur.asc,dg_cur.desc&limit=8"),
         "nangsuat": _get_safe(url, key, "v_nv_nangsuat?order=nang_suat.desc&limit=15"),
@@ -424,8 +422,6 @@ def gen_nhanvien_html(data):
     # Năng suất GTC = đơn GTC / số ngày làm việc (mục chính)
     P.append(_ns_card(data.get("nangsuat") or []))
     # Xếp hạng %GTC nhân viên tuần / tháng
-    P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · TUẦN (7 ngày gần nhất)", "≥ 1 tuần dữ liệu",
-                        data.get("tuan_top") or [], data.get("tuan_bot") or []))
     P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · THÁNG (30 ngày gần nhất)", "≥ 1 tháng dữ liệu",
                         data.get("thang_top") or [], data.get("thang_bot") or []))
     P.append("<a class='eod' href='trend.html'><span>📈 Xu hướng theo ngày</span>"
