@@ -1,0 +1,44 @@
+name: Đồng bộ DB cuối ngày (23h35)
+
+# LUỒNG RIÊNG chỉ ghi Supabase — KHÔNG có environment github-pages nên KHÔNG
+# bao giờ kẹt "waiting" như live-30m. Đảm bảo dữ liệu ngày luôn được lưu dù trang
+# web có kẹt deploy. Chạy độc lập, không đụng GitHub Pages.
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Ngày YYYY-MM-DD (trống = tự tính ngày vừa kết thúc)'
+        required: false
+        default: ''
+  schedule:
+    # 23:35 VN = 16:35 UTC — sau slot EOD 23:30, độc lập. Trễ vài phút không sao
+    # vì logic ngày tự lấy ngày vừa kết thúc; chuyến đã đóng là số cố định.
+    - cron: '35 16 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-sync-23h
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Sync dữ liệu ngày vào Supabase
+        env:
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          EOD_DATE: ${{ github.event.inputs.date }}
+        run: python report_db_sync.py
