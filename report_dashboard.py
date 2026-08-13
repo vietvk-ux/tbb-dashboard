@@ -237,12 +237,12 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
         top3 = " · ".join("%s (%s)" % (dr["driver_name"], dr["bc"]) for dr in danger[:3])
         P.append("<div class='dsub'><b>%d nhân viên</b> %%GTC &lt;%d%% (≥%d đơn) → <b class='rd'>%s đơn GTB</b>, COD GTB <b>%.0f triệu</b>.<br>🔥 COD kẹt/đơn cao nhất: <b>%s</b> — cần đốc thúc/thu hồi ngay.</div>"
                  % (len(danger), int(NGUONG), MIN, _n(tot_gtb), tot_cod / 1e6, _esc(top3)))
-        P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th><th>Đơn</th><th>COD/đơn</th><th>%GTC</th></tr></thead><tbody>")
+        P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th><th>Đơn</th><th>COD/đơn (tr)</th><th>%GTC</th></tr></thead><tbody>")
         for i, dr in enumerate(danger[:15], 1):
-            codper = round((dr.get("gtb_cod", 0) / dr["total"]) / 1000) if dr["total"] else 0
-            P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td><td class='rd'>%sk</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
-                     % (i, _esc(dr["driver_name"]), _esc(dr["bc"]), _n(dr["total"]), _n(codper),
-                        _cls(dr["gtc"]), dr["gtc"]))
+            codper = (dr.get("gtb_cod", 0) / dr["total"] / 1e6) if dr["total"] else 0  # triệu/đơn
+            P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td><td class='rd'>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (i, _esc(dr["driver_name"]), _esc(dr["bc"]), _n(dr["total"]),
+                        ("%.2f" % codper).replace(".", ","), _cls(dr["gtc"]), dr["gtc"]))
         P.append("</tbody></table>")
     P.append("</section>")
 
