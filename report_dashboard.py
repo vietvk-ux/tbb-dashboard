@@ -220,23 +220,23 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     P.append("<div class='banner'><div class='bl'>⏳ Chưa gán giao<br><span style='opacity:.75;font-weight:500'>chờ xếp chuyến · %s</span></div>"
              "<div class='bv'>%s đơn</div></div>" % (_esc(backlog_time), _n(total_backlog)))
 
-    # ===== ⚠️ Nhóm nhân viên nguy hiểm (GTC thấp + nhiều đơn hỏng, ≥20 đơn) =====
-    MIN, NGUONG = 20, 50.0
+    # ===== ⚠️ Nhóm nhân viên nguy hiểm (%GTC<50%, KHÔNG giới hạn số đơn, xếp COD GTB/đơn cao nhất) =====
+    NGUONG = 50.0
     danger = [dr for dr in agg["drivers"]
-              if dr["total"] >= MIN and dr["gtc"] is not None and dr["gtc"] < NGUONG]
+              if dr["gtc"] is not None and dr["gtc"] < NGUONG]
     # Xếp theo COD GTB / đơn CAO NHẤT (tiền thu hộ kẹt trên mỗi đơn — rủi ro tài chính)
     danger.sort(key=lambda x: -((x.get("gtb_cod", 0) / x["total"]) if x["total"] else 0))
     P.append("<section class='danger'>")
     P.append("<div class='dhead'>⚠️ NHÓM NHÂN VIÊN NGUY HIỂM CẦN CHÚ Ý</div>")
     if not danger:
-        P.append("<div class='ok'>✅ Không có nhân viên nào %%GTC dưới %d%% (≥%d đơn). Vùng ổn định.</div>"
-                 % (int(NGUONG), MIN))
+        P.append("<div class='ok'>✅ Không có nhân viên nào %%GTC dưới %d%%. Vùng ổn định.</div>"
+                 % int(NGUONG))
     else:
         tot_gtb = sum(dr["total"] - dr["success"] for dr in danger)
         tot_cod = sum(dr.get("gtb_cod", 0) for dr in danger)
         top3 = " · ".join("%s (%s)" % (dr["driver_name"], dr["bc"]) for dr in danger[:3])
-        P.append("<div class='dsub'><b>%d nhân viên</b> %%GTC &lt;%d%% (≥%d đơn) → <b class='rd'>%s đơn GTB</b>, COD GTB <b>%.0f triệu</b>.<br>🔥 COD kẹt/đơn cao nhất: <b>%s</b> — cần đốc thúc/thu hồi ngay.</div>"
-                 % (len(danger), int(NGUONG), MIN, _n(tot_gtb), tot_cod / 1e6, _esc(top3)))
+        P.append("<div class='dsub'><b>%d nhân viên</b> %%GTC &lt;%d%% → <b class='rd'>%s đơn GTB</b>, COD GTB <b>%.0f triệu</b>.<br>🔥 COD GTB/đơn cao nhất: <b>%s</b> — cần đốc thúc/thu hồi ngay.</div>"
+                 % (len(danger), int(NGUONG), _n(tot_gtb), tot_cod / 1e6, _esc(top3)))
         P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th><th>Đơn</th><th>COD/đơn (tr)</th><th>%GTC</th></tr></thead><tbody>")
         for i, dr in enumerate(danger[:15], 1):
             codper = (dr.get("gtb_cod", 0) / dr["total"] / 1e6) if dr["total"] else 0  # triệu/đơn
