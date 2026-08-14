@@ -77,31 +77,36 @@ async def fetch_live(token):
                 ontrip = await _list("ON_TRIP")
                 fin = [t for t in await _list("FINISHED") if t.get("endDateIndex") == ymd]
 
+                def _drv0(dn):
+                    return {"name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0}
+
                 async def _it(t, is_ontrip):
                     dn = t.get("driverName") or "—"
                     try:
                         async with sem:
                             items = await _fetch_all_items(session, token, hid, t["tripCode"])
-                        # (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?)
+                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?)
                         recs = [(x.get("orderCode"), dn, x.get("isSucceeded") is True,
                                  x.get("isUpdated") is True, is_ontrip)
                                 for x in items if x.get("type") == "DELIVER"]
-                        return (dn, recs)
+                        # PICK: (mã đơn, tài xế, đã lấy thành công?)
+                        picks = [(x.get("orderCode"), dn, x.get("isSucceeded") is True)
+                                 for x in items if x.get("type") == "PICK"]
+                        return (dn, recs, picks)
                     except Exception:
-                        return (dn, [])
+                        return (dn, [], [])
 
                 res = await asyncio.gather(
                     *([_it(t, True) for t in ontrip] + [_it(t, False) for t in fin]))
                 drivers = {}
                 # Mỗi chuyến (dù trùng đơn) vẫn tính là 1 chuyến của tài xế
-                for dn, _recs in res:
-                    d = drivers.setdefault(dn, {"name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0})
-                    d["chuyen"] += 1
+                for dn, _recs, _picks in res:
+                    drivers.setdefault(dn, _drv0(dn))["chuyen"] += 1
                 # GỘP theo MÃ ĐƠN: 1 đơn gán nhiều chuyến chỉ tính 1 lần.
                 # Ưu tiên bản ghi: đã giao > đã xử lý > chuyến đang chạy (đơn còn treo
                 # tính cho chuyến hiện tại). GTC=đơn giao xong ở BẤT KỲ chuyến nào.
                 best = {}
-                for dn, recs in res:
+                for dn, recs, _picks in res:
                     for oc, drv, succ, att, ot in recs:
                         if not oc:
                             continue
@@ -110,18 +115,33 @@ async def fetch_live(token):
                         if cur is None or score > cur[0]:
                             best[oc] = (score, drv, succ, att)
                 for oc, (score, drv, succ, att) in best.items():
-                    d = drivers.setdefault(drv, {"name": drv, "chuyen": 0, "gtc": 0, "att": 0, "total": 0})
+                    d = drivers.setdefault(drv, _drv0(drv))
                     d["total"] += 1
                     if succ:
                         d["gtc"] += 1
                     if att:
                         d["att"] += 1
+                # LTC (lấy thành công): gộp mã đơn PICK, thành công ở bất kỳ chuyến nào
+                bestp = {}
+                for dn, _recs, picks in res:
+                    for oc, drv, psucc in picks:
+                        if not oc:
+                            continue
+                        cur = bestp.get(oc)
+                        if cur is None or (psucc and not cur[1]):
+                            bestp[oc] = (drv, psucc)
+                for oc, (drv, psucc) in bestp.items():
+                    d = drivers.setdefault(drv, _drv0(drv))
+                    if psucc:
+                        d["ltc"] += 1
                 h_total = sum(d["total"] for d in drivers.values())
                 h_gtc = sum(d["gtc"] for d in drivers.values())
                 h_att = sum(d["att"] for d in drivers.values())
+                h_ltc = sum(d["ltc"] for d in drivers.values())
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
-                        "att": h_att, "total": h_total, "drivers": list(drivers.values())}
+                        "att": h_att, "total": h_total, "ltc": h_ltc,
+                        "drivers": list(drivers.values())}
             except TokenExpiredError:
                 raise
             except Exception as e:
@@ -230,14 +250,16 @@ def gen_html(rows):
         drv = r["drivers"]  # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao)
         P.append("<div class='dtl'>")
         if drv:
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>❌GTB</th><th>%GTC</th></tr></thead><tbody>")
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>LTC</th><th>❌GTB</th><th>%GTC</th></tr></thead><tbody>")
             for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
                 pc2 = _pct(d["gtc"], d["total"])
                 gtb2 = d["att"] - d["gtc"]  # GTB đã thao tác (đã xử lý nhưng không thành công)
                 gtb_cell = ("<b class='gtb'>%s</b>" % _n(gtb2)) if gtb2 > 0 else "0"
-                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                ltc = d.get("ltc", 0)
+                ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
+                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                          % (_esc(d["name"]), _n(d.get("chuyen", 0)), _n(d["total"]), _n(d["gtc"]),
-                            gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—"))
+                            ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—"))
             P.append("</tbody></table>")
         else:
             P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
@@ -338,15 +360,16 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bcm{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 .bcm .w{color:var(--warn)}
 .gtb{color:var(--bad);font-weight:700}
+.ltc{color:var(--good);font-weight:700}
 .dtl{padding:2px 12px 12px}
 .none{color:var(--mut);font-size:12.5px;padding:6px 2px 10px}
 
-table.drv{width:100%;border-collapse:collapse;font-size:13px}
-table.drv th,table.drv td{padding:8px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
-table.drv th{color:var(--mut);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line)}
+table.drv{width:100%;border-collapse:collapse;font-size:12px}
+table.drv th,table.drv td{padding:7px 3px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+table.drv th{color:var(--mut);font-weight:600;font-size:9.5px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid var(--line)}
 table.drv th:first-child,table.drv td:first-child{text-align:left}
 table.drv tbody tr:last-child td{border-bottom:none}
-td.nv{font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.nv{font-weight:600;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:24px 0 4px}
 </style></head><body>"""
