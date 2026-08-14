@@ -124,7 +124,7 @@ def fetch_trend(days=90):
         "vung": vung, "bc30": bc, "nv30": nv30,
         "thang_top": _get_safe(url, key, "v_nv_thang?order=pct_cur.desc,dg_cur.desc&limit=8"),
         "thang_bot": _get_safe(url, key, "v_nv_thang?order=pct_cur.asc,dg_cur.desc&limit=8"),
-        "nangsuat": _get_safe(url, key, "v_nv_nangsuat?order=nang_suat.desc&limit=30"),
+        "nangsuat": _get_safe(url, key, "v_nv_nangsuat?order=nang_suat.desc&limit=20"),
     }
 
 
