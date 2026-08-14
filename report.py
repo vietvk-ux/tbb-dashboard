@@ -93,9 +93,11 @@ async def _trip_items(session, token, hub_id, trip_code, sem):
         items = await _fetch_all_items(session, token, hub_id, trip_code)
     recs = []
     for x in items:
-        if x.get("type") != "DELIVER":
+        typ = x.get("type")
+        if typ not in ("DELIVER", "PICK"):   # giữ cả LẤY (PICK) để tính LTC
             continue
         recs.append({
+            "type": typ,
             "code": x.get("orderCode") or "",
             "succ": x.get("isSucceeded") is True,
             "att": x.get("isUpdated") is True,
@@ -146,6 +148,8 @@ def aggregate(payload):
     for t in ok:
         pc = pcode_of(t["bc"])
         for it in t.get("items", []):
+            if it.get("type") != "DELIVER":
+                continue
             code = it["code"]
             if not code:
                 continue
@@ -156,6 +160,25 @@ def aggregate(payload):
                 best[key] = {"score": score, "bc": t["bc"], "prov": pc,
                              "driver_id": t.get("driver_id", ""), "driver_name": t.get("driver_name", "—"),
                              "succ": it["succ"], "cod": it["cod"], "vngh": code.startswith("VNGH")}
+
+    # 1b) GỘP đơn LẤY (PICK) → LTC (lấy thành công) theo (bưu cục, mã đơn)
+    bestp = {}
+    for t in ok:
+        for it in t.get("items", []):
+            if it.get("type") != "PICK" or not it["code"]:
+                continue
+            key = (t["bc"], it["code"])
+            cur = bestp.get(key)
+            if cur is None or (it["succ"] and not cur[3]):
+                bestp[key] = (t["bc"], pcode_of(t["bc"]),
+                              f"{t.get('driver_id','')}|{t['bc']}", it["succ"])
+    ltc_bc, ltc_prov, ltc_drv = {}, {}, {}
+    for bc, pc, dk, succ in bestp.values():
+        if succ:
+            ltc_bc[bc] = ltc_bc.get(bc, 0) + 1
+            ltc_prov[pc] = ltc_prov.get(pc, 0) + 1
+            ltc_drv[dk] = ltc_drv.get(dk, 0) + 1
+    grand_ltc = sum(ltc_bc.values())
 
     # 2) Đếm số chuyến (bc/prov/driver) — chuyến có ≥1 đơn deliver
     prov_trips, bc_trips, drv_trips = {}, {}, {}
@@ -186,11 +209,14 @@ def aggregate(payload):
 
     def gtc(v): return round(v["success"]/v["total"]*100, 1) if v["total"] else None
     prov_list = sorted([{"prov": v["prov"], "bc_count": len(v["bcs"]), "trips": prov_trips.get(v["prov"], 0),
-                          "total": v["total"], "success": v["success"], "gtc": gtc(v)}
+                          "total": v["total"], "success": v["success"], "gtc": gtc(v),
+                          "ltc": ltc_prov.get(v["prov"], 0)}
                          for v in provs.values()], key=lambda x: -x["total"])
-    bc_list = sorted([{**v, "trips": bc_trips.get(v["bc"], 0), "gtc": gtc(v)} for v in bcs.values()],
+    bc_list = sorted([{**v, "trips": bc_trips.get(v["bc"], 0), "gtc": gtc(v),
+                       "ltc": ltc_bc.get(v["bc"], 0)} for v in bcs.values()],
                      key=lambda x: -x["total"])
-    driver_list = sorted([{**v, "trips": drv_trips.get(f"{v['driver_id']}|{v['bc']}", 0), "gtc": gtc(v)}
+    driver_list = sorted([{**v, "trips": drv_trips.get(f"{v['driver_id']}|{v['bc']}", 0), "gtc": gtc(v),
+                           "ltc": ltc_drv.get(f"{v['driver_id']}|{v['bc']}", 0)}
                           for v in drivers.values() if v["total"] > 0],
                          key=lambda x: (x["gtc"] if x["gtc"] is not None else 999))
     grand_total = sum(p["total"] for p in prov_list)
@@ -203,6 +229,7 @@ def aggregate(payload):
     vngh_gtc = round(vngh_success/vngh_total*100, 1) if vngh_total else None
     return {"date": payload["date"], "hub_count": payload["hub_count"], "errors": err_count,
             "grand": {"trips": grand_trips, "total": grand_total, "success": grand_success, "gtc": grand_gtc,
+                      "ltc": grand_ltc,
                       "vngh_total": vngh_total, "vngh_success": vngh_success, "vngh_gtc": vngh_gtc},
             "provinces": prov_list, "bcs": bc_list, "drivers": driver_list}
 
@@ -220,6 +247,8 @@ def dedup_orders(payload):
     for t in ok:
         pc = pcode_of(t["bc"])
         for it in t.get("items", []):
+            if it.get("type") != "DELIVER":
+                continue
             code = it["code"]
             if not code:
                 continue

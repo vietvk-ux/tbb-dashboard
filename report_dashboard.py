@@ -101,9 +101,9 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bar i.bad{background:linear-gradient(90deg,#d8434b,#f2585f)}
 .bar i.na{background:#4b5168}
 
-.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
-.st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 6px;text-align:center}
-.sv{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.strip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 4px;text-align:center}
+.sv{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
 .sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
 .sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
 
@@ -151,16 +151,17 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bch{display:flex;align-items:center;gap:9px}
 .bcn{font-weight:700;font-size:15px;flex:1;min-width:0}
 .bcm{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
-.bcm .w{color:var(--warn)}.bcm .b{color:var(--bad)}
+.bcm .w{color:var(--warn)}.bcm .b{color:var(--bad)}.bcm .g{color:var(--good)}
 .dtl{padding:2px 12px 12px}
 .note{color:var(--mut);font-size:12px;margin:2px 0 8px}
 
-table.drv{width:100%;border-collapse:collapse;font-size:13px}
-table.drv th,table.drv td{padding:8px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
-table.drv th{color:var(--mut);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line)}
+table.drv{width:100%;border-collapse:collapse;font-size:12px}
+table.drv th,table.drv td{padding:7px 3px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+table.drv th{color:var(--mut);font-weight:600;font-size:9.5px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid var(--line)}
 table.drv th:first-child,table.drv td:first-child{text-align:left}
 table.drv tbody tr:last-child td{border-bottom:none}
-td.nv{font-weight:600;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+table.drv .ltc{color:var(--good);font-weight:700}
+td.nv{font-weight:600;max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 table.drv th.lft{text-align:left}
 td.nv .sc{color:var(--mut);font-size:11px;font-weight:500;margin-top:1px;overflow:hidden;text-overflow:ellipsis}
 td.rd{color:var(--bad);font-weight:700}
@@ -204,8 +205,8 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG TÂY BẮC BỘ</div>")
     P.append("<div class='hpct'>%s<span>%%</span></div>" % gtc)
     P.append(_bar(g["gtc"], _cls(g["gtc"])))
-    P.append("<div class='hsub'>%s / %s đơn giao thành công · GTB %s đơn</div>"
-             % (_n(g["success"]), _n(g["total"]), _n(total_gtb)))
+    P.append("<div class='hsub'>%s / %s đơn giao thành công · GTB %s đơn · lấy TC %s</div>"
+             % (_n(g["success"]), _n(g["total"]), _n(total_gtb), _n(g.get("ltc", 0))))
     P.append("</section>")
 
     # ===== Dải chỉ số =====
@@ -213,6 +214,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📦 Đơn giao</div></div>" % _n(g["total"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ Giao TC</div></div>" % _n(g["success"]))
     P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>❌ GTB</div></div>" % _n(total_gtb))
+    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 Lấy TC</div></div>" % _n(g.get("ltc", 0)))
     P.append("<div class='st'><div class='sv'>%.0f<span style=\"font-size:12px\">tr</span></div><div class='sl'>💰 COD GTB</div></div>" % (total_cod / 1e6))
     P.append("</section>")
 
@@ -253,8 +255,8 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
         P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(p["prov"], p["prov"]))))
         P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %d BC · 🚚 %d chuyến · 📦 %s đơn · ✅ %s</div>"
-                 % (p["bc_count"], p["trips"], _n(p["total"]), _n(p["success"])))
+        P.append("<div class='pmeta'>🏤 %d BC · 🚚 %d chuyến · 📦 %s đơn · ✅ %s · 🛒 lấy %s</div>"
+                 % (p["bc_count"], p["trips"], _n(p["total"]), _n(p["success"]), _n(p.get("ltc", 0))))
         P.append("</div>")
     P.append("</section>")
 
@@ -277,19 +279,21 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
                  % (cls, _esc(b["bc"]), cls, b["gtc"] if b["gtc"] is not None else "—"))
         P.append(_bar(b["gtc"], cls))
         blchip = ("<span class='w'>⏳ %s</span>" % _n(bl_d)) if bl_d else ""
-        P.append("<div class='bcm'><span>📦 %s</span><span>✅ %s</span><span class='b'>❌ %s</span>%s</div>"
-                 % (_n(b["total"]), _n(b["success"]), _n(b["total"] - b["success"]), blchip))
+        P.append("<div class='bcm'><span>📦 %s</span><span>✅ %s</span><span class='b'>❌ %s</span><span class='g'>🛒 %s</span>%s</div>"
+                 % (_n(b["total"]), _n(b["success"]), _n(b["total"] - b["success"]), _n(b.get("ltc", 0)), blchip))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         if bl_d or bl.get("pick") or bl.get("return"):
             P.append("<div class='note'>⏳ Chưa gán chuyến: <b>%s</b> giao · %s lấy · %s trả</div>"
                      % (_n(bl_d), _n(bl.get("pick", 0)), _n(bl.get("return", 0))))
         if drivers:
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>GTB</th><th>%GTC</th></tr></thead><tbody>")
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>LTC</th><th>GTB</th><th>%GTC</th></tr></thead><tbody>")
             for dr in drivers:
-                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                dltc = dr.get("ltc", 0)
+                ltc_cell = ("<b class='ltc'>%s</b>" % _n(dltc)) if dltc > 0 else "0"
+                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                          % (_esc(dr["driver_name"]), _n(dr["total"]), _n(dr["success"]),
-                            _n(dr["total"] - dr["success"]), _cls(dr["gtc"]),
+                            ltc_cell, _n(dr["total"] - dr["success"]), _cls(dr["gtc"]),
                             dr["gtc"] if dr["gtc"] is not None else "—"))
             P.append("</tbody></table>")
         else:
