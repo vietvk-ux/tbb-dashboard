@@ -117,9 +117,11 @@ def fetch_trend(days=90):
     # %GTC 30 ngày theo bưu cục (tốt/kém) — dùng cho bảng. limit cao tránh cắt dòng.
     since30 = (datetime.now(VN).date() - timedelta(days=30)).isoformat()
     bc = _get_all(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,gtc,gtb,don_giao" % since30)
+    # Nhân viên 30 ngày (để xếp COD GTB / đơn GTB cao nhất)
+    nv30 = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=driver_id,ten_nv,buu_cuc,cod_gtb,gtb,don_giao" % since30)
     # Xếp hạng %GTC nhân viên tuần/tháng (view v_nv_tuan, v_nv_thang; chưa tạo → [])
     return {
-        "vung": vung, "bc30": bc,
+        "vung": vung, "bc30": bc, "nv30": nv30,
         "thang_top": _get_safe(url, key, "v_nv_thang?order=pct_cur.desc,dg_cur.desc&limit=8"),
         "thang_bot": _get_safe(url, key, "v_nv_thang?order=pct_cur.asc,dg_cur.desc&limit=8"),
         "nangsuat": _get_safe(url, key, "v_nv_nangsuat?order=nang_suat.desc&limit=30"),
@@ -252,6 +254,39 @@ def _ns_card(rows):
         inner = ("<table class='t'><thead><tr><th class='rk'>#</th><th>Nhân viên</th><th>GTC</th><th>Ngày</th>"
                  "<th>NS/ngày</th></tr></thead><tbody>" + "".join(trs) + "</tbody></table>")
     return ("<div class='sec' style='color:var(--good)'>⚡ Năng suất GTC nhân viên · GTC/ngày làm (30 ngày)</div>"
+            "<section class='card'>%s</section>" % inner)
+
+
+def _cod_card(nv30):
+    """Top 10 nhân viên COD GTB / đơn GTB cao nhất (gộp 30 ngày). Tiền kẹt / đơn hỏng."""
+    if not nv30:
+        inner = "<div class='none'>Chưa đủ dữ liệu — cần bảng nhân viên tích lũy (số hiện khi có dữ liệu 30 ngày).</div>"
+    else:
+        agg = {}
+        for r in nv30:
+            did = str(r.get("driver_id") or "") or ("%s|%s" % (r.get("ten_nv") or "", r.get("buu_cuc") or ""))
+            a = agg.setdefault(did, {"ten": r.get("ten_nv"), "bc": r.get("buu_cuc"), "cod": 0.0, "gtb": 0})
+            a["cod"] += r.get("cod_gtb") or 0
+            a["gtb"] += r.get("gtb") or 0
+            if r.get("ten_nv"):
+                a["ten"] = r["ten_nv"]
+            if r.get("buu_cuc"):
+                a["bc"] = r["buu_cuc"]
+        rows = [a for a in agg.values() if a["gtb"] > 0]
+        rows.sort(key=lambda x: -(x["cod"] / x["gtb"]))
+        top = rows[:10]
+        trs = []
+        for i, a in enumerate(top, 1):
+            per = a["cod"] / a["gtb"] / 1e6           # triệu / đơn GTB
+            trs.append("<tr><td class='rk'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
+                       "<td>%s</td><td>%s</td><td class='cod'>%s</td></tr>"
+                       % (i, _esc(a["ten"]), _esc(a["bc"]), _n(a["gtb"]),
+                          ("%.1f" % (a["cod"] / 1e6)).replace(".", ","),
+                          ("%.2f" % per).replace(".", ",")))
+        inner = ("<table class='t'><thead><tr><th class='rk'>#</th><th>Nhân viên</th>"
+                 "<th>GTB</th><th>COD GTB tr</th><th>tr/đơn</th></tr></thead><tbody>"
+                 + "".join(trs) + "</tbody></table>")
+    return ("<div class='sec' style='color:var(--bad)'>💰 Top 10 nhân viên COD GTB / đơn cao nhất (30 ngày)</div>"
             "<section class='card'>%s</section>" % inner)
 
 
@@ -421,6 +456,8 @@ def gen_nhanvien_html(data):
         return "\n".join(P)
     # Năng suất GTC = đơn GTC / số ngày làm việc (mục chính)
     P.append(_ns_card(data.get("nangsuat") or []))
+    # Top 10 COD GTB / đơn GTB cao nhất (30 ngày) — tiền thu hộ kẹt/đơn hỏng
+    P.append(_cod_card(data.get("nv30") or []))
     # Xếp hạng %GTC nhân viên tuần / tháng
     P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · THÁNG (30 ngày gần nhất)", "≥ 1 tháng dữ liệu",
                         data.get("thang_top") or [], data.get("thang_bot") or []))
@@ -548,6 +585,7 @@ td.up{color:var(--good);font-weight:800}td.down{color:var(--bad);font-weight:800
 td.dmut{color:var(--mut)}
 td.ns{font-weight:800;color:var(--good)}
 td.vol{font-weight:800;color:#aeb6e0}
+td.cod{font-weight:800;color:var(--bad)}
 .gchips{display:flex;flex-wrap:wrap;gap:7px;margin:2px 0 6px}
 .gchip{font-size:12px;padding:5px 9px;border-radius:9px;background:rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
 .gchip b{font-weight:800;margin-left:2px}
