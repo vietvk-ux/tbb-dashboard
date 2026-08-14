@@ -205,7 +205,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG TÂY BẮC BỘ</div>")
     P.append("<div class='hpct'>%s<span>%%</span></div>" % gtc)
     P.append(_bar(g["gtc"], _cls(g["gtc"])))
-    P.append("<div class='hsub'>%s / %s đơn giao thành công · GTB %s đơn · lấy TC %s</div>"
+    P.append("<div class='hsub'>%s / %s đơn giao thành công · GTB %s đơn · LTC %s</div>"
              % (_n(g["success"]), _n(g["total"]), _n(total_gtb), _n(g.get("ltc", 0))))
     P.append("</section>")
 
@@ -214,7 +214,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📦 Đơn giao</div></div>" % _n(g["total"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ Giao TC</div></div>" % _n(g["success"]))
     P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>❌ GTB</div></div>" % _n(total_gtb))
-    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 Lấy TC</div></div>" % _n(g.get("ltc", 0)))
+    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(g.get("ltc", 0)))
     P.append("<div class='st'><div class='sv'>%.0f<span style=\"font-size:12px\">tr</span></div><div class='sl'>💰 COD GTB</div></div>" % (total_cod / 1e6))
     P.append("</section>")
 
@@ -255,7 +255,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
         P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(p["prov"], p["prov"]))))
         P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %d BC · 🚚 %d chuyến · 📦 %s đơn · ✅ %s · 🛒 lấy %s</div>"
+        P.append("<div class='pmeta'>🏤 %d BC · 🚚 %d chuyến · 📦 %s đơn · ✅ %s · 🛒 LTC %s</div>"
                  % (p["bc_count"], p["trips"], _n(p["total"]), _n(p["success"]), _n(p.get("ltc", 0))))
         P.append("</div>")
     P.append("</section>")

@@ -187,7 +187,7 @@ def gen_html(rows):
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
     P.append(_bar(reg_pct, _cls(reg_pct)))
-    P.append("<div class='hsub'>%s / %s đơn giao thành công · lấy TC %s · cần giao %s</div>"
+    P.append("<div class='hsub'>%s / %s đơn giao thành công · LTC %s · cần giao %s</div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
     P.append("</section>")
 
@@ -221,7 +221,7 @@ def gen_html(rows):
         P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(pv, pv))))
         P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏃 %s · 📥 %s · ⏳ %s · ✅ %s · <span class='gtb'>❌ %s</span> · <span class='ltc'>lấy %s</span></div>"
+        P.append("<div class='pmeta'>🏃 %s · 📥 %s · ⏳ %s · ✅ %s · <span class='gtb'>❌ %s</span> · <span class='ltc'>LTC %s</span></div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _n(v["att"] - v["gtc"]), _n(v["ltc"])))
         P.append("</div>")
@@ -244,7 +244,7 @@ def gen_html(rows):
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
                  "<span class='w'>⏳ %s</span><span>✅ %s</span><span class='gtb'>❌ %s</span>"
-                 "<span class='ltc'>lấy %s</span></div>"
+                 "<span class='ltc'>LTC %s</span></div>"
                  % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
                     _n(r["att"] - r["gtc"]), _n(r.get("ltc", 0))))
         P.append("</summary>")
