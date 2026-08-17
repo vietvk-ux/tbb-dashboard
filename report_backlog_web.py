@@ -442,6 +442,73 @@ def build_html(entries, hub_count):
     return "\n".join(P)
 
 
+def build_backlog_fallback(agg, backlog, day):
+    """Trang backlog DỰ PHÒNG: số tồn theo khung giờ không có trong Supabase, nên chỉ
+    hiện 'Chưa gán giao' (chờ xếp chuyến) theo tỉnh/bưu cục từ snapshot + banner."""
+    import snapshot as SNAP
+    now = datetime.now(VN)
+    total = sum(v.get("deliver", 0) for v in backlog.values())
+    prov = {}
+    for b in agg["bcs"]:
+        cg = backlog.get(b["bc"], {}).get("deliver", 0)
+        p = prov.setdefault(b["prov"], {"cg": 0, "bc": 0})
+        p["cg"] += cg
+        p["bc"] += 1
+    P = ["<!doctype html><html lang='vi'><head><meta charset='utf-8'>",
+         "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>",
+         "<meta name='robots' content='noindex,nofollow'>",
+         "<meta http-equiv='refresh' content='300'>",
+         "<meta name='theme-color' content='#0a0d18'>",
+         "<title>Tồn đọng TBB · dự phòng</title>",
+         _CSS, "<div class='wrap'>"]
+    P.append("<header class='top'><div class='brand'><span class='dot'></span>TỒN ĐỌNG · TBB</div>"
+             "<div class='ts'>%s<br>dự phòng</div></header>" % now.strftime("%H:%M · %d/%m/%Y"))
+    P.append(SNAP.banner_html(day, "Số tồn theo Lấy·Giao·Trả / khung giờ không lưu trong dự phòng — "
+                                   "chỉ hiện <b>chưa gán giao</b> (chờ xếp chuyến)."))
+    P.append("<section class='hero'><div class='hlbl'>⏳ Chưa gán giao toàn vùng · chốt %s/%s</div>"
+             "<div class='hbig'>%s</div><div class='hsub'>đơn chờ xếp chuyến</div></section>"
+             % (day[8:10], day[5:7], _n(total)))
+    P.append("<div class='subh'>🗺 Theo tỉnh · nhiều → ít</div>")
+    P.append("<table><tr><th>Tỉnh</th><th>BC</th><th>Chưa gán giao</th></tr>")
+    for pv, v in sorted(prov.items(), key=lambda kv: -kv[1]["cg"]):
+        P.append("<tr><td>%s</td><td>%d</td><td><b>%s</b></td></tr>"
+                 % (_esc(PROV_NAME.get(pv, pv)), v["bc"], _n(v["cg"])))
+    P.append("</table>")
+    P.append("<div class='subh'>🏤 Bưu cục còn chưa gán giao · nhiều → ít</div>")
+    P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục...' oninput='filt()'>")
+    bcs = sorted([b for b in agg["bcs"] if backlog.get(b["bc"], {}).get("deliver", 0) > 0],
+                 key=lambda b: -backlog.get(b["bc"], {}).get("deliver", 0))
+    P.append("<div class='scroll'><table id='bctb'><tr><th>Bưu cục</th><th>Tỉnh</th><th>Chưa gán giao</th></tr>")
+    for b in bcs:
+        cg = backlog.get(b["bc"], {}).get("deliver", 0)
+        key = _esc((b["bc"] + " " + PROV_NAME.get(b["prov"], b["prov"])).lower())
+        P.append("<tr data-k=\"%s\"><td>%s</td><td>%s</td><td><span class='pill mut'>%s</span></td></tr>"
+                 % (key, _esc(b["bc"]), _esc(PROV_NAME.get(b["prov"], b["prov"])), _n(cg)))
+    P.append("</table></div>")
+    P.append("<div class='foot'>Bản dự phòng từ Supabase (chốt %s/%s) · số tồn real-time tạm dừng do token nhanh.ghn.vn</div>"
+             % (day[8:10], day[5:7]))
+    P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();"
+             "document.querySelectorAll('#bctb tr[data-k]').forEach(function(e){"
+             "e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
+    P.append("</div></body></html>")
+    return "\n".join(P)
+
+
+def _write_backlog_fallback(err):
+    import snapshot as SNAP
+    snap = SNAP.load_snapshot()
+    if not snap:
+        return False
+    agg, backlog, day = snap
+    slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
+    outdir = os.path.join("docs", slug)
+    os.makedirs(outdir, exist_ok=True)
+    with open(os.path.join(outdir, "backlog.html"), "w", encoding="utf-8") as f:
+        f.write(build_backlog_fallback(agg, backlog, day))
+    logger.warning("ĐÃ GHI backlog.html DỰ PHÒNG từ Supabase ngày %s · lỗi: %s", day, str(err)[:120])
+    return True
+
+
 def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
@@ -450,8 +517,11 @@ def main():
         raise SystemExit("Thiếu NHANH_TOKEN")
     try:
         entries, hub_count = asyncio.run(fetch_all(token))
-    except TokenExpiredError as e:
-        raise SystemExit("Token hết hạn: %s" % e)
+    except Exception as e:
+        # Token hết hạn / API lỗi → backlog.html dự phòng (chưa gán giao từ Supabase) + banner.
+        if _write_backlog_fallback(e):
+            return
+        raise SystemExit("Fetch tồn đọng lỗi và không có snapshot dự phòng: %s" % e)
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)

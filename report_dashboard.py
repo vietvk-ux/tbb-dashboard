@@ -312,6 +312,27 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
     return "\n".join(P)
 
 
+def _write_eod_fallback(err):
+    """Fetch báo cáo lỗi → dựng eod.html từ snapshot Supabase mới nhất + banner. True nếu ghi được.
+    KHÔNG đồng bộ Supabase và KHÔNG gửi GTalk (số đã cũ)."""
+    import snapshot as SNAP
+    snap = SNAP.load_snapshot()
+    if not snap:
+        return False
+    agg, backlog, day = snap
+    dm = day[8:10] + "/" + day[5:7]
+    html_out = gen_html(agg, backlog, backlog_time="chốt %s" % dm)
+    banner = SNAP.banner_html(day, "Chỉ số LTC không có trong bản dự phòng.")
+    html_out = html_out.replace("<div class='wrap'>", "<div class='wrap'>" + banner, 1)
+    slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
+    outdir = os.path.join("docs", slug)
+    os.makedirs(outdir, exist_ok=True)
+    with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
+        f.write(html_out)
+    logger.warning("ĐÃ GHI eod.html DỰ PHÒNG từ Supabase ngày %s · lỗi: %s", day, str(err)[:120])
+    return True
+
+
 def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
@@ -331,8 +352,11 @@ def main():
     try:
         payload = asyncio.run(fetch_report(token, d))
         agg = aggregate(payload)
-    except TokenExpiredError as e:
-        raise SystemExit("Token hết hạn: %s" % e)
+    except Exception as e:
+        # Token hết hạn / API lỗi → dựng eod.html từ snapshot Supabase + banner (thay vì đọng).
+        if _write_eod_fallback(e):
+            return
+        raise SystemExit("Fetch báo cáo lỗi và không có snapshot dự phòng: %s" % e)
 
     # Đơn chưa gán giao: lấy số THẬT (live) tại thời điểm chạy báo cáo cuối ngày (23h).
     backlog, backlog_time = {}, "cuối ngày"
