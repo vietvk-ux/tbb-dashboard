@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 import report
 import db_sync
+import report_backlog_web as BL
 from report_dashboard import fetch_backlog
 
 VN = timezone(timedelta(hours=7))
@@ -58,6 +59,15 @@ def main():
     db_sync.sync(d.isoformat(), agg, report.dedup_orders(payload), backlog)
     logger.info("XONG sync ngày %s · %d bưu cục · %d nhân viên · GTC %s%%.",
                 d, len(agg["bcs"]), len(agg["drivers"]), agg["grand"]["gtc"])
+
+    # Tồn đọng Lấy·Giao·Trả·Luân chuyển (số LIVE lúc chạy ~23h) → bảng bao_cao_ton_dong.
+    # Lỗi (token/API/bảng chưa tạo) KHÔNG làm hỏng phần sync chính ở trên.
+    try:
+        entries, _ = asyncio.run(BL.fetch_all(token))
+        rows = BL.backlog_rows(entries)
+        db_sync.sync_backlog(d.isoformat(), rows)
+    except Exception as e:
+        logger.warning("Sync tồn đọng lỗi (bỏ qua): %s", str(e)[:200])
 
 
 if __name__ == "__main__":

@@ -55,12 +55,12 @@ def load_snapshot():
         return None
     v = vung[0]
     grand = {"trips": v.get("so_chuyen") or 0, "total": v.get("don_giao") or 0,
-             "success": v.get("gtc") or 0, "gtc": v.get("pct_gtc"), "ltc": 0,
+             "success": v.get("gtc") or 0, "gtc": v.get("pct_gtc"), "ltc": v.get("ltc") or 0,
              "vngh_total": v.get("vngh_don") or 0, "vngh_success": 0,
              "vngh_gtc": v.get("vngh_gtc")}
     bcs = [{"bc": b["buu_cuc"], "prov": b.get("tinh"), "trips": b.get("so_chuyen") or 0,
             "total": b.get("don_giao") or 0, "success": b.get("gtc") or 0,
-            "gtc": b.get("pct_gtc"), "ltc": 0} for b in bcs_raw]
+            "gtc": b.get("pct_gtc"), "ltc": b.get("ltc") or 0} for b in bcs_raw]
     provs = {}
     for b in bcs:
         p = provs.setdefault(b["prov"], {"prov": b["prov"], "bc_count": 0, "trips": 0,
@@ -69,12 +69,13 @@ def load_snapshot():
         p["trips"] += b["trips"]
         p["total"] += b["total"]
         p["success"] += b["success"]
+        p["ltc"] += b["ltc"]
     for p in provs.values():
         p["gtc"] = round(p["success"] / p["total"] * 100, 1) if p["total"] else None
     drivers = [{"driver_id": str(d.get("driver_id") or ""), "driver_name": d.get("ten_nv") or "—",
                 "bc": d.get("buu_cuc"), "prov": d.get("tinh"), "trips": d.get("so_chuyen") or 0,
                 "total": d.get("don_giao") or 0, "success": d.get("gtc") or 0,
-                "gtc": d.get("pct_gtc"), "gtb_cod": d.get("cod_gtb") or 0, "ltc": 0}
+                "gtc": d.get("pct_gtc"), "gtb_cod": d.get("cod_gtb") or 0, "ltc": d.get("ltc") or 0}
                for d in nv_raw]
     y, m, dd = (int(x) for x in day.split("-"))
     agg = {"date": _date(y, m, dd), "hub_count": v.get("so_buu_cuc") or len(bcs),
@@ -82,6 +83,21 @@ def load_snapshot():
            "bcs": bcs, "drivers": drivers}
     backlog = {b["buu_cuc"]: {"deliver": b.get("chua_gan") or 0} for b in bcs_raw}
     return agg, backlog, day
+
+
+def load_ton_dong(day):
+    """Đọc tồn đọng Lấy·Giao·Trả·Luân chuyển của ngày `day` từ bao_cao_ton_dong.
+    Trả list dòng (hoặc [] nếu bảng chưa tạo / chưa có dữ liệu)."""
+    url = os.environ.get("SUPABASE_URL", "").strip()
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return []
+    try:
+        return _sb_all(url, key, "bao_cao_ton_dong?ngay=eq.%s&select=*" % day)
+    except Exception as e:
+        logger.warning("Không đọc được tồn đọng snapshot: %s", str(e)[:120])
+        return []
 
 
 def banner_html(day, extra=""):

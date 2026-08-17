@@ -442,18 +442,34 @@ def build_html(entries, hub_count):
     return "\n".join(P)
 
 
+def backlog_rows(entries):
+    """entries (fetch_all) → dòng cho bảng bao_cao_ton_dong (chỉ loại có tồn > 0)."""
+    rows = []
+    for e in entries:
+        for key, types in (("lgt", LGT_TYPES), ("tr", TR_TYPES)):
+            parsed = e.get(key) or {}
+            for ot, _, _ in types:
+                v = parsed.get(ot)
+                if not v or v.get("total", 0) <= 0:
+                    continue
+                g = type_group_counts(parsed, ot)   # [<24h, 24–72h, 72–120h, >120h]
+                rows.append({"buu_cuc": e["name"], "tinh": e.get("prov"), "order_type": ot,
+                             "total": v.get("total", 0), "g_lt24": g[0], "g_24_72": g[1],
+                             "g_72_120": g[2], "g_gt120": g[3]})
+    return rows
+
+
 def build_backlog_fallback(agg, backlog, day):
-    """Trang backlog DỰ PHÒNG: số tồn theo khung giờ không có trong Supabase, nên chỉ
-    hiện 'Chưa gán giao' (chờ xếp chuyến) theo tỉnh/bưu cục từ snapshot + banner."""
+    """Trang backlog DỰ PHÒNG từ Supabase. Nếu đã có bảng bao_cao_ton_dong (chốt tối) →
+    hiện tồn Lấy·Giao·Trả·Luân chuyển + >120h. Luôn kèm 'chưa gán giao'. Banner cảnh báo."""
     import snapshot as SNAP
     now = datetime.now(VN)
-    total = sum(v.get("deliver", 0) for v in backlog.values())
-    prov = {}
-    for b in agg["bcs"]:
-        cg = backlog.get(b["bc"], {}).get("deliver", 0)
-        p = prov.setdefault(b["prov"], {"cg": 0, "bc": 0})
-        p["cg"] += cg
-        p["bc"] += 1
+    dm = "%s/%s" % (day[8:10], day[5:7])
+    td = SNAP.load_ton_dong(day)
+    labels = {ot: short for grp in (LGT_TYPES, TR_TYPES) for ot, _, short in grp}
+    type_order = [ot for grp in (LGT_TYPES, TR_TYPES) for ot, _, _ in grp]
+    total_cg = sum(v.get("deliver", 0) for v in backlog.values())
+
     P = ["<!doctype html><html lang='vi'><head><meta charset='utf-8'>",
          "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>",
          "<meta name='robots' content='noindex,nofollow'>",
@@ -463,30 +479,80 @@ def build_backlog_fallback(agg, backlog, day):
          _CSS, "<div class='wrap'>"]
     P.append("<header class='top'><div class='brand'><span class='dot'></span>TỒN ĐỌNG · TBB</div>"
              "<div class='ts'>%s<br>dự phòng</div></header>" % now.strftime("%H:%M · %d/%m/%Y"))
-    P.append(SNAP.banner_html(day, "Số tồn theo Lấy·Giao·Trả / khung giờ không lưu trong dự phòng — "
-                                   "chỉ hiện <b>chưa gán giao</b> (chờ xếp chuyến)."))
-    P.append("<section class='hero'><div class='hlbl'>⏳ Chưa gán giao toàn vùng · chốt %s/%s</div>"
+    if td:
+        P.append(SNAP.banner_html(day, "Hiện tồn Lấy·Giao·Trả·Luân chuyển đã chốt tối (không real-time)."))
+    else:
+        P.append(SNAP.banner_html(day, "Số tồn theo khung giờ chưa lưu — chỉ hiện <b>chưa gán giao</b>. "
+                                       "(Chạy migration + đợi 1 tối để có đủ.)"))
+
+    # ===== Tồn Lấy·Giao·Trả·Luân chuyển (nếu đã lưu) =====
+    if td:
+        by_type = {ot: {"total": 0, "gt120": 0} for ot in type_order}
+        prov_t, bc_t = {}, {}
+        for r in td:
+            ot = r["order_type"]
+            t = r.get("total") or 0
+            o120 = r.get("g_gt120") or 0
+            if ot in by_type:
+                by_type[ot]["total"] += t
+                by_type[ot]["gt120"] += o120
+            pv = r.get("tinh") or "?"
+            p = prov_t.setdefault(pv, {"total": 0, "gt120": 0, "bc": set()})
+            p["total"] += t
+            p["gt120"] += o120
+            p["bc"].add(r["buu_cuc"])
+            b = bc_t.setdefault(r["buu_cuc"], {"tinh": pv, "total": 0, "gt120": 0})
+            b["total"] += t
+            b["gt120"] += o120
+        grand_t = sum(x["total"] for x in by_type.values())
+        grand_120 = sum(x["gt120"] for x in by_type.values())
+        P.append("<section class='hero'><div class='hlbl'>📦 Tổng tồn Lấy·Giao·Trả·Luân chuyển · chốt %s</div>"
+                 "<div class='hbig'>%s</div><div class='hsub'>đơn tồn · 🔴 &gt;120h: "
+                 "<b style='color:var(--bad)'>%s</b></div></section>" % (dm, _n(grand_t), _n(grand_120)))
+        P.append("<section class='types n4'>")
+        for ot in type_order:
+            P.append("<div class='ty'><div class='v'>%s</div><div class='l'>%s</div></div>"
+                     % (_n(by_type[ot]["total"]), _esc(labels[ot])))
+        P.append("</section>")
+        P.append("<div class='subh'>🗺 Theo tỉnh · tồn nhiều → ít</div>")
+        P.append("<table><tr><th>Tỉnh</th><th>BC</th><th>Tổng tồn</th><th>&gt;120h</th></tr>")
+        for pv, v in sorted(prov_t.items(), key=lambda kv: -kv[1]["total"]):
+            ucls = "bad" if v["gt120"] > 0 else "mut"
+            P.append("<tr><td>%s</td><td>%d</td><td><b>%s</b></td><td><span class='pill %s'>%s</span></td></tr>"
+                     % (_esc(PROV_NAME.get(pv, pv)), len(v["bc"]), _n(v["total"]), ucls, _n(v["gt120"])))
+        P.append("</table>")
+        P.append("<div class='subh'>🏤 Bưu cục · tồn nhiều → ít · 🔎 tìm nhanh</div>")
+        P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục...' oninput='filt()'>")
+        P.append("<div class='scroll'><table id='bctb'><tr><th>Bưu cục</th><th>Tỉnh</th>"
+                 "<th>Tồn</th><th>&gt;120h</th><th>Chưa gán</th></tr>")
+        for name, b in sorted(bc_t.items(), key=lambda kv: -kv[1]["total"]):
+            cg = backlog.get(name, {}).get("deliver", 0)
+            pvn = PROV_NAME.get(b["tinh"], b["tinh"])
+            key = _esc((name + " " + pvn).lower())
+            o120 = ("<span class='pill bad'>%s</span>" % _n(b["gt120"])) if b["gt120"] else "<span class='muted'>0</span>"
+            P.append("<tr data-k=\"%s\"><td>%s</td><td>%s</td><td><b>%s</b></td><td>%s</td>"
+                     "<td><span class='pill mut'>%s</span></td></tr>"
+                     % (key, _esc(name), _esc(pvn), _n(b["total"]), o120, _n(cg)))
+        P.append("</table></div>")
+
+    # ===== Chưa gán giao (luôn có) =====
+    P.append("<div class='sec' id='cg'>⏳ Chưa gán giao (chờ xếp chuyến)</div>")
+    prov_cg = {}
+    for b in agg["bcs"]:
+        cg = backlog.get(b["bc"], {}).get("deliver", 0)
+        p = prov_cg.setdefault(b["prov"], {"cg": 0, "bc": 0})
+        p["cg"] += cg
+        p["bc"] += 1
+    P.append("<section class='hero'><div class='hlbl'>⏳ Chưa gán giao toàn vùng · chốt %s</div>"
              "<div class='hbig'>%s</div><div class='hsub'>đơn chờ xếp chuyến</div></section>"
-             % (day[8:10], day[5:7], _n(total)))
-    P.append("<div class='subh'>🗺 Theo tỉnh · nhiều → ít</div>")
+             % (dm, _n(total_cg)))
     P.append("<table><tr><th>Tỉnh</th><th>BC</th><th>Chưa gán giao</th></tr>")
-    for pv, v in sorted(prov.items(), key=lambda kv: -kv[1]["cg"]):
+    for pv, v in sorted(prov_cg.items(), key=lambda kv: -kv[1]["cg"]):
         P.append("<tr><td>%s</td><td>%d</td><td><b>%s</b></td></tr>"
                  % (_esc(PROV_NAME.get(pv, pv)), v["bc"], _n(v["cg"])))
     P.append("</table>")
-    P.append("<div class='subh'>🏤 Bưu cục còn chưa gán giao · nhiều → ít</div>")
-    P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục...' oninput='filt()'>")
-    bcs = sorted([b for b in agg["bcs"] if backlog.get(b["bc"], {}).get("deliver", 0) > 0],
-                 key=lambda b: -backlog.get(b["bc"], {}).get("deliver", 0))
-    P.append("<div class='scroll'><table id='bctb'><tr><th>Bưu cục</th><th>Tỉnh</th><th>Chưa gán giao</th></tr>")
-    for b in bcs:
-        cg = backlog.get(b["bc"], {}).get("deliver", 0)
-        key = _esc((b["bc"] + " " + PROV_NAME.get(b["prov"], b["prov"])).lower())
-        P.append("<tr data-k=\"%s\"><td>%s</td><td>%s</td><td><span class='pill mut'>%s</span></td></tr>"
-                 % (key, _esc(b["bc"]), _esc(PROV_NAME.get(b["prov"], b["prov"])), _n(cg)))
-    P.append("</table></div>")
-    P.append("<div class='foot'>Bản dự phòng từ Supabase (chốt %s/%s) · số tồn real-time tạm dừng do token nhanh.ghn.vn</div>"
-             % (day[8:10], day[5:7]))
+
+    P.append("<div class='foot'>Bản dự phòng từ Supabase (chốt %s) · số tồn real-time tạm dừng do token nhanh.ghn.vn</div>" % dm)
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();"
              "document.querySelectorAll('#bctb tr[data-k]').forEach(function(e){"
              "e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")

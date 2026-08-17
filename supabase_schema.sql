@@ -15,6 +15,7 @@ create table if not exists bao_cao_vung (
   pct_gtc     numeric(5,1),
   cod_gtb     bigint,     -- tiền COD kẹt ở đơn GTB
   chua_gan    int,        -- tồn chưa gán vào chuyến
+  ltc         int,        -- đơn lấy thành công (LTC)
   vngh_don    int,        -- đơn TikTok Shop (VNGH)
   vngh_gtc    numeric(5,1),
   created_at  timestamptz default now()
@@ -32,6 +33,7 @@ create table if not exists bao_cao_buu_cuc (
   gtb       int,
   pct_gtc   numeric(5,1),
   chua_gan  int,
+  ltc       int,          -- đơn lấy thành công (LTC)
   unique (ngay, buu_cuc)
 );
 create index if not exists idx_bc_ngay on bao_cao_buu_cuc (ngay);
@@ -51,10 +53,28 @@ create table if not exists bao_cao_nhan_vien (
   gtb       int,
   pct_gtc   numeric(5,1),
   cod_gtb   bigint,
+  ltc       int,          -- đơn lấy thành công (LTC)
   unique (ngay, buu_cuc, driver_id)
 );
 create index if not exists idx_nv_ngay on bao_cao_nhan_vien (ngay);
 create index if not exists idx_nv_ten  on bao_cao_nhan_vien (ten_nv);
+
+-- 3b) TỒN ĐỌNG theo bưu cục × loại đơn × 4 nhóm khung giờ (chốt mỗi tối)
+create table if not exists bao_cao_ton_dong (
+  id         bigserial primary key,
+  ngay       date not null,
+  buu_cuc    text not null,
+  tinh       text,
+  order_type text not null,   -- PICK/DELIVER/DELIVER_PRIORITY/RETURN/TRANSPORT_DELIVERY/TRANSPORT_RETURN
+  total      int,
+  g_lt24     int,             -- <24h
+  g_24_72    int,             -- 24–72h
+  g_72_120   int,             -- 72–120h
+  g_gt120    int,             -- >120h
+  unique (ngay, buu_cuc, order_type)
+);
+create index if not exists idx_td_ngay on bao_cao_ton_dong (ngay);
+create index if not exists idx_td_bc   on bao_cao_ton_dong (buu_cuc);
 
 -- 4) CHI TIẾT từng đơn (đã gộp mã đơn — 1 dòng/đơn/ngày)
 create table if not exists chi_tiet_don (
