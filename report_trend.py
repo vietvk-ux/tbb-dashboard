@@ -94,12 +94,15 @@ def _get_safe(url, key, path):
         return []
 
 
-def _get_all(url, key, path, page=1000):
-    """Lấy HẾT dòng qua phân trang (Supabase chặn 1000 dòng/request)."""
+def _get_all(url, key, path, page=1000, order="id.asc"):
+    """Lấy HẾT dòng qua phân trang (Supabase chặn 1000 dòng/request).
+    BẮT BUỘC có ORDER BY ổn định (mặc định id) — nếu không, giữa các trang
+    limit/offset Postgres có thể trả trùng/sót dòng → tổng hợp sai."""
     out, offset = [], 0
     sep = "&" if "?" in path else "?"
+    ordq = ("order=%s&" % order) if order else ""
     while True:
-        chunk = _get(url, key, "%s%slimit=%d&offset=%d" % (path, sep, page, offset))
+        chunk = _get(url, key, "%s%s%slimit=%d&offset=%d" % (path, sep, ordq, page, offset))
         out.extend(chunk)
         if len(chunk) < page:
             return out
