@@ -455,7 +455,9 @@ def backlog_rows(entries):
                 g = type_group_counts(parsed, ot)   # [<24h, 24–72h, 72–120h, >120h]
                 rows.append({"buu_cuc": e["name"], "tinh": e.get("prov"), "order_type": ot,
                              "total": v.get("total", 0), "g_lt24": g[0], "g_24_72": g[1],
-                             "g_72_120": g[2], "g_gt120": g[3]})
+                             "g_72_120": g[2], "g_gt120": g[3],
+                             # đơn ĐỎ theo ngưỡng đúng từng loại (Giao/Trả>120h, LCg>36h, LCt>48h)
+                             "g_red": _red_type(parsed, ot)})
     return rows
 
 

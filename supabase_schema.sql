@@ -71,6 +71,7 @@ create table if not exists bao_cao_ton_dong (
   g_24_72    int,             -- 24–72h
   g_72_120   int,             -- 72–120h
   g_gt120    int,             -- >120h
+  g_red      int,             -- đơn ĐỎ đúng ngưỡng: Giao/Trả>120h · LC giao>36h · LC trả>48h
   unique (ngay, buu_cuc, order_type)
 );
 create index if not exists idx_td_ngay on bao_cao_ton_dong (ngay);

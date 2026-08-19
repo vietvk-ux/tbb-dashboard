@@ -123,14 +123,18 @@ def fetch_trend(days=90):
     # Nhân viên 30 ngày (để xếp COD GTB / đơn GTB cao nhất)
     nv30 = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=driver_id,ten_nv,buu_cuc,cod_gtb,gtb,don_giao" % since30)
     # Tồn đọng theo NGÀY (gộp toàn vùng) — cho biểu đồ xu hướng.
-    # gt120_giao = đơn GIAO tồn >120h (khách chờ lâu); ton = tổng tồn mọi loại.
-    td_raw = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,order_type,total,g_gt120" % since)
+    #  gt120_giao = đơn GIAO tồn >120h (khách chờ lâu)
+    #  red_tra_lc = đơn ĐỎ Trả+Luân chuyển (Trả>120h + LC giao>36h + LC trả>48h) — cột g_red
+    td_raw = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,order_type,g_gt120,g_red" % since)
+    RED_TYPES = ("RETURN", "TRANSPORT_DELIVERY", "TRANSPORT_RETURN")
     tdd = {}
     for r in td_raw:
-        a = tdd.setdefault(r["ngay"], {"ngay": r["ngay"], "gt120_giao": 0, "ton": 0})
-        a["ton"] += r.get("total") or 0
-        if r.get("order_type") == "DELIVER":
+        a = tdd.setdefault(r["ngay"], {"ngay": r["ngay"], "gt120_giao": 0, "red_tra_lc": 0})
+        ot = r.get("order_type")
+        if ot == "DELIVER":
             a["gt120_giao"] += r.get("g_gt120") or 0
+        if ot in RED_TYPES:
+            a["red_tra_lc"] += r.get("g_red") or 0
     tondong = sorted(tdd.values(), key=lambda x: x["ngay"])
     # Xếp hạng %GTC nhân viên tuần/tháng (view v_nv_tuan, v_nv_thang; chưa tạo → [])
     return {
@@ -412,16 +416,21 @@ def gen_html(data):
     td = data.get("tondong") or []
     if td:
         g120 = [v["gt120_giao"] for v in td]
-        tons = [v["ton"] for v in td]
+        redtl = [v["red_tra_lc"] for v in td]
         last_td = td[-1]
         P.append("<div class='sec' style='color:var(--bad)'>🔴 Đơn GIAO quá hạn &gt;120h theo ngày</div>")
         P.append("<section class='card'><div class='note' style='margin:0 0 6px'>"
                  "Đơn giao khách chờ &gt;5 ngày · hôm nay: <b style='color:var(--bad)'>%s</b> đơn</div>%s</section>"
                  % (_n(last_td["gt120_giao"]),
                     _line(td, "gt120_giao", 0, (max(g120) // 100 + 1) * 100 if g120 else 100, "bad", 150)))
-        P.append("<div class='sec'>📦 Tổng tồn Lấy·Giao·Trả·Luân chuyển theo ngày</div>")
-        P.append("<section class='card'>%s</section>"
-                 % _line(td, "ton", 0, (max(tons) // 2000 + 1) * 2000 if tons else 2000, "warn", 150))
+        # Đơn đỏ Trả + Luân chuyển (ngưỡng đúng: Trả>120h · LC giao>36h · LC trả>48h)
+        if any(redtl):
+            P.append("<div class='sec' style='color:#ff9d5c'>↩️ Đơn đỏ Trả + Luân chuyển theo ngày</div>")
+            P.append("<section class='card'><div class='note' style='margin:0 0 6px'>"
+                     "Trả&gt;120h · LC giao&gt;36h · LC trả&gt;48h · hôm nay: "
+                     "<b style='color:#ff9d5c'>%s</b> đơn</div>%s</section>"
+                     % (_n(last_td["red_tra_lc"]),
+                        _line(td, "red_tra_lc", 0, (max(redtl) // 100 + 1) * 100 if redtl else 100, "orng", 150)))
 
     # Bảng bưu cục %GTC TB 7 ngày
     bc30 = data.get("bc30") or []
@@ -591,10 +600,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .gt{fill:var(--mut);font-size:8px}
 .xt{fill:var(--mut);font-size:8px}
 .ln{fill:none;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
-.ln.good{stroke:var(--good)}.ln.warn{stroke:var(--warn)}.ln.bad{stroke:var(--bad)}
-.ar{opacity:.16}.ar.good{fill:var(--good)}.ar.warn{fill:var(--warn)}.ar.bad{fill:var(--bad)}
-.dot.good{fill:var(--good)}.dot.warn{fill:var(--warn)}.dot.bad{fill:var(--bad)}
-.lv{font-size:10px;font-weight:800}.lv.good{fill:var(--good)}.lv.warn{fill:var(--warn)}.lv.bad{fill:var(--bad)}
+.ln.good{stroke:var(--good)}.ln.warn{stroke:var(--warn)}.ln.bad{stroke:var(--bad)}.ln.orng{stroke:#ff9d5c}
+.ar{opacity:.16}.ar.good{fill:var(--good)}.ar.warn{fill:var(--warn)}.ar.bad{fill:var(--bad)}.ar.orng{fill:#ff9d5c}
+.dot.good{fill:var(--good)}.dot.warn{fill:var(--warn)}.dot.bad{fill:var(--bad)}.dot.orng{fill:#ff9d5c}
+.lv{font-size:10px;font-weight:800}.lv.good{fill:var(--good)}.lv.warn{fill:var(--warn)}.lv.bad{fill:var(--bad)}.lv.orng{fill:#ff9d5c}
 .bg2{fill:#3a4470}.bg-good{fill:var(--good)}
 .lg{display:flex;gap:14px;align-items:center;color:var(--mut);font-size:11.5px;padding:6px 2px 4px}
 .lg .k{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
