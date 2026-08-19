@@ -33,16 +33,16 @@ def gen_html(rows):
          "<meta name='robots' content='noindex,nofollow'>",
          "<meta http-equiv='refresh' content='300'>",
          "<meta name='theme-color' content='#0a0d18'>",
-         "<title>Đơn TikTok VNGH · TBB</title>", _CSS, "<div class='wrap'>"]
-    P.append("<header class='top'><div class='brand'>🛍️ ĐƠN TIKTOK · VNGH</div>"
+         "<title>Đơn TikTok · TBB</title>", _CSS, "<div class='wrap'>"]
+    P.append("<header class='top'><div class='brand'>🛍️ ĐƠN TIKTOK</div>"
              "<div class='ts'>%s · %s</div></header>" % (now.strftime("%H:%M"), now.strftime("%d/%m")))
 
     # Hero — %GTC đơn VNGH toàn vùng
     P.append("<section class='hero %s'>" % cls)
-    P.append("<div class='hlbl'>🎯 %GTC ĐƠN VNGH (TIKTOK) TOÀN VÙNG</div>")
+    P.append("<div class='hlbl'>🎯 %GTC ĐƠN TIKTOK TOÀN VÙNG</div>")
     P.append("<div class='hpct'>%s<span>%%</span></div>" % (pct if pct is not None else "—"))
     P.append(_bar(pct, cls))
-    P.append("<div class='hsub'>%s / %s đơn VNGH đã giao · còn lại <b>%s</b> · %d bưu cục</div>"
+    P.append("<div class='hsub'>%s / %s đơn TikTok đã giao · còn lại <b>%s</b> · %d bưu cục</div>"
              % (_n(R_g), _n(R_t), _n(R_t - R_g), nbc))
     P.append("</section>")
 
@@ -59,7 +59,7 @@ def gen_html(rows):
         P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (c, _esc(PROV_NAME.get(pv, pv))))
         P.append("<span class='pill %s'>%s%%</span>" % (c, pc if pc is not None else "—"))
         P.append(_bar(pc, c))
-        P.append("<div class='pmeta'>🏤 %d BC · 🛍️ %s đơn VNGH · ✅ %s · <span class='gtb'>còn %s</span></div>"
+        P.append("<div class='pmeta'>🏤 %d BC · 🛍️ %s đơn TikTok · ✅ %s · <span class='gtb'>còn %s</span></div>"
                  % (v["bc"], _n(v["t"]), _n(v["g"]), _n(v["t"] - v["g"])))
         P.append("</div>")
     P.append("</section>")
@@ -86,7 +86,7 @@ def gen_html(rows):
         P.append("</summary>")
         P.append("<div class='dtl'>")
         if vdrv:
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>VNGH</th><th>Giao</th>"
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>TikTok</th><th>Giao</th>"
                      "<th>Còn</th><th>%GTC</th></tr></thead><tbody>")
             for d in sorted(vdrv, key=lambda x: -(x["vngh"] - x["vngh_gtc"])):
                 dt, dg = d["vngh"], d["vngh_gtc"]
@@ -98,10 +98,10 @@ def gen_html(rows):
                          % (_esc(d["name"]), _n(dt), _n(dg), dc, _cls(dpc), dpc if dpc is not None else "—"))
             P.append("</tbody></table>")
         else:
-            P.append("<div class='none'>Không có nhân viên VNGH.</div>")
+            P.append("<div class='none'>Không có nhân viên TikTok.</div>")
         P.append("</div></details>")
 
-    P.append("<div class='foot'>Đơn TikTok Shop = mã bắt đầu <b>VNGH</b> · %GTC = đã giao / tổng đơn VNGH đã gán<br>"
+    P.append("<div class='foot'>Đơn TikTok Shop = mã bắt đầu <b>VNGH</b> · %GTC = đã giao / tổng đơn TikTok đã gán<br>"
              "gộp theo mã đơn · số LIVE gồm cả chuyến đã kết thúc trong ngày · nguồn nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
              "document.querySelectorAll('.bc').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
