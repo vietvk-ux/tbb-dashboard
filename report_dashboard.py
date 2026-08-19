@@ -161,7 +161,8 @@ table.drv th{color:var(--mut);font-weight:600;font-size:9.5px;text-transform:upp
 table.drv th:first-child,table.drv td:first-child{text-align:left}
 table.drv tbody tr:last-child td{border-bottom:none}
 table.drv .ltc{color:var(--good);font-weight:700}
-td.nv{font-weight:600;max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+table.drv .cod{color:var(--bad);font-weight:700}
+td.nv{font-weight:600;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 table.drv th.lft{text-align:left}
 td.nv .sc{color:var(--mut);font-size:11px;font-weight:500;margin-top:1px;overflow:hidden;text-overflow:ellipsis}
 td.rd{color:var(--bad);font-weight:700}
@@ -287,13 +288,15 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
             P.append("<div class='note'>⏳ Chưa gán chuyến: <b>%s</b> giao · %s lấy · %s trả</div>"
                      % (_n(bl_d), _n(bl.get("pick", 0)), _n(bl.get("return", 0))))
         if drivers:
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>LTC</th><th>GTB</th><th>%GTC</th></tr></thead><tbody>")
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>LTC</th><th>GTB</th><th>COD tr</th><th>%GTC</th></tr></thead><tbody>")
             for dr in drivers:
                 dltc = dr.get("ltc", 0)
                 ltc_cell = ("<b class='ltc'>%s</b>" % _n(dltc)) if dltc > 0 else "0"
-                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                dcod = dr.get("gtb_cod", 0) or 0
+                cod_cell = ("<b class='cod'>%s</b>" % ("%.1f" % (dcod / 1e6)).replace(".", ",")) if dcod >= 1e5 else "0"
+                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                          % (_esc(dr["driver_name"]), _n(dr["total"]), _n(dr["success"]),
-                            ltc_cell, _n(dr["total"] - dr["success"]), _cls(dr["gtc"]),
+                            ltc_cell, _n(dr["total"] - dr["success"]), cod_cell, _cls(dr["gtc"]),
                             dr["gtc"] if dr["gtc"] is not None else "—"))
             P.append("</tbody></table>")
         else:
