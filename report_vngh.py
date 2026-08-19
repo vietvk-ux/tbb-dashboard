@@ -64,30 +64,47 @@ def gen_html(rows):
         P.append("</div>")
     P.append("</section>")
 
-    # Bưu cục — còn lại nhiều → ít (ưu tiên đốc thúc)
-    P.append("<div class='sec'>🏤 Bưu cục · còn lại nhiều → ít</div>")
-    P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục...' oninput='filt()'></div>")
+    # Bưu cục — xếp theo SỐ ĐƠN CHƯA GIAO nhiều → ít; bấm để xem chi tiết nhân viên
+    P.append("<div class='sec'>🏤 Bưu cục · còn chưa giao nhiều → ít</div>")
+    P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'></div>")
     P.append("<div id='empty' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
-    P.append("<section class='provs'>")
     vbcs = [r for r in rows if r.get("vngh", 0) > 0]
-    for r in sorted(vbcs, key=lambda x: (-(x["vngh"] - x["vngh_gtc"]),
-                                         x["vngh_gtc"] / x["vngh"] if x["vngh"] else 1)):
+    for r in sorted(vbcs, key=lambda x: -(x["vngh"] - x["vngh_gtc"])):
         t, g = r["vngh"], r["vngh_gtc"]
+        rem = t - g
         pc = round(g / t * 100, 1) if t else None
         c = _cls(pc)
-        P.append("<div class='prow vbc %s' data-k=\"%s\">" % (c, _esc(r["name"].lower())))
-        P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (c, _esc(r["name"])))
-        P.append("<span class='pill %s'>%s%%</span>" % (c, pc if pc is not None else "—"))
+        vdrv = [d for d in r.get("drivers", []) if d.get("vngh", 0) > 0]
+        keys = _esc((r["name"] + " " + " ".join(d["name"] for d in vdrv)).lower())
+        P.append("<details class='bc %s' data-k=\"%s\">" % (c, keys))
+        P.append("<summary>")
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+                 "<span class='pill %s'>%s%%</span></div>" % (c, _esc(r["name"]), c, pc if pc is not None else "—"))
         P.append(_bar(pc, c))
-        P.append("<div class='pmeta'>🛍️ %s đơn VNGH · ✅ giao %s · <span class='gtb'>còn %s</span></div>"
-                 % (_n(t), _n(g), _n(t - g)))
-        P.append("</div>")
-    P.append("</section>")
+        P.append("<div class='bcm'><span>🛍️ %s</span><span>✅ %s</span><span class='gtb'>còn %s</span></div>"
+                 % (_n(t), _n(g), _n(rem)))
+        P.append("</summary>")
+        P.append("<div class='dtl'>")
+        if vdrv:
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>VNGH</th><th>Giao</th>"
+                     "<th>Còn</th><th>%GTC</th></tr></thead><tbody>")
+            for d in sorted(vdrv, key=lambda x: -(x["vngh"] - x["vngh_gtc"])):
+                dt, dg = d["vngh"], d["vngh_gtc"]
+                dpc = round(dg / dt * 100, 1) if dt else None
+                dc = _n(dt - dg)
+                dc = ("<b class='gtb'>%s</b>" % dc) if (dt - dg) > 0 else "0"
+                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+                         "<td><span class='pill sm %s'>%s%%</span></td></tr>"
+                         % (_esc(d["name"]), _n(dt), _n(dg), dc, _cls(dpc), dpc if dpc is not None else "—"))
+            P.append("</tbody></table>")
+        else:
+            P.append("<div class='none'>Không có nhân viên VNGH.</div>")
+        P.append("</div></details>")
 
     P.append("<div class='foot'>Đơn TikTok Shop = mã bắt đầu <b>VNGH</b> · %GTC = đã giao / tổng đơn VNGH đã gán<br>"
              "gộp theo mã đơn · số LIVE gồm cả chuyến đã kết thúc trong ngày · nguồn nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
-             "document.querySelectorAll('.vbc').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
+             "document.querySelectorAll('.bc').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
              "e.style.display=s?'':'none';if(s)n++;});"
              "document.getElementById('empty').style.display=n?'none':'block';}</script>")
     P.append("</div></body></html>")

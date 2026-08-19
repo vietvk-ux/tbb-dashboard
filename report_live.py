@@ -79,7 +79,8 @@ async def fetch_live(token):
                 fin = [t for t in await _list("FINISHED") if t.get("endDateIndex") == ymd]
 
                 def _drv0(did, dn):
-                    return {"id": did, "name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0}
+                    return {"id": did, "name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0,
+                            "ltc": 0, "vngh": 0, "vngh_gtc": 0}
 
                 def _dk(did, dn):
                     # GỘP theo driver_id (phân biệt 2 người TRÙNG TÊN); thiếu id → theo tên
@@ -127,6 +128,10 @@ async def fetch_live(token):
                         d["gtc"] += 1
                     if att:
                         d["att"] += 1
+                    if oc.startswith("VNGH"):        # đơn TikTok Shop → tiến độ theo nhân viên
+                        d["vngh"] += 1
+                        if succ:
+                            d["vngh_gtc"] += 1
                 # LTC (lấy thành công): gộp mã đơn PICK, thành công ở bất kỳ chuyến nào
                 bestp = {}
                 for did, dn, _recs, picks in res:
