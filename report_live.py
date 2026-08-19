@@ -149,9 +149,13 @@ async def fetch_live(token):
                 h_gtc = sum(d["gtc"] for d in drivers.values())
                 h_att = sum(d["att"] for d in drivers.values())
                 h_ltc = sum(d["ltc"] for d in drivers.values())
+                # Đơn TikTok Shop (mã VNGH) — gộp theo mã đơn giao, tiến độ theo bưu cục
+                h_vngh = sum(1 for oc in best if oc.startswith("VNGH"))
+                h_vngh_gtc = sum(1 for oc, v in best.items() if oc.startswith("VNGH") and v[3])
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc,
+                        "vngh": h_vngh, "vngh_gtc": h_vngh_gtc,
                         "drivers": list(drivers.values())}
             except TokenExpiredError:
                 raise
@@ -221,6 +225,8 @@ def gen_html(rows):
              "<span class='arw'>xếp hạng GTC/ngày →</span></a>")
     P.append("<a class='eod' href='khochuyentiep.html'><span>📦 Kho Chuyển Tiếp</span>"
              "<span class='arw'>tồn luân chuyển →</span></a>")
+    P.append("<a class='eod' href='vngh.html'><span>🛍️ Đơn TikTok (VNGH)</span>"
+             "<span class='arw'>tiến độ theo bưu cục →</span></a>")
 
     # ===== Theo tỉnh =====
     P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")
@@ -430,6 +436,14 @@ def main():
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
+
+    # Trang đơn TikTok (VNGH) — tiến độ theo bưu cục, dùng lại rows (không fetch lại)
+    try:
+        import report_vngh
+        with open(os.path.join(outdir, "vngh.html"), "w", encoding="utf-8") as f:
+            f.write(report_vngh.gen_html(rows))
+    except Exception as e:
+        logger.warning("Tạo vngh.html lỗi (bỏ qua): %s", str(e)[:150])
 
     # JSON dữ liệu cho BOT đọc trực tiếp (khớp 100% trang) — cạnh dashboard
     payload = {
