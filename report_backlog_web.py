@@ -174,9 +174,9 @@ _CSS = """<style>
 --good:#22c55e;--warn:#f59e0b;--orng:#fb923c;--bad:#ef4444;--acc:#38bdf8}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx);-webkit-text-size-adjust:100%}
-.wrap{max-width:820px;margin:0 auto;padding:0 12px 40px}
+.wrap{max-width:820px;margin:0 auto;padding:0 12px 40px;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));padding-bottom:calc(40px + env(safe-area-inset-bottom))}
 .top{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
-padding:12px 4px;background:linear-gradient(180deg,var(--bg) 70%,transparent);backdrop-filter:blur(6px)}
+padding:calc(12px + env(safe-area-inset-top)) 4px 12px;background:linear-gradient(180deg,var(--bg) 70%,transparent);backdrop-filter:blur(6px)}
 .brand{font-weight:800;letter-spacing:.02em;font-size:15px}
 .brand .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-right:7px;animation:pl 1.6s infinite}
 @keyframes pl{0%,100%{opacity:1}50%{opacity:.25}}
