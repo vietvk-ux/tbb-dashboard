@@ -129,10 +129,13 @@ def fetch_trend(days=90):
     RED_TYPES = ("RETURN", "TRANSPORT_DELIVERY", "TRANSPORT_RETURN")
     tdd = {}
     for r in td_raw:
-        a = tdd.setdefault(r["ngay"], {"ngay": r["ngay"], "gt120_giao": 0, "red_tra_lc": 0})
+        a = tdd.setdefault(r["ngay"], {"ngay": r["ngay"], "gt120_giao": 0,
+                                       "red_tra_lc": 0, "has_red": False})
         ot = r.get("order_type")
         if ot == "DELIVER":
             a["gt120_giao"] += r.get("g_gt120") or 0
+        if r.get("g_red") is not None:   # ngày đã có cột g_red (sau migration)
+            a["has_red"] = True
         if ot in RED_TYPES:
             a["red_tra_lc"] += r.get("g_red") or 0
     tondong = sorted(tdd.values(), key=lambda x: x["ngay"])
@@ -416,7 +419,6 @@ def gen_html(data):
     td = data.get("tondong") or []
     if td:
         g120 = [v["gt120_giao"] for v in td]
-        redtl = [v["red_tra_lc"] for v in td]
         last_td = td[-1]
         P.append("<div class='sec' style='color:var(--bad)'>🔴 Đơn GIAO quá hạn &gt;120h theo ngày</div>")
         P.append("<section class='card'><div class='note' style='margin:0 0 6px'>"
@@ -424,13 +426,16 @@ def gen_html(data):
                  % (_n(last_td["gt120_giao"]),
                     _line(td, "gt120_giao", 0, (max(g120) // 100 + 1) * 100 if g120 else 100, "bad", 150)))
         # Đơn đỏ Trả + Luân chuyển (ngưỡng đúng: Trả>120h · LC giao>36h · LC trả>48h)
-        if any(redtl):
+        # Chỉ vẽ ngày ĐÃ có cột g_red (từ sau migration) — tránh hiểu nhầm ngày cũ = 0.
+        td_red = [v for v in td if v.get("has_red")]
+        redtl = [v["red_tra_lc"] for v in td_red]
+        if td_red:
             P.append("<div class='sec' style='color:#ff9d5c'>↩️ Đơn đỏ Trả + Luân chuyển theo ngày</div>")
             P.append("<section class='card'><div class='note' style='margin:0 0 6px'>"
                      "Trả&gt;120h · LC giao&gt;36h · LC trả&gt;48h · hôm nay: "
                      "<b style='color:#ff9d5c'>%s</b> đơn</div>%s</section>"
-                     % (_n(last_td["red_tra_lc"]),
-                        _line(td, "red_tra_lc", 0, (max(redtl) // 100 + 1) * 100 if redtl else 100, "orng", 150)))
+                     % (_n(td_red[-1]["red_tra_lc"]),
+                        _line(td_red, "red_tra_lc", 0, (max(redtl) // 100 + 1) * 100 if redtl else 100, "orng", 150)))
 
     # Bảng bưu cục %GTC TB 7 ngày
     bc30 = data.get("bc30") or []
