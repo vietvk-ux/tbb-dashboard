@@ -1,0 +1,43 @@
+name: Bản tin việc cần làm (sáng 07:30)
+
+# Đọc số CHỐT TỐI QUA từ Supabase → tổng hợp việc cần ưu tiên → gửi nhóm GTalk.
+# KHÔNG cần token nhanh.ghn.vn, KHÔNG đụng GitHub Pages. Chạy độc lập.
+
+on:
+  workflow_dispatch:
+    inputs:
+      send:
+        description: '1 = gửi GTalk · 0 = chỉ in thử (không gửi)'
+        required: false
+        default: '1'
+  schedule:
+    # 07:30 VN = 00:30 UTC — trước các báo cáo 08:00/08:10, làm "việc cần làm" mở đầu ngày.
+    - cron: '30 0 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: morning-digest
+  cancel-in-progress: false
+
+jobs:
+  morning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Gửi bản tin việc cần làm
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
+          GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
+          MORNING_SEND: ${{ github.event.inputs.send || '1' }}
+        run: python report_morning.py
