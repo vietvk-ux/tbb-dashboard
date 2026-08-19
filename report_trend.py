@@ -122,13 +122,15 @@ def fetch_trend(days=90):
     bc = _get_all(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,gtc,gtb,don_giao" % since30)
     # Nhân viên 30 ngày (để xếp COD GTB / đơn GTB cao nhất)
     nv30 = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=driver_id,ten_nv,buu_cuc,cod_gtb,gtb,don_giao" % since30)
-    # Tồn đọng Lấy·Giao·Trả·Luân chuyển theo NGÀY (gộp toàn vùng) — cho biểu đồ xu hướng
-    td_raw = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,total,g_gt120" % since)
+    # Tồn đọng theo NGÀY (gộp toàn vùng) — cho biểu đồ xu hướng.
+    # gt120_giao = đơn GIAO tồn >120h (khách chờ lâu); ton = tổng tồn mọi loại.
+    td_raw = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,order_type,total,g_gt120" % since)
     tdd = {}
     for r in td_raw:
-        a = tdd.setdefault(r["ngay"], {"ngay": r["ngay"], "gt120": 0, "ton": 0})
-        a["gt120"] += r.get("g_gt120") or 0
+        a = tdd.setdefault(r["ngay"], {"ngay": r["ngay"], "gt120_giao": 0, "ton": 0})
         a["ton"] += r.get("total") or 0
+        if r.get("order_type") == "DELIVER":
+            a["gt120_giao"] += r.get("g_gt120") or 0
     tondong = sorted(tdd.values(), key=lambda x: x["ngay"])
     # Xếp hạng %GTC nhân viên tuần/tháng (view v_nv_tuan, v_nv_thang; chưa tạo → [])
     return {
@@ -409,14 +411,14 @@ def gen_html(data):
     # Xu hướng TỒN ĐỌNG (Lấy·Giao·Trả·Luân chuyển) theo ngày — từ bao_cao_ton_dong
     td = data.get("tondong") or []
     if td:
-        g120 = [v["gt120"] for v in td]
+        g120 = [v["gt120_giao"] for v in td]
         tons = [v["ton"] for v in td]
         last_td = td[-1]
-        P.append("<div class='sec' style='color:var(--bad)'>🔴 Đơn quá hạn &gt;120h theo ngày</div>")
+        P.append("<div class='sec' style='color:var(--bad)'>🔴 Đơn GIAO quá hạn &gt;120h theo ngày</div>")
         P.append("<section class='card'><div class='note' style='margin:0 0 6px'>"
-                 "Hôm nay: <b style='color:var(--bad)'>%s</b> đơn &gt;120h · tổng tồn %s</div>%s</section>"
-                 % (_n(last_td["gt120"]), _n(last_td["ton"]),
-                    _line(td, "gt120", 0, (max(g120) // 200 + 1) * 200 if g120 else 200, "bad", 150)))
+                 "Đơn giao khách chờ &gt;5 ngày · hôm nay: <b style='color:var(--bad)'>%s</b> đơn</div>%s</section>"
+                 % (_n(last_td["gt120_giao"]),
+                    _line(td, "gt120_giao", 0, (max(g120) // 100 + 1) * 100 if g120 else 100, "bad", 150)))
         P.append("<div class='sec'>📦 Tổng tồn Lấy·Giao·Trả·Luân chuyển theo ngày</div>")
         P.append("<section class='card'>%s</section>"
                  % _line(td, "ton", 0, (max(tons) // 2000 + 1) * 2000 if tons else 2000, "warn", 150))

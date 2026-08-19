@@ -58,7 +58,7 @@ def build(url, key, dash_url=""):
     dm = day[8:10] + "/" + day[5:7]
     bcs = _all(url, key, "bao_cao_buu_cuc?ngay=eq.%s&select=buu_cuc,pct_gtc,don_giao,gtb" % day)
     nv = _all(url, key, "bao_cao_nhan_vien?ngay=eq.%s&select=ten_nv,buu_cuc,cod_gtb,gtb" % day)
-    td0 = _all(url, key, "bao_cao_ton_dong?ngay=eq.%s&select=buu_cuc,total,g_gt120" % day)
+    td0 = _all(url, key, "bao_cao_ton_dong?ngay=eq.%s&select=buu_cuc,order_type,total,g_gt120" % day)
     td1 = (_all(url, key, "bao_cao_ton_dong?ngay=eq.%s&select=buu_cuc,total" % d1["ngay"])
            if d1 else [])
 
@@ -84,14 +84,17 @@ def build(url, key, dash_url=""):
             L.append("%d. %s — %s%% · %s đơn (GTB %s)"
                      % (i, b["buu_cuc"], b["pct_gtc"], _n(b["don_giao"]), _n(b["gtb"])))
 
-    # ⏳ Đơn quá hạn >120h — xử lý gấp
+    # ⏳ Đơn GIAO tồn >120h — khách chờ >5 ngày, xử lý gấp (chỉ loại DELIVER)
     if td0:
         red = {}
         for r in td0:
+            if r.get("order_type") != "DELIVER":
+                continue
             red[r["buu_cuc"]] = red.get(r["buu_cuc"], 0) + (r.get("g_gt120") or 0)
+        tot_red = sum(red.values())
         red = sorted([(k, v) for k, v in red.items() if v > 0], key=lambda x: -x[1])[:5]
         if red:
-            L += ["", "⏳ **Đơn quá hạn >120h — xử lý gấp:**"]
+            L += ["", "⏳ **Đơn GIAO tồn >120h (khách chờ >5 ngày) — %s đơn:**" % _n(tot_red)]
             for i, (k, v) in enumerate(red, 1):
                 L.append("%d. %s — %s đơn" % (i, k, _n(v)))
 
