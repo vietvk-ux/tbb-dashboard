@@ -6,7 +6,7 @@ token hết hạn), tổng hợp thành các việc cần ưu tiên xử lý tro
   🔴 Bưu cục %GTC thấp cần can thiệp
   ⏳ Đơn quá hạn >120h cần xử lý gấp
   📈 Bưu cục tồn tăng vọt so hôm trước
-  💰 Nhân viên COD kẹt/đơn cao nhất
+  💰 Nhân viên COD GTB/đơn cao nhất
 
 Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, GTALK_OA_TOKEN, GTALK_CHANNEL_ID.
 Tùy chọn: DASH_URL / DASH_SLUG (link trang), MORNING_SEND=0 để chỉ in, không gửi.
@@ -72,7 +72,7 @@ def build(url, key, dash_url=""):
         dd = round(pct - d1["pct_gtc"], 1)
         delta = (" ▲%.1f" % dd) if dd > 0 else ((" ▼%.1f" % abs(dd)) if dd < 0 else " ▬")
     gtb_v = (d0.get("don_giao") or 0) - (d0.get("gtc") or 0)
-    L.append("🎯 %%GTC vùng hôm qua: **%s%%**%s · GTB %s đơn · COD kẹt %.0f tr" %
+    L.append("🎯 %%GTC vùng hôm qua: **%s%%**%s · GTB %s đơn · COD GTB %.0f tr" %
              (pct if pct is not None else "—", delta, _n(gtb_v), (d0.get("cod_gtb") or 0) / 1e6))
 
     # 🔴 Bưu cục cần can thiệp (%GTC thấp, đủ sản lượng)
@@ -109,11 +109,11 @@ def build(url, key, dash_url=""):
             for i, (k, dlt, tot) in enumerate(surge, 1):
                 L.append("%d. %s — +%s đơn (tổng tồn %s)" % (i, k, _n(dlt), _n(tot)))
 
-    # 💰 Nhân viên COD kẹt/đơn cao nhất
+    # 💰 Nhân viên COD GTB/đơn cao nhất
     dng = [x for x in nv if (x.get("gtb") or 0) > 0]
     dng.sort(key=lambda x: -((x.get("cod_gtb") or 0) / x["gtb"]))
     if dng:
-        L += ["", "💰 **NV COD kẹt/đơn cao nhất:**"]
+        L += ["", "💰 **NV COD GTB/đơn cao nhất:**"]
         for i, x in enumerate(dng[:3], 1):
             per = (x.get("cod_gtb") or 0) / x["gtb"] / 1e6
             L.append("%d. %s (%s) — %s tr/đơn · %s đơn GTB"
