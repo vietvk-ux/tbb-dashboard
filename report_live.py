@@ -11,6 +11,7 @@ import html
 import json
 import logging
 import os
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
@@ -77,45 +78,50 @@ async def fetch_live(token):
                 ontrip = await _list("ON_TRIP")
                 fin = [t for t in await _list("FINISHED") if t.get("endDateIndex") == ymd]
 
-                def _drv0(dn):
-                    return {"name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0}
+                def _drv0(did, dn):
+                    return {"id": did, "name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0}
+
+                def _dk(did, dn):
+                    # GỘP theo driver_id (phân biệt 2 người TRÙNG TÊN); thiếu id → theo tên
+                    return did or ("~" + dn)
 
                 async def _it(t, is_ontrip):
                     dn = t.get("driverName") or "—"
+                    did = str(t.get("driverId") or "")
                     try:
                         async with sem:
                             items = await _fetch_all_items(session, token, hid, t["tripCode"])
                         # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?)
-                        recs = [(x.get("orderCode"), dn, x.get("isSucceeded") is True,
+                        recs = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True,
                                  x.get("isUpdated") is True, is_ontrip)
                                 for x in items if x.get("type") == "DELIVER"]
                         # PICK: (mã đơn, tài xế, đã lấy thành công?)
-                        picks = [(x.get("orderCode"), dn, x.get("isSucceeded") is True)
+                        picks = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True)
                                  for x in items if x.get("type") == "PICK"]
-                        return (dn, recs, picks)
+                        return (did, dn, recs, picks)
                     except Exception:
-                        return (dn, [], [])
+                        return (did, dn, [], [])
 
                 res = await asyncio.gather(
                     *([_it(t, True) for t in ontrip] + [_it(t, False) for t in fin]))
                 drivers = {}
                 # Mỗi chuyến (dù trùng đơn) vẫn tính là 1 chuyến của tài xế
-                for dn, _recs, _picks in res:
-                    drivers.setdefault(dn, _drv0(dn))["chuyen"] += 1
+                for did, dn, _recs, _picks in res:
+                    drivers.setdefault(_dk(did, dn), _drv0(did, dn))["chuyen"] += 1
                 # GỘP theo MÃ ĐƠN: 1 đơn gán nhiều chuyến chỉ tính 1 lần.
                 # Ưu tiên bản ghi: đã giao > đã xử lý > chuyến đang chạy (đơn còn treo
                 # tính cho chuyến hiện tại). GTC=đơn giao xong ở BẤT KỲ chuyến nào.
                 best = {}
-                for dn, recs, _picks in res:
-                    for oc, drv, succ, att, ot in recs:
+                for did, dn, recs, _picks in res:
+                    for oc, rdid, rdn, succ, att, ot in recs:
                         if not oc:
                             continue
                         score = (4 if succ else 0) + (2 if att else 0) + (1 if ot else 0)
                         cur = best.get(oc)
                         if cur is None or score > cur[0]:
-                            best[oc] = (score, drv, succ, att)
-                for oc, (score, drv, succ, att) in best.items():
-                    d = drivers.setdefault(drv, _drv0(drv))
+                            best[oc] = (score, rdid, rdn, succ, att)
+                for oc, (score, rdid, rdn, succ, att) in best.items():
+                    d = drivers.setdefault(_dk(rdid, rdn), _drv0(rdid, rdn))
                     d["total"] += 1
                     if succ:
                         d["gtc"] += 1
@@ -123,17 +129,22 @@ async def fetch_live(token):
                         d["att"] += 1
                 # LTC (lấy thành công): gộp mã đơn PICK, thành công ở bất kỳ chuyến nào
                 bestp = {}
-                for dn, _recs, picks in res:
-                    for oc, drv, psucc in picks:
+                for did, dn, _recs, picks in res:
+                    for oc, rdid, rdn, psucc in picks:
                         if not oc:
                             continue
                         cur = bestp.get(oc)
-                        if cur is None or (psucc and not cur[1]):
-                            bestp[oc] = (drv, psucc)
-                for oc, (drv, psucc) in bestp.items():
-                    d = drivers.setdefault(drv, _drv0(drv))
+                        if cur is None or (psucc and not cur[2]):
+                            bestp[oc] = (rdid, rdn, psucc)
+                for oc, (rdid, rdn, psucc) in bestp.items():
+                    d = drivers.setdefault(_dk(rdid, rdn), _drv0(rdid, rdn))
                     if psucc:
                         d["ltc"] += 1
+                # PHÂN BIỆT TRÙNG TÊN trong cùng bưu cục: thêm đuôi #id
+                namec = Counter(d["name"] for d in drivers.values())
+                for d in drivers.values():
+                    if namec[d["name"]] > 1 and d.get("id"):
+                        d["name"] = "%s #%s" % (d["name"], d["id"][-6:])
                 h_total = sum(d["total"] for d in drivers.values())
                 h_gtc = sum(d["gtc"] for d in drivers.values())
                 h_att = sum(d["att"] for d in drivers.values())

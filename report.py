@@ -6,6 +6,7 @@ Chạy: `python report.py` — đọc env vars NHANH_TOKEN, GTALK_OA_TOKEN, GTAL
 """
 from __future__ import annotations
 import asyncio, logging, os, sys, time
+from collections import Counter
 from datetime import date
 
 import aiohttp
@@ -219,6 +220,11 @@ def aggregate(payload):
                            "ltc": ltc_drv.get(f"{v['driver_id']}|{v['bc']}", 0)}
                           for v in drivers.values() if v["total"] > 0],
                          key=lambda x: (x["gtc"] if x["gtc"] is not None else 999))
+    # PHÂN BIỆT TRÙNG TÊN trong cùng bưu cục: thêm đuôi #id (2 NV khác id cùng tên)
+    _namebc = Counter((d["driver_name"], d["bc"]) for d in driver_list)
+    for d in driver_list:
+        if _namebc[(d["driver_name"], d["bc"])] > 1 and d.get("driver_id"):
+            d["driver_name"] = "%s #%s" % (d["driver_name"], str(d["driver_id"])[-6:])
     grand_total = sum(p["total"] for p in prov_list)
     grand_success = sum(p["success"] for p in prov_list)
     grand_trips = sum(prov_trips.values())
