@@ -11,8 +11,8 @@ on:
         required: false
         default: '1'
   schedule:
-    # 07:30 VN = 00:30 UTC — trước các báo cáo 08:00/08:10, làm "việc cần làm" mở đầu ngày.
-    - cron: '30 0 * * *'
+    # 07:32 VN = 00:32 UTC — dùng phút LẺ (tránh mốc :00/:30 quá đông → GitHub hay bỏ nhịp).
+    - cron: '32 0 * * *'
 
 permissions:
   contents: read
