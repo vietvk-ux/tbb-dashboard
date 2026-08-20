@@ -62,6 +62,44 @@ async def fetch_backlog(token):
     return dict(rows)
 
 
+async def fetch_ontrip(token):
+    """Nhân viên còn chuyến ĐANG CHẠY (CHƯA kết thúc) — đơn trên đó CHƯA tính vào %GTC.
+    Dùng deliverCount trong danh sách chuyến (không cần bóc từng đơn). Gộp theo (NV, bưu cục)."""
+    sem = asyncio.Semaphore(CONCURRENCY)
+    timeout = aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=30)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        hubs = await _get_hubs(session, token)
+
+        async def one(h):
+            hid = str(h["locationCode"])
+            try:
+                async with sem:
+                    d = await _post(session, "/lastmile/trip/get-trip-list-by-hub",
+                                    {"hub_id": hid, "status": "ON_TRIP", "is_ready": 0,
+                                     "offset": 0, "limit": 200, "page": 1, "size": 200, "reverse": 1},
+                                    hid, token)
+                return [(h["locationName"], str(t.get("driverId") or ""), t.get("driverName") or "—",
+                         t.get("deliverCount") or 0) for t in (d.get("data") or [])]
+            except Exception:
+                return []
+
+        lists = await asyncio.gather(*[one(h) for h in hubs])
+    agg = {}
+    for lst in lists:
+        for bc, did, dn, don in lst:
+            k = (did, bc)
+            a = agg.setdefault(k, {"driver_id": did, "driver_name": dn, "bc": bc, "trips": 0, "don": 0})
+            a["trips"] += 1
+            a["don"] += don
+    # phân biệt trùng tên trong cùng bưu cục
+    from collections import Counter
+    nc = Counter((a["driver_name"], a["bc"]) for a in agg.values())
+    for a in agg.values():
+        if nc[(a["driver_name"], a["bc"])] > 1 and a["driver_id"]:
+            a["driver_name"] = "%s #%s" % (a["driver_name"], a["driver_id"][-6:])
+    return sorted(agg.values(), key=lambda x: -x["don"])
+
+
 def _bar(pct, cls):
     w = pct if pct is not None else 0
     return "<div class='bar'><i class='%s' style='width:%s%%'></i></div>" % (cls, w)
@@ -172,7 +210,7 @@ td.rd{color:var(--bad);font-weight:700}
 </style></head><body>"""
 
 
-def gen_html(agg, backlog=None, backlog_time="hiện tại"):
+def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
     backlog = backlog or {}
     g = agg["grand"]
     d = agg["date"]
@@ -245,6 +283,27 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại"):
                         ("%.2f" % codper).replace(".", ","), _cls(dr["gtc"]), dr["gtc"]))
         P.append("</tbody></table>")
     P.append("</section>")
+
+    # ===== 🚗 Nhân viên còn chuyến CHƯA kết thúc (đơn chưa tính vào %GTC) =====
+    ot = [x for x in (ontrip or []) if x.get("don", 0) > 0]
+    if ot:
+        tot_don = sum(x["don"] for x in ot)
+        tot_ch = sum(x["trips"] for x in ot)
+        P.append("<div class='sec' style='color:var(--warn)'>🚗 Nhân viên còn chuyến CHƯA kết thúc</div>")
+        P.append("<section class='card'>")
+        P.append("<div class='note' style='margin:0 0 8px'>%d người · %d chuyến đang chạy · <b>%s đơn</b> "
+                 "chưa tính vào %%GTC — cần đốc thúc đóng chuyến. <i>(ảnh chụp %s)</i></div>"
+                 % (len(ot), tot_ch, _n(tot_don), gen_at))
+        P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
+                 "<th>Chuyến</th><th>Đơn treo</th></tr></thead><tbody>")
+        for i, x in enumerate(ot[:20], 1):
+            P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
+                     "<td>%s</td><td class='rd'>%s</td></tr>"
+                     % (i, _esc(x["driver_name"]), _esc(x["bc"]), _n(x["trips"]), _n(x["don"])))
+        if len(ot) > 20:
+            P.append("<tr><td></td><td class='nv' style='color:var(--mut)'>… và %d người khác</td>"
+                     "<td></td><td></td></tr>" % (len(ot) - 20))
+        P.append("</tbody></table></section>")
 
     # ===== Theo tỉnh =====
     P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")
@@ -369,12 +428,18 @@ def main():
         backlog = {}
     total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
     logger.info("Tồn chưa gán giao toàn vùng (%s): %d đơn", backlog_time, total_backlog)
+    # Nhân viên còn chuyến CHƯA kết thúc (đơn chưa tính vào %GTC) — lỗi thì bỏ qua
+    ontrip = []
+    try:
+        ontrip = asyncio.run(fetch_ontrip(token))
+    except Exception as e:
+        logger.warning("Không lấy được chuyến đang chạy (bỏ qua): %s", str(e)[:120])
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
-        f.write(gen_html(agg, backlog, backlog_time))
+        f.write(gen_html(agg, backlog, backlog_time, ontrip))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],
