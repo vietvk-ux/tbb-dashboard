@@ -7,7 +7,24 @@ Chạy: `python report.py` — đọc env vars NHANH_TOKEN, GTALK_OA_TOKEN, GTAL
 from __future__ import annotations
 import asyncio, logging, os, sys, time
 from collections import Counter
-from datetime import date
+from datetime import date, datetime, timedelta
+
+# %GTC cuối ngày CHỈ tính chuyến kết thúc TỪ giờ này (VN) trở đi — loại chuyến đóng
+# sớm buổi sáng (thường là đuôi hôm trước). Đổi bằng env EOD_TRIP_CUTOFF_HOUR.
+EOD_TRIP_CUTOFF_HOUR = int(os.environ.get("EOD_TRIP_CUTOFF_HOUR", "10") or "10")
+
+
+def _ended_after_cutoff(end_time_utc, cutoff_hour=EOD_TRIP_CUTOFF_HOUR):
+    """True nếu chuyến kết thúc lúc >= cutoff_hour giờ VN. endTime là UTC ISO ('...Z').
+    Không đọc được giờ → GIỮ (không loại nhầm)."""
+    if not end_time_utc:
+        return True
+    try:
+        s = str(end_time_utc).replace("Z", "").split(".")[0]
+        vn = datetime.strptime(s, "%Y-%m-%dT%H:%M:%S") + timedelta(hours=7)
+        return vn.hour >= cutoff_hour
+    except Exception:
+        return True
 
 import aiohttp
 import requests
@@ -69,7 +86,8 @@ async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem):
         }, hub_id, token)
     return [{"tripCode": t["tripCode"], "hub_id": hub_id, "bc": hub_name,
              "driver_id": t.get("driverId") or "", "driver_name": t.get("driverName") or "—"}
-            for t in (d.get("data") or []) if t.get("endDateIndex") == yyyymmdd]
+            for t in (d.get("data") or [])
+            if t.get("endDateIndex") == yyyymmdd and _ended_after_cutoff(t.get("endTime"))]
 
 
 async def _fetch_all_items(session, token, hub_id, trip_code):
