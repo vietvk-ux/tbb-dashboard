@@ -4,15 +4,14 @@ name: Bản tin việc cần làm (sáng 07:30)
 # KHÔNG cần token nhanh.ghn.vn, KHÔNG đụng GitHub Pages. Chạy độc lập.
 
 on:
+  # Kích DUY NHẤT qua cron-job.org (gọi GitHub API workflow_dispatch) — đúng giờ 100%,
+  # tránh lịch native GitHub hay bỏ nhịp. KHÔNG dùng `schedule` để không gửi trùng.
   workflow_dispatch:
     inputs:
       send:
         description: '1 = gửi GTalk · 0 = chỉ in thử (không gửi)'
         required: false
         default: '1'
-  schedule:
-    # 07:32 VN = 00:32 UTC — dùng phút LẺ (tránh mốc :00/:30 quá đông → GitHub hay bỏ nhịp).
-    - cron: '32 0 * * *'
 
 permissions:
   contents: read
