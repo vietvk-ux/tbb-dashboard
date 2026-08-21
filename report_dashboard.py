@@ -346,20 +346,33 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
                         cod_cell, _cls(b["gtc"]), b["gtc"] if b["gtc"] is not None else "—"))
         P.append("</tbody></table></div></details>")
 
-    # ===== Theo tỉnh =====
-    P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")
-    P.append("<section class='provs'>")
+    # ===== Theo tỉnh (bấm mở xem bưu cục) =====
+    prov_bcs = {}
+    for b in agg["bcs"]:
+        prov_bcs.setdefault(b["prov"], []).append(b)
+    P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao · bấm xem bưu cục</div>")
     for p in sorted(agg["provinces"], key=lambda x: (x["gtc"] if x["gtc"] is not None else 999)):
         pc = p["gtc"]
         cls = _cls(pc)
-        P.append("<div class='prow %s'>" % cls)
-        P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(p["prov"], p["prov"]))))
-        P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
+        P.append("<details class='bc %s'>" % cls)
+        P.append("<summary>")
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+                 "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(p["prov"], p["prov"])), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %d BC·🚚 %d chuyến·📦 %s đơn·✅ %s·🛒 LTC %s</div>"
-                 % (p["bc_count"], p["trips"], _n(p["total"]), _n(p["success"]), _n(p.get("ltc", 0))))
-        P.append("</div>")
-    P.append("</section>")
+        P.append("<div class='bcm'><span>🏤 %d BC</span><span>📦 %s</span><span>✅ %s</span>"
+                 "<span class='b'>❌ %s</span><span class='g'>🛒 %s</span></div>"
+                 % (p["bc_count"], _n(p["total"]), _n(p["success"]), _n(p["total"] - p["success"]), _n(p.get("ltc", 0))))
+        P.append("</summary>")
+        P.append("<div class='dtl'><table class='drv'><thead><tr><th>Bưu cục</th><th>Đơn</th><th>GTC</th>"
+                 "<th>GTB</th><th>COD tr</th><th>%GTC</th></tr></thead><tbody>")
+        for b in sorted(prov_bcs.get(p["prov"], []), key=lambda x: (x["gtc"] if x["gtc"] is not None else 999)):
+            bcod = cod_by_bc.get(b["bc"], 0)
+            cod_cell = ("<b class='cod'>%s</b>" % ("%.1f" % (bcod / 1e6)).replace(".", ",")) if bcod >= 1e5 else "0"
+            P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+                     "<td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (_esc(b["bc"]), _n(b["total"]), _n(b["success"]), _n(b["total"] - b["success"]),
+                        cod_cell, _cls(b["gtc"]), b["gtc"] if b["gtc"] is not None else "—"))
+        P.append("</tbody></table></div></details>")
 
     # ===== 61 bưu cục — card + drill nhân viên =====
     P.append("<div class='sec'>🏤 Tất cả bưu cục (%d) · %%GTC thấp → cao</div>" % len(agg["bcs"]))
