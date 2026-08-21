@@ -52,6 +52,38 @@ def _bar(pct, cls):
     return "<div class='bar'><i class='%s' style='width:%s%%'></i></div>" % (cls, w)
 
 
+def _bc_drv_details(r):
+    """1 bưu cục dạng <details> LỒNG (bấm mở ra bảng nhân viên) — dùng trong mục AM/tỉnh."""
+    pc = _pct(r["gtc"], r["total"])
+    cls = _cls(pc)
+    P = ["<details class='bc sub %s'><summary>" % cls]
+    P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+             "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
+    P.append("<div class='bcm'><span>📥 %s</span><span>✅ %s</span>"
+             "<span class='gtb'>❌ %s</span><span class='ltc'>LTC %s</span></div>"
+             % (_n(r["total"]), _n(r["gtc"]), _n(r["att"] - r["gtc"]), _n(r.get("ltc", 0))))
+    P.append("</summary><div class='dtl'>")
+    drv = r.get("drivers", [])
+    if drv:
+        P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th>"
+                 "<th>LTC</th><th>❌GTB</th><th>%GTC</th></tr></thead><tbody>")
+        for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
+            pc2 = _pct(d["gtc"], d["total"])
+            gtb2 = d["att"] - d["gtc"]
+            gtb_cell = ("<b class='gtb'>%s</b>" % _n(gtb2)) if gtb2 > 0 else "0"
+            ltc = d.get("ltc", 0)
+            ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
+            P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+                     "<td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (_esc(d["name"]), _n(d.get("chuyen", 0)), _n(d["total"]), _n(d["gtc"]),
+                        ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—"))
+        P.append("</tbody></table>")
+    else:
+        P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
+    P.append("</div></details>")
+    return "".join(P)
+
+
 async def fetch_live(token):
     today = datetime.now(VN).date()
     ymd = today.year * 10000 + today.month * 100 + today.day
@@ -266,15 +298,10 @@ def gen_html(rows):
         P.append("<div class='pmeta'>🏤 %s BC·📥 %s·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
                  % (v["bc"], _n(v["total"]), _n(v["gtc"]), _n(v["att"] - v["gtc"]), _n(v["ltc"])))
         P.append("</summary>")
-        P.append("<div class='dtl'><table class='drv'><thead><tr><th>Bưu cục</th><th>Gán</th><th>GTC</th>"
-                 "<th>❌GTB</th><th>LTC</th><th>%GTC</th></tr></thead><tbody>")
+        P.append("<div class='dtl'>")
         for r in sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
-            bpc = _pct(r["gtc"], r["total"])
-            P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                     "<td><span class='pill sm %s'>%s%%</span></td></tr>"
-                     % (_esc(r["name"]), _n(r["total"]), _n(r["gtc"]), _n(r["att"] - r["gtc"]),
-                        _n(r.get("ltc", 0)), _cls(bpc), bpc if bpc is not None else "—"))
-        P.append("</tbody></table></div></details>")
+            P.append(_bc_drv_details(r))
+        P.append("</div></details>")
 
     # ===== Theo tỉnh (bấm mở xem bưu cục) =====
     prov_rows = {}
@@ -293,15 +320,10 @@ def gen_html(rows):
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _n(v["att"] - v["gtc"]), _n(v["ltc"])))
         P.append("</summary>")
-        P.append("<div class='dtl'><table class='drv'><thead><tr><th>Bưu cục</th><th>Gán</th><th>GTC</th>"
-                 "<th>❌GTB</th><th>LTC</th><th>%GTC</th></tr></thead><tbody>")
+        P.append("<div class='dtl'>")
         for r in sorted(prov_rows.get(pv, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
-            bpc = _pct(r["gtc"], r["total"])
-            P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                     "<td><span class='pill sm %s'>%s%%</span></td></tr>"
-                     % (_esc(r["name"]), _n(r["total"]), _n(r["gtc"]), _n(r["att"] - r["gtc"]),
-                        _n(r.get("ltc", 0)), _cls(bpc), bpc if bpc is not None else "—"))
-        P.append("</tbody></table></div></details>")
+            P.append(_bc_drv_details(r))
+        P.append("</div></details>")
 
     # ===== Bưu cục =====
     P.append("<div class='sec'>🏤 Bưu cục · Tồn chưa gán giao cao → thấp</div>")
@@ -439,6 +461,11 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .gtb{color:var(--bad);font-weight:700}
 .ltc{color:var(--good);font-weight:700}
 .dtl{padding:2px 12px 12px}
+.bc .dtl{padding:2px 4px 10px}
+.bc.sub{margin:6px 0;border-radius:11px;border-left-width:2px;background:rgba(255,255,255,.02)}
+.bc.sub summary{padding:9px 10px;gap:7px}
+.bc.sub[open]{background:rgba(255,255,255,.035)}
+.bc.sub .dtl{padding:0 2px 6px}
 .none{color:var(--mut);font-size:12.5px;padding:6px 2px 10px}
 
 table.drv{width:100%;border-collapse:collapse;font-size:12px}
