@@ -222,7 +222,9 @@ def gen_html(rows):
     # 3 chỉ số đơn TikTok (VNGH) toàn vùng
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🛍️ TikTok gán</div></div>" % _n(R["vngh"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛍️ TikTok GTC</div></div>" % _n(R["vngh_gtc"]))
-    P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>🛍️ TikTok còn</div></div>" % _n(R["vngh"] - R["vngh_gtc"]))
+    vpct = _pct(R["vngh_gtc"], R["vngh"])
+    P.append("<div class='st'><div class='sv %s'>%s%%</div><div class='sl'>🛍️ %%GTC TikTok</div></div>"
+             % (_cls(vpct), vpct if vpct is not None else "—"))
     P.append("</section>")
 
     P.append("<a class='eod' href='eod.html'><span>📊 Báo cáo %GTC cuối ngày</span>"
