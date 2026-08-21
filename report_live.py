@@ -250,7 +250,7 @@ def gen_html(rows):
         P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(pv, pv))))
         P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏃 %s · 📥 %s · ⏳ %s · ✅ %s · <span class='gtb'>❌ %s</span> · <span class='ltc'>LTC %s</span></div>"
+        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _n(v["att"] - v["gtc"]), _n(v["ltc"])))
         P.append("</div>")
@@ -363,7 +363,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .prow.good{border-left-color:var(--good)}.prow.warn{border-left-color:var(--warn)}.prow.bad{border-left-color:var(--bad)}
 .pl{display:flex;align-items:center;gap:9px;font-size:15px}
 .prow .bar{grid-column:1/-1}
-.pmeta{grid-column:1/-1;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+.pmeta{grid-column:1/-1;color:var(--mut);font-size:10.5px;letter-spacing:-.1px;font-variant-numeric:tabular-nums;line-height:1.5}
 
 .dot{width:9px;height:9px;border-radius:50%;flex:none;background:#4b5168}
 .dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
@@ -387,7 +387,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bc[open]{background:var(--card2)}
 .bch{display:flex;align-items:center;gap:9px}
 .bcn{font-weight:700;font-size:15px;flex:1;min-width:0}
-.bcm{display:flex;flex-wrap:wrap;gap:5px 12px;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+.bcm{display:flex;flex-wrap:wrap;gap:4px 9px;color:var(--mut);font-size:10.5px;letter-spacing:-.1px;font-variant-numeric:tabular-nums}
 .bcm .w{color:var(--warn)}
 .gtb{color:var(--bad);font-weight:700}
 .ltc{color:var(--good);font-weight:700}

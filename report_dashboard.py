@@ -165,7 +165,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .prow.good{border-left-color:var(--good)}.prow.warn{border-left-color:var(--warn)}.prow.bad{border-left-color:var(--bad)}
 .pl{display:flex;align-items:center;gap:9px;font-size:15px}
 .prow .bar{grid-column:1/-1}
-.pmeta{grid-column:1/-1;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+.pmeta{grid-column:1/-1;color:var(--mut);font-size:10.5px;letter-spacing:-.1px;font-variant-numeric:tabular-nums;line-height:1.5}
 
 .dot{width:9px;height:9px;border-radius:50%;flex:none;background:#4b5168}
 .dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
@@ -315,7 +315,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
         P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(PROV_NAME.get(p["prov"], p["prov"]))))
         P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %d BC · 🚚 %d chuyến · 📦 %s đơn · ✅ %s · 🛒 LTC %s</div>"
+        P.append("<div class='pmeta'>🏤 %d BC·🚚 %d chuyến·📦 %s đơn·✅ %s·🛒 LTC %s</div>"
                  % (p["bc_count"], p["trips"], _n(p["total"]), _n(p["success"]), _n(p.get("ltc", 0))))
         P.append("</div>")
     P.append("</section>")
