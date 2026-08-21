@@ -248,20 +248,34 @@ def gen_html(rows):
     P.append("<a class='eod' href='vngh.html'><span>🛍️ Đơn TikTok</span>"
              "<span class='arw'>tiến độ theo bưu cục →</span></a>")
 
-    # ===== Theo AM (xếp hạng) =====
-    P.append("<div class='sec'>🧑‍💼 Theo AM · %GTC thấp → cao</div>")
-    P.append("<section class='provs'>")
+    # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
+    am_rows = {}
+    for r in rows:
+        amn = AM_OF.get(r["name"])
+        if amn:
+            am_rows.setdefault(amn, []).append(r)
+    P.append("<div class='sec'>🧑‍💼 Theo AM · %GTC thấp → cao · bấm xem bưu cục</div>")
     for amn, v in sorted(am.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
         pc = _pct(v["gtc"], v["total"])
         cls = _cls(pc)
-        P.append("<div class='prow %s'>" % cls)
-        P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(amn)))
-        P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
+        P.append("<details class='bc %s'>" % cls)
+        P.append("<summary>")
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+                 "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
+        P.append("<div class='bcm'><span>🏤 %s BC</span><span>📥 %s</span><span>✅ %s</span>"
+                 "<span class='gtb'>❌ %s</span><span class='ltc'>LTC %s</span></div>"
                  % (v["bc"], _n(v["total"]), _n(v["gtc"]), _n(v["att"] - v["gtc"]), _n(v["ltc"])))
-        P.append("</div>")
-    P.append("</section>")
+        P.append("</summary>")
+        P.append("<div class='dtl'><table class='drv'><thead><tr><th>Bưu cục</th><th>Gán</th><th>GTC</th>"
+                 "<th>❌GTB</th><th>LTC</th><th>%GTC</th></tr></thead><tbody>")
+        for r in sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
+            bpc = _pct(r["gtc"], r["total"])
+            P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+                     "<td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (_esc(r["name"]), _n(r["total"]), _n(r["gtc"]), _n(r["att"] - r["gtc"]),
+                        _n(r.get("ltc", 0)), _cls(bpc), bpc if bpc is not None else "—"))
+        P.append("</tbody></table></div></details>")
 
     # ===== Theo tỉnh =====
     P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")
