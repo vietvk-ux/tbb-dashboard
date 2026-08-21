@@ -174,7 +174,8 @@ async def fetch_live(token):
 
 def gen_html(rows):
     now = datetime.now(VN)
-    R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0}
+    R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0,
+         "vngh": 0, "vngh_gtc": 0}
     prov = {}
     for r in rows:
         for k in R:
@@ -218,6 +219,10 @@ def gen_html(rows):
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🏃 Đang chạy</div></div>" % _n(R["ontrip"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ GTC nay</div></div>" % _n(R["gtc"]))
     P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>❌ GTB thao tác</div></div>" % _n(R["att"] - R["gtc"]))
+    # 3 chỉ số đơn TikTok (VNGH) toàn vùng
+    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🛍️ TikTok gán</div></div>" % _n(R["vngh"]))
+    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛍️ TikTok GTC</div></div>" % _n(R["vngh_gtc"]))
+    P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>🛍️ TikTok còn</div></div>" % _n(R["vngh"] - R["vngh_gtc"]))
     P.append("</section>")
 
     P.append("<a class='eod' href='eod.html'><span>📊 Báo cáo %GTC cuối ngày</span>"
