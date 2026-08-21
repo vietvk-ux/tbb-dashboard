@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 import aiohttp
 from report import _get_hubs, _post, _fetch_all_items, CONCURRENCY, TokenExpiredError
+from am_map import AM_OF
 
 logger = logging.getLogger("live")
 VN = timezone(timedelta(hours=7))
@@ -177,12 +178,19 @@ def gen_html(rows):
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0,
          "vngh": 0, "vngh_gtc": 0}
     prov = {}
+    am = {}
     for r in rows:
         for k in R:
             R[k] += r.get(k, 0)
         p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0})
         for k in ("backlog", "ontrip", "fin", "gtc", "att", "total", "ltc"):
             p[k] += r.get(k, 0)
+        amn = AM_OF.get(r["name"])
+        if amn:
+            a = am.setdefault(amn, {"bc": 0, "backlog": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0})
+            a["bc"] += 1
+            for k in ("backlog", "gtc", "att", "total", "ltc"):
+                a[k] += r.get(k, 0)
     reg_pct = _pct(R["gtc"], R["total"])
 
     can_giao = R["total"] + R["backlog"]
@@ -239,6 +247,21 @@ def gen_html(rows):
              "<span class='arw'>tồn luân chuyển →</span></a>")
     P.append("<a class='eod' href='vngh.html'><span>🛍️ Đơn TikTok</span>"
              "<span class='arw'>tiến độ theo bưu cục →</span></a>")
+
+    # ===== Theo AM (xếp hạng) =====
+    P.append("<div class='sec'>🧑‍💼 Theo AM · %GTC thấp → cao</div>")
+    P.append("<section class='provs'>")
+    for amn, v in sorted(am.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
+        pc = _pct(v["gtc"], v["total"])
+        cls = _cls(pc)
+        P.append("<div class='prow %s'>" % cls)
+        P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(amn)))
+        P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
+        P.append(_bar(pc, cls))
+        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
+                 % (v["bc"], _n(v["total"]), _n(v["gtc"]), _n(v["att"] - v["gtc"]), _n(v["ltc"])))
+        P.append("</div>")
+    P.append("</section>")
 
     # ===== Theo tỉnh =====
     P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")

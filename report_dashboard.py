@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 import aiohttp
 from report import (fetch_report, aggregate, dedup_orders, send_gtalk, TokenExpiredError,
                     _get_hubs, _post, CONCURRENCY)
+from am_map import AM_OF
 
 logger = logging.getLogger("dash")
 VN = timezone(timedelta(hours=7))
@@ -304,6 +305,35 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
             P.append("<tr><td></td><td class='nv' style='color:var(--mut)'>… và %d người khác</td>"
                      "<td></td><td></td></tr>" % (len(ot) - 20))
         P.append("</tbody></table></section>")
+
+    # ===== Theo AM (xếp hạng) =====
+    am = {}
+    for b in agg["bcs"]:
+        amn = AM_OF.get(b["bc"])
+        if not amn:
+            continue
+        a = am.setdefault(amn, {"bc": 0, "total": 0, "success": 0, "ltc": 0, "cod": 0.0})
+        a["bc"] += 1
+        a["total"] += b["total"]
+        a["success"] += b["success"]
+        a["ltc"] += b.get("ltc", 0)
+    for dr in agg["drivers"]:
+        amn = AM_OF.get(dr["bc"])
+        if amn and amn in am:
+            am[amn]["cod"] += dr.get("gtb_cod", 0)
+    P.append("<div class='sec'>🧑‍💼 Theo AM · %GTC thấp → cao</div>")
+    P.append("<section class='provs'>")
+    for amn, v in sorted(am.items(), key=lambda kv: (round(kv[1]["success"] / kv[1]["total"] * 100, 1) if kv[1]["total"] else 999)):
+        pc = round(v["success"] / v["total"] * 100, 1) if v["total"] else None
+        cls = _cls(pc)
+        P.append("<div class='prow %s'>" % cls)
+        P.append("<div class='pl'><span class='dot %s'></span><b>%s</b></div>" % (cls, _esc(amn)))
+        P.append("<span class='pill %s'>%s%%</span>" % (cls, pc if pc is not None else "—"))
+        P.append(_bar(pc, cls))
+        P.append("<div class='pmeta'>🏤 %d BC·📦 %s đơn·✅ %s·<span style='color:var(--bad)'>❌ %s</span>·💰 %.0ftr·🛒 %s</div>"
+                 % (v["bc"], _n(v["total"]), _n(v["success"]), _n(v["total"] - v["success"]), v["cod"] / 1e6, _n(v["ltc"])))
+        P.append("</div>")
+    P.append("</section>")
 
     # ===== Theo tỉnh =====
     P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao</div>")
