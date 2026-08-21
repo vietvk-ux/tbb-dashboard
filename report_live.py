@@ -263,8 +263,7 @@ def gen_html(rows):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='bcm'><span>🏤 %s BC</span><span>📥 %s</span><span>✅ %s</span>"
-                 "<span class='gtb'>❌ %s</span><span class='ltc'>LTC %s</span></div>"
+        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
                  % (v["bc"], _n(v["total"]), _n(v["gtc"]), _n(v["att"] - v["gtc"]), _n(v["ltc"])))
         P.append("</summary>")
         P.append("<div class='dtl'><table class='drv'><thead><tr><th>Bưu cục</th><th>Gán</th><th>GTC</th>"
@@ -290,8 +289,7 @@ def gen_html(rows):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='bcm'><span>🏃 %s</span><span>📥 %s</span><span class='w'>⏳ %s</span>"
-                 "<span>✅ %s</span><span class='gtb'>❌ %s</span><span class='ltc'>LTC %s</span></div>"
+        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _n(v["att"] - v["gtc"]), _n(v["ltc"])))
         P.append("</summary>")

@@ -331,8 +331,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='bcm'><span>🏤 %d BC</span><span>📦 %s</span><span>✅ %s</span>"
-                 "<span class='b'>❌ %s</span><span>💰 %.0ftr</span></div>"
+        P.append("<div class='pmeta'>🏤 %d BC·📦 %s·✅ %s·<span style='color:var(--bad)'>❌ %s</span>·💰 %.0ftr</div>"
                  % (v["bc"], _n(v["total"]), _n(v["success"]), _n(v["total"] - v["success"]), v["cod"] / 1e6))
         P.append("</summary>")
         P.append("<div class='dtl'><table class='drv'><thead><tr><th>Bưu cục</th><th>Đơn</th><th>GTC</th>"
@@ -359,8 +358,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(p["prov"], p["prov"])), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='bcm'><span>🏤 %d BC</span><span>📦 %s</span><span>✅ %s</span>"
-                 "<span class='b'>❌ %s</span><span class='g'>🛒 %s</span></div>"
+        P.append("<div class='pmeta'>🏤 %d BC·📦 %s·✅ %s·<span style='color:var(--bad)'>❌ %s</span>·<span style='color:var(--good)'>🛒 %s</span></div>"
                  % (p["bc_count"], _n(p["total"]), _n(p["success"]), _n(p["total"] - p["success"]), _n(p.get("ltc", 0))))
         P.append("</summary>")
         P.append("<div class='dtl'><table class='drv'><thead><tr><th>Bưu cục</th><th>Đơn</th><th>GTC</th>"
