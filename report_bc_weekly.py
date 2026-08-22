@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from snapshot import _sb_all
 from am_map import AM_OF
+from am_user_ids import extract_ids_from_msg
 from report import send_gtalk
 
 VN = timezone(timedelta(hours=7))
@@ -113,7 +114,7 @@ def main():
     L.append(f"_🤖 Recap tuần BC · Vùng TBB · {now.strftime('%d/%m %H:%M')}_")
     msg = "\n".join(L)
     print(f"[INFO] Msg {len(msg)} chars · drop={len(drop)} imp={len(imp)} red={len(red)}")
-    send_gtalk(msg, oa, ch)
+    send_gtalk(msg, oa, ch, mentioned_user_ids=extract_ids_from_msg(msg))
     print("[INFO] Đã gửi RECAP TUẦN BC vào GTalk")
 
 

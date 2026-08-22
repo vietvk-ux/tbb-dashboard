@@ -363,9 +363,10 @@ def format_report(agg, include_cod=False):
 
 
 # ==== GTALK SEND ====
-def send_gtalk(text, oa_token, channel_id):
+def send_gtalk(text, oa_token, channel_id, mentioned_user_ids=None):
     """Gửi text vào GTalk. Chia nhỏ nếu > 4200 ký tự.
-    Fan-out sang GTALK_CHANNEL_ID_2 nếu env này set (channel phụ, silent fail)."""
+    Fan-out sang GTALK_CHANNEL_ID_2 nếu env này set (channel phụ, silent fail).
+    mentioned_user_ids: list userId GTalk để trigger notification tag @ (optional)."""
     MAX = 4200
     parts = []
     while len(text) > MAX:
@@ -378,6 +379,11 @@ def send_gtalk(text, oa_token, channel_id):
     ch2 = os.environ.get("GTALK_CHANNEL_ID_2", "").strip()
     if ch2 and ch2 != channel_id:
         channels.append(ch2)
+
+    interaction_str = None
+    if mentioned_user_ids:
+        import json as _json
+        interaction_str = _json.dumps({"mentionedUserIds": list(mentioned_user_ids)})
 
     for idx, ch in enumerate(channels):
         is_primary = (idx == 0)
@@ -392,6 +398,8 @@ def send_gtalk(text, oa_token, channel_id):
                         "parseMode": "MARKDOWN",
                     },
                 }
+                if i == 0 and interaction_str:
+                    body["interaction"] = interaction_str
                 r = requests.post("https://mbff.ghn.vn/api/gtalk/send-message", json=body, timeout=20)
                 r.raise_for_status()
                 d = r.json()
