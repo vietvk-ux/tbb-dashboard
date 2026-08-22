@@ -83,6 +83,11 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
     total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
     total_cod = sum(x.get("gtb_cod", 0) for x in agg["drivers"])
 
+    # Kỷ luật ra hàng: giờ xuất phát TB vùng + số NV muộn
+    timed = [d for d in agg["drivers"] if d.get("start_h") is not None]
+    gio_xp_tb = round(sum(d["start_h"] for d in timed) / len(timed), 2) if timed else None
+    so_nv_muon = sum(1 for d in agg["drivers"] if d.get("late"))
+
     # 1) Toàn VÙNG (1 dòng/ngày)
     _upsert(url, key, "bao_cao_vung", [{
         "ngay": date_iso, "so_buu_cuc": agg["hub_count"], "so_chuyen": g["trips"],
@@ -90,6 +95,7 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         "pct_gtc": g["gtc"], "cod_gtb": round(total_cod), "chua_gan": total_backlog,
         "ltc": g.get("ltc", 0),
         "vngh_don": g.get("vngh_total"), "vngh_gtc": g.get("vngh_gtc"),
+        "gio_xuat_phat_tb": gio_xp_tb, "so_nv_muon": so_nv_muon,
     }], "ngay")
 
     # 2) Theo BƯU CỤC
@@ -107,6 +113,8 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         "driver_id": str(d.get("driver_id", "") or ""), "so_chuyen": d.get("trips", 0),
         "don_giao": d["total"], "gtc": d["success"], "gtb": d["total"] - d["success"],
         "pct_gtc": d["gtc"], "cod_gtb": round(d.get("gtb_cod", 0)), "ltc": d.get("ltc", 0),
+        "gio_xuat_phat": d.get("start"), "gio_ket_thuc": d.get("end"),
+        "thoi_luong_phut": d.get("span_min"), "xuat_phat_muon": bool(d.get("late")),
     } for d in agg["drivers"]]
     _upsert(url, key, "bao_cao_nhan_vien", nv_rows, "ngay,buu_cuc,driver_id")
 

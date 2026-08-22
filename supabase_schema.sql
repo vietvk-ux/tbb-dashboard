@@ -18,6 +18,8 @@ create table if not exists bao_cao_vung (
   ltc         int,        -- đơn lấy thành công (LTC)
   vngh_don    int,        -- đơn TikTok Shop (VNGH)
   vngh_gtc    numeric(5,1),
+  gio_xuat_phat_tb numeric(4,2), -- giờ xuất phát TB vùng (giờ VN thập phân)
+  so_nv_muon  int,        -- số NV xuất phát muộn (>= ngưỡng)
   created_at  timestamptz default now()
 );
 
@@ -54,6 +56,10 @@ create table if not exists bao_cao_nhan_vien (
   pct_gtc   numeric(5,1),
   cod_gtb   bigint,
   ltc       int,          -- đơn lấy thành công (LTC)
+  gio_xuat_phat   text,   -- 'HH:MM' chuyến bắt đầu trong ngày sớm nhất
+  gio_ket_thuc    text,   -- 'HH:MM' chuyến kết thúc muộn nhất
+  thoi_luong_phut int,     -- phút từ XP -> KT
+  xuat_phat_muon  boolean, -- true nếu XP >= ngưỡng muộn
   unique (ngay, buu_cuc, driver_id)
 );
 create index if not exists idx_nv_ngay on bao_cao_nhan_vien (ngay);
