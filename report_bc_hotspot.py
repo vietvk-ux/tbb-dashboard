@@ -1,61 +1,59 @@
-"""BC ĐIỂM NÓNG NGÀY 09:00 · cross-metric alert (Vùng TBB) → GTalk.
-Kết hợp %GTC + backlog + COD GTB → top 5 BC critical cần intervention ngay.
+"""BC ĐIỂM NÓNG NGÀY 08:00 · Vùng TBB → GTalk.
+Lọc 2 danh sách:
+  1) Top 10 BC %GTC THẤP NHẤT (số hôm qua từ Supabase)
+  2) Top 10 BC BACKLOG TỒN ĐỌNG NHIỀU NHẤT
+Hiển thị AM phụ trách để user gọi ngay.
 """
 from __future__ import annotations
-import os, sys
+import os
 from datetime import datetime, timedelta, timezone
-from snapshot import load_snapshot, _sb_all
+from snapshot import _sb_all
 from am_map import AM_OF
 from report import send_gtalk
 
 VN = timezone(timedelta(hours=7))
 
 
-def _pct(p, t):
-    return round(p * 100 / t, 1) if t else 0
+def _n(x):
+    return "{:,}".format(int(x or 0)).replace(",", ".")
 
 
-def _tr(x):
-    return f"{(x or 0) / 1_000_000:.1f} tr₫"
+def _icon_gtc(pct):
+    if pct is None: return "⚪"
+    if pct < 50: return "🔴"
+    if pct < 70: return "🟠"
+    return "🟡"
 
 
-def _score(b):
-    """Impact score: nặng đơn tồn + COD kẹt + %GTC thấp."""
-    pct_gap = max(0, 70 - (b.get("pct_gtc") or 100))  # 0-70
-    return (b.get("chua_gan") or 0) * 1.0 + (b.get("cod_gtb") or 0) / 1_000_000 * 2 + pct_gap * 3
+def _icon_backlog(n):
+    if n >= 100: return "🔴"
+    if n >= 50: return "🟠"
+    return "🟡"
 
 
 def main():
     oa = os.environ.get("GTALK_OA_TOKEN", "").strip()
     ch = os.environ.get("GTALK_CHANNEL_ID", "").strip()
-    if not (oa and ch):
-        raise SystemExit("Thiếu GTALK_OA_TOKEN / GTALK_CHANNEL_ID")
-
     url = os.environ.get("SUPABASE_URL", "").strip()
     key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
-    if not (url and key):
-        raise SystemExit("Thiếu SUPABASE_URL / SUPABASE_SERVICE_KEY")
+    if not (oa and ch and url and key):
+        raise SystemExit("Thiếu env: GTALK_OA_TOKEN / GTALK_CHANNEL_ID / SUPABASE_URL / SUPABASE_SERVICE_KEY")
 
     day = (datetime.now(VN).date() - timedelta(days=1)).strftime("%Y-%m-%d")
     bcs = _sb_all(url, key, f"bao_cao_buu_cuc?ngay=eq.{day}&select=*")
     if not bcs:
         raise SystemExit(f"Không có data BC ngày {day}")
 
-    # Cross-metric filter: các BC có ít nhất 2 dấu hiệu yếu
-    critical = []
-    for b in bcs:
-        pct = b.get("pct_gtc") or 100
-        cg = b.get("chua_gan") or 0
-        cod = b.get("cod_gtb") or 0
-        flags = 0
-        if pct < 70: flags += 1
-        if cg >= 30: flags += 1
-        if cod >= 20_000_000: flags += 1
-        if flags >= 2:  # có ít nhất 2 vấn đề
-            b["_score"] = _score(b)
-            critical.append(b)
-    critical.sort(key=lambda x: -x["_score"])
-    top5 = critical[:5]
+    # Chỉ lấy BC có đủ đơn giao (loại BC quá nhỏ để tránh nhiễu)
+    valid = [b for b in bcs if (b.get("don_giao") or 0) >= 20]
+
+    # Top 10 BC %GTC thấp nhất
+    low_gtc = sorted([b for b in valid if b.get("pct_gtc") is not None],
+                    key=lambda x: x["pct_gtc"])[:10]
+
+    # Top 10 BC backlog tồn đọng nhiều nhất (chua_gan)
+    high_backlog = sorted([b for b in bcs if (b.get("chua_gan") or 0) > 0],
+                          key=lambda x: -(x.get("chua_gan") or 0))[:10]
 
     now = datetime.now(VN)
     L = [
@@ -63,29 +61,50 @@ def main():
         f"⏰ Sáng {now.strftime('%d/%m/%Y')} · số chốt ngày {day}",
         "",
     ]
-    if not top5:
-        L.append("✅ Không có BC nào chạm ≥2 tiêu chí yếu (GTC<70% · Tồn≥30 · COD≥20 tr₫).")
-    else:
+
+    if low_gtc:
         L += [
-            f"⚠️ **{len(critical)} BC** chạm ≥2 tiêu chí yếu (GTC<70% · Tồn≥30 · COD≥20 tr₫)",
-            f"🎯 **TOP {len(top5)} BC CRITICAL NHẤT** _(sort theo impact score)_",
-            "",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            f"▶️ 🔴 **TOP {len(low_gtc)} BC %GTC THẤP NHẤT** _(≥20 đơn/ngày)_",
+            "━━━━━━━━━━━━━━━━━━━━━━",
         ]
-        for i, b in enumerate(top5, 1):
+        for i, b in enumerate(low_gtc, 1):
             bc = b.get("buu_cuc", "?")
             am = AM_OF.get(bc, "?")
-            pct = b.get("pct_gtc") or 0
-            cg = b.get("chua_gan") or 0
-            cod = b.get("cod_gtb") or 0
-            L.append(f"{i}. 🔴 **{bc}** — AM: **{am}**")
-            L.append(f"   ├ %GTC: **{pct}%** · Tồn chưa gán: **{cg}** đơn · COD GTB: **{_tr(cod)}**")
-            L.append(f"   └ 👉 gọi AM **{am}** thúc BC này ngay")
-        L += ["", "🎯 **HÀNH ĐỘNG HÔM NAY**",
-              f"• Gọi từng AM có tên trên → yêu cầu báo cáo tiến độ trước 12:00",
-              f"• Focus BC top 1-2 trước (impact cao nhất)"]
-    L += ["", f"_🤖 BC Điểm nóng · Vùng TBB · sáng {now.strftime('%H:%M')}_"]
+            pct = b.get("pct_gtc", 0)
+            vol = b.get("don_giao", 0)
+            L.append(f"{i}. {_icon_gtc(pct)} {bc} · AM **{am}** — **{pct}%** · {_n(vol)} đơn")
+        L.append("")
+
+    if high_backlog:
+        L += [
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            f"▶️ 📦 **TOP {len(high_backlog)} BC BACKLOG TỒN ĐỌNG NHIỀU NHẤT**",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+        ]
+        for i, b in enumerate(high_backlog, 1):
+            bc = b.get("buu_cuc", "?")
+            am = AM_OF.get(bc, "?")
+            cg = b.get("chua_gan", 0)
+            L.append(f"{i}. {_icon_backlog(cg)} {bc} · AM **{am}** — **{_n(cg)}** đơn tồn")
+        L.append("")
+
+    # Hành động — union set BC xuất hiện ở cả 2 danh sách
+    intersect = set(b.get("buu_cuc") for b in low_gtc) & set(b.get("buu_cuc") for b in high_backlog)
+    if intersect:
+        L += [
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            f"🎯 **{len(intersect)} BC CRITICAL** _(đồng thời %GTC thấp + backlog cao)_",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+        ]
+        for bc in sorted(intersect):
+            am = AM_OF.get(bc, "?")
+            L.append(f"• {bc} · AM **{am}** → cần gọi ngay")
+        L.append("")
+
+    L.append(f"_🤖 BC Điểm nóng · Vùng TBB · sáng {now.strftime('%H:%M')}_")
     msg = "\n".join(L)
-    print(f"[INFO] Msg {len(msg)} chars · {len(critical)} BC critical (top {len(top5)})")
+    print(f"[INFO] Msg {len(msg)} chars · low_gtc={len(low_gtc)} high_backlog={len(high_backlog)} intersect={len(intersect)}")
     send_gtalk(msg, oa, ch)
     print("[INFO] Đã gửi BC ĐIỂM NÓNG vào GTalk")
 
