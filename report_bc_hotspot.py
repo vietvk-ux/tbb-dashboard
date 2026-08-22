@@ -1,11 +1,13 @@
 """BC ĐIỂM NÓNG NGÀY 08:00 · Vùng TBB → GTalk.
 Lọc 2 danh sách:
-  1) Top 10 BC %GTC THẤP NHẤT (số hôm qua từ Supabase)
-  2) Top 10 BC BACKLOG TỒN ĐỌNG NHIỀU NHẤT
+  1) Top 10 BC %GTC THẤP NHẤT (từ bao_cao_buu_cuc)
+  2) Top 10 BC BACKLOG TỒN ĐỌNG NHIỀU NHẤT (từ bao_cao_ton_dong · aging bucket)
+     🔴 đỏ khi có tồn >120h nhiều nhất
 Hiển thị AM phụ trách để user gọi ngay.
 """
 from __future__ import annotations
 import os
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from snapshot import _sb_all
 from am_map import AM_OF
@@ -25,9 +27,10 @@ def _icon_gtc(pct):
     return "🟡"
 
 
-def _icon_backlog(n):
-    if n >= 100: return "🔴"
-    if n >= 50: return "🟠"
+def _icon_backlog(gt120):
+    """Cảnh báo đỏ theo tồn >120h."""
+    if gt120 >= 30: return "🔴"
+    if gt120 >= 10: return "🟠"
     return "🟡"
 
 
@@ -51,9 +54,20 @@ def main():
     low_gtc = sorted([b for b in valid if b.get("pct_gtc") is not None],
                     key=lambda x: x["pct_gtc"])[:10]
 
-    # Top 10 BC backlog tồn đọng nhiều nhất (chua_gan)
-    high_backlog = sorted([b for b in bcs if (b.get("chua_gan") or 0) > 0],
-                          key=lambda x: -(x.get("chua_gan") or 0))[:10]
+    # Top 10 BC backlog TỒN ĐỌNG NHIỀU NHẤT — dùng bao_cao_ton_dong
+    ton_rows = _sb_all(url, key, f"bao_cao_ton_dong?ngay=eq.{day}&select=buu_cuc,order_type,total,g_gt120")
+    ton_by_bc = defaultdict(lambda: {"total": 0, "gt120": 0})
+    for r in ton_rows:
+        bc = r.get("buu_cuc")
+        if not bc: continue
+        ton_by_bc[bc]["total"] += r.get("total") or 0
+        ton_by_bc[bc]["gt120"] += r.get("g_gt120") or 0
+    # Sort theo tổng tồn desc → top 10
+    high_backlog = sorted(
+        [{"bc": bc, "total": v["total"], "gt120": v["gt120"]}
+         for bc, v in ton_by_bc.items() if v["total"] > 0],
+        key=lambda x: -x["total"]
+    )[:10]
 
     now = datetime.now(VN)
     L = [
@@ -79,18 +93,17 @@ def main():
     if high_backlog:
         L += [
             "━━━━━━━━━━━━━━━━━━━━━━",
-            f"▶️ 📦 **TOP {len(high_backlog)} BC BACKLOG TỒN ĐỌNG NHIỀU NHẤT**",
+            f"▶️ 📦 **TOP {len(high_backlog)} BC BACKLOG TỒN ĐỌNG NHIỀU NHẤT** _(🔴 nếu tồn >120h ≥30 đơn)_",
             "━━━━━━━━━━━━━━━━━━━━━━",
         ]
         for i, b in enumerate(high_backlog, 1):
-            bc = b.get("buu_cuc", "?")
+            bc = b["bc"]
             am = AM_OF.get(bc, "?")
-            cg = b.get("chua_gan", 0)
-            L.append(f"{i}. {_icon_backlog(cg)} {bc} · AM **{am}** — **{_n(cg)}** đơn tồn")
+            L.append(f"{i}. {_icon_backlog(b['gt120'])} {bc} · AM **{am}** — **{_n(b['total'])}** đơn tồn · 🔴 >120h: **{_n(b['gt120'])}**")
         L.append("")
 
     # Hành động — union set BC xuất hiện ở cả 2 danh sách
-    intersect = set(b.get("buu_cuc") for b in low_gtc) & set(b.get("buu_cuc") for b in high_backlog)
+    intersect = set(b.get("buu_cuc") for b in low_gtc) & set(b["bc"] for b in high_backlog)
     if intersect:
         L += [
             "━━━━━━━━━━━━━━━━━━━━━━",
