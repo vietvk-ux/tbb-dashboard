@@ -380,26 +380,24 @@ def send_gtalk(text, oa_token, channel_id, mentioned_user_ids=None):
     if ch2 and ch2 != channel_id:
         channels.append(ch2)
 
-    interaction_str = None
-    if mentioned_user_ids:
-        import json as _json
-        interaction_str = _json.dumps({"mentionedUserIds": list(mentioned_user_ids)})
+    mentions = list(mentioned_user_ids) if mentioned_user_ids else None
 
     for idx, ch in enumerate(channels):
         is_primary = (idx == 0)
         try:
             for i, p in enumerate(parts):
+                content = {
+                    "text": p + (f"\n_(phần {i+1}/{len(parts)})_" if len(parts) > 1 else ""),
+                    "parseMode": "MARKDOWN",
+                }
+                if i == 0 and mentions:
+                    content["mentionedUserIds"] = mentions
                 body = {
                     "oaToken": oa_token,
                     "channelId": ch,
                     "clientMsgId": str(int(time.time() * 1000) + i),
-                    "content": {
-                        "text": p + (f"\n_(phần {i+1}/{len(parts)})_" if len(parts) > 1 else ""),
-                        "parseMode": "MARKDOWN",
-                    },
+                    "content": content,
                 }
-                if i == 0 and interaction_str:
-                    body["interaction"] = interaction_str
                 r = requests.post("https://mbff.ghn.vn/api/gtalk/send-message", json=body, timeout=20)
                 r.raise_for_status()
                 d = r.json()
