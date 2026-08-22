@@ -297,6 +297,33 @@ def render_summary(entries, key, types, hero_lbl, tr=False):
             P.append("<tr><td>%s</td><td><span class='pill bad'>%s</span></td><td>%s</td></tr>"
                      % (_esc(name), _n(o120), _n(tot)))
         P.append("</table>")
+
+    # Theo AM (tồn nhiều → ít · bấm mở xem bưu cục)
+    am, am_bcs = {}, {}
+    for e in entries:
+        amn = AM_OF.get(e["name"])
+        if not amn:
+            continue
+        t = sec_total(e[key], types)
+        o120 = sec_groups(e[key], types)[">120h"]
+        a = am.setdefault(amn, {"tot": 0, "o120": 0, "bc": 0})
+        a["tot"] += t
+        a["o120"] += o120
+        a["bc"] += 1
+        am_bcs.setdefault(amn, []).append((e["name"], t, o120))
+    am_rows = sorted(am.items(), key=lambda kv: -kv[1]["tot"])
+    if am_rows:
+        P.append("<div class='subh'>🧑‍💼 Theo AM · tồn nhiều → ít · bấm xem bưu cục</div>")
+        for amn, a in am_rows:
+            P.append("<details class='bc'><summary>")
+            P.append("<div><div class='bcn'>%s</div><div class='bcm'>🏤 %d BC · <span style='color:var(--bad)'>🔴 &gt;120h %s</span></div></div>"
+                     % (_esc(amn), a["bc"], _n(a["o120"])))
+            P.append("<div class='bcr'><span class='tot'>%s</span></div></summary>" % _n(a["tot"]))
+            P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th><th>Tổng tồn</th><th>&gt;120h</th></tr>")
+            for name, t, o120 in sorted(am_bcs[amn], key=lambda x: -x[1]):
+                ov = ("<span class='pill bad'>%s</span>" % _n(o120)) if o120 > 0 else "<span class='muted'>0</span>"
+                P.append("<tr><td>%s</td><td><b>%s</b></td><td>%s</td></tr>" % (_esc(name), _n(t), ov))
+            P.append("</table></div></div></details>")
     return P
 
 
