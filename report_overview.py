@@ -47,8 +47,8 @@ def build_msg(rows):
 
     reg_txt = ("%s" % reg) if reg is not None else "—"
     L = [
-        "📊 *BÁO CÁO TỔNG QUAN — VÙNG TÂY BẮC BỘ*",
-        "🕐 %s" % now.strftime("%H:%M · %d/%m/%Y"),
+        "📊 **TỔNG QUAN 2H · VÙNG TÂY BẮC BỘ**",
+        "⏰ %s" % now.strftime("%H:%M · %d/%m/%Y"),
         "",
         "🎯 *%%GTC TOÀN VÙNG:  %s%%*  %s" % (reg_txt, _ico(reg)),
         "%s" % _bar(reg),
@@ -103,7 +103,7 @@ def build_msg(rows):
             L.append("%d.  %s  —  *%s GTB*  (%s/%s · %s)" % (i, nm, _n(tot - g), _n(g), _n(tot), bc))
 
     L += ["", DIV, "📱 Chi tiết realtime (cập nhật mỗi 15'):", DASH_URL,
-          "", "🤖 _Báo cáo tự động · 2 tiếng/lần · 9h–21h · Vùng TBB_"]
+          "", "_🤖 Overview 2h · Vùng TBB · %s_" % now.strftime("%H:%M %d/%m")]
     return "\n".join(L)
 
 

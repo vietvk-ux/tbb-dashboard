@@ -62,8 +62,9 @@ def build(url, key, dash_url=""):
     td1 = (_all(url, key, "bao_cao_ton_dong?ngay=eq.%s&select=buu_cuc,total" % d1["ngay"])
            if d1 else [])
 
-    L = ["🔆 **VIỆC CẦN LÀM HÔM NAY** · sáng %s" % datetime.now(VN).strftime("%d/%m"),
-         "_(số chốt hôm qua %s)_" % dm, ""]
+    L = ["🔆 **VIỆC CẦN LÀM HÔM NAY · VÙNG TÂY BẮC BỘ**",
+         "⏰ Sáng %s · số chốt hôm qua %s" % (datetime.now(VN).strftime("%d/%m/%Y"), dm),
+         ""]
 
     # %GTC vùng + Δ so hôm trước
     pct = d0.get("pct_gtc")
@@ -124,6 +125,7 @@ def build(url, key, dash_url=""):
 
     if dash_url:
         L += ["", "📱 Chi tiết vùng: " + dash_url]
+    L += ["", "_🤖 Việc cần làm sáng · Vùng TBB · %s_" % datetime.now(VN).strftime("%H:%M %d/%m")]
     return "\n".join(L)
 
 
