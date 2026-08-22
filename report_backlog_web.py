@@ -359,8 +359,8 @@ def render_red_section(entries):
                         _n(r["TRANSPORT_DELIVERY"]), _n(r["TRANSPORT_RETURN"]), _n(r["total"])))
         P.append("</table></div>")
 
-    # Đơn backlog theo AM (cao → thấp)
-    am = {}
+    # Đơn backlog theo AM (cao → thấp · bấm mở xem bưu cục)
+    am, am_bcs = {}, {}
     for e in entries:
         amn = AM_OF.get(e["name"])
         if not amn:
@@ -376,17 +376,24 @@ def render_red_section(entries):
             a[ot] += r[ot]
         a["total"] += r["total"]
         a["bc"] += 1
+        am_bcs.setdefault(amn, []).append((e["name"], r))
     am_rows = sorted(am.items(), key=lambda kv: -kv[1]["total"])
     if am_rows:
-        P.append("<div class='subh'>🧑‍💼 Đơn backlog theo AM · cao → thấp</div>")
-        P.append("<div class='scroll'><table><tr><th>AM</th><th>BC</th><th>Giao&gt;120</th><th>Trả&gt;120</th>"
-                 "<th>LCg&gt;36</th><th>LCt&gt;48</th><th>Tổng backlog</th></tr>")
+        P.append("<div class='subh'>🧑‍💼 Đơn backlog theo AM · cao → thấp · bấm xem bưu cục</div>")
         for amn, a in am_rows:
-            P.append("<tr><td>%s</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                     "<td><span class='pill bad'>%s</span></td></tr>"
+            P.append("<details class='bc' data-u='%s'><summary>" % ("1" if a["total"] > 0 else "0"))
+            P.append("<div><div class='bcn'>%s</div><div class='bcm'>🏤 %d BC · Giao&gt;120 %s · Trả %s · LCg %s · LCt %s</div></div>"
                      % (_esc(amn), a["bc"], _n(a["DELIVER"]), _n(a["RETURN"]),
-                        _n(a["TRANSPORT_DELIVERY"]), _n(a["TRANSPORT_RETURN"]), _n(a["total"])))
-        P.append("</table></div>")
+                        _n(a["TRANSPORT_DELIVERY"]), _n(a["TRANSPORT_RETURN"])))
+            P.append("<div class='bcr'><span class='pill bad'>%s</span></div></summary>" % _n(a["total"]))
+            P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th><th>Giao&gt;120</th>"
+                     "<th>Trả&gt;120</th><th>LCg&gt;36</th><th>LCt&gt;48</th><th>Tổng</th></tr>")
+            for name, r in sorted(am_bcs[amn], key=lambda x: -x[1]["total"]):
+                red = ("<span class='pill bad'>%s</span>" % _n(r["total"])) if r["total"] > 0 else "<span class='muted'>0</span>"
+                P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>"
+                         % (_esc(name), _n(r["DELIVER"]), _n(r["RETURN"]),
+                            _n(r["TRANSPORT_DELIVERY"]), _n(r["TRANSPORT_RETURN"]), red))
+            P.append("</table></div></div></details>")
     return P
 
 
