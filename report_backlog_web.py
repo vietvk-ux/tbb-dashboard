@@ -102,14 +102,14 @@ GT_48 = ["48_72", "72_96", "96_120", "120_192", "192"]            # > 48h
 RED_BUCKETS = {
     "DELIVER": ("lgt", GT_120),            # Giao > 120h
     "RETURN": ("lgt", GT_120),             # Trả > 120h
-    "TRANSPORT_DELIVERY": ("tr", GT_36),   # LC giao > 36h
+    "TRANSPORT_DELIVERY": ("tr", GT_48),   # LC giao > 48h
     "TRANSPORT_RETURN": ("tr", GT_48),     # LC trả > 48h
 }
 # thứ tự hiển thị + nhãn ngắn
 RED_LABELS = [
     ("DELIVER", "Giao>120h", "Giao>120"),
     ("RETURN", "Trả>120h", "Trả>120"),
-    ("TRANSPORT_DELIVERY", "LC giao>36h", "LCg>36"),
+    ("TRANSPORT_DELIVERY", "LC giao>48h", "LCg>48"),
     ("TRANSPORT_RETURN", "LC trả>48h", "LCt>48"),
 ]
 
@@ -349,7 +349,7 @@ def render_red_section(entries):
     P = ["<section class='hero' style='border-color:rgba(239,68,68,.55);background:rgba(239,68,68,.09)'>"]
     P.append("<div class='hlbl'>🚨 Tổng đơn backlog quá hạn toàn vùng</div>")
     P.append("<div class='hbig' style='color:var(--bad)'>%s</div>" % _n(grand))
-    P.append("<div class='hsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;36h · LC trả&gt;48h</div>")
+    P.append("<div class='hsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;48h · LC trả&gt;48h</div>")
     P.append("</section>")
     P.append("<section class='strip'>")
     for ot, lbl, _ in RED_LABELS:
@@ -362,7 +362,7 @@ def render_red_section(entries):
     if rows:
         P.append("<div class='subh'>🔴 Top bưu cục đơn backlog nhiều nhất</div>")
         P.append("<div class='scroll'><table><tr><th>Bưu cục</th><th>Giao&gt;120</th><th>Trả&gt;120</th>"
-                 "<th>LCg&gt;36</th><th>LCt&gt;48</th><th>Tổng backlog</th></tr>")
+                 "<th>LCg&gt;48</th><th>LCt&gt;48</th><th>Tổng backlog</th></tr>")
         for name, r in rows[:10]:
             P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
                      "<td><span class='pill bad'>%s</span></td></tr>"
@@ -398,7 +398,7 @@ def render_red_section(entries):
                         _n(a["TRANSPORT_DELIVERY"]), _n(a["TRANSPORT_RETURN"])))
             P.append("<div class='bcr'><span class='pill bad'>%s</span></div></summary>" % _n(a["total"]))
             P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th><th>Giao&gt;120</th>"
-                     "<th>Trả&gt;120</th><th>LCg&gt;36</th><th>LCt&gt;48</th><th>Tổng</th></tr>")
+                     "<th>Trả&gt;120</th><th>LCg&gt;48</th><th>LCt&gt;48</th><th>Tổng</th></tr>")
             for name, r in sorted(am_bcs[amn], key=lambda x: -x[1]["total"]):
                 red = ("<span class='pill bad'>%s</span>" % _n(r["total"])) if r["total"] > 0 else "<span class='muted'>0</span>"
                 P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>"
@@ -431,7 +431,7 @@ def build_html(entries, hub_count):
 
     # ===== 🚨 ĐƠN ĐỎ QUÁ HẠN (ưu tiên) =====
     P.append("<div class='sec first' id='do'>🚨 Đơn backlog — quá hạn cần xử lý</div>")
-    P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;36h · LC trả&gt;48h · danh sách BC dưới sắp theo tổng backlog</div>")
+    P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;48h · LC trả&gt;48h · danh sách BC dưới sắp theo tổng backlog</div>")
     P += render_red_section(entries)
 
     # ===== BÁO CÁO 1: LẤY-GIAO-TRẢ =====
@@ -504,7 +504,7 @@ def backlog_rows(entries):
                 rows.append({"buu_cuc": e["name"], "tinh": e.get("prov"), "order_type": ot,
                              "total": v.get("total", 0), "g_lt24": g[0], "g_24_72": g[1],
                              "g_72_120": g[2], "g_gt120": g[3],
-                             # đơn ĐỎ theo ngưỡng đúng từng loại (Giao/Trả>120h, LCg>36h, LCt>48h)
+                             # đơn ĐỎ theo ngưỡng đúng từng loại (Giao/Trả>120h, LCg>48h, LCt>48h)
                              "g_red": _red_type(parsed, ot)})
     return rows
 

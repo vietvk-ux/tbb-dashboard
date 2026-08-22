@@ -124,9 +124,9 @@ def fetch_trend(days=90):
     nv30 = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=driver_id,ten_nv,buu_cuc,cod_gtb,gtb,don_giao" % since30)
     # Tồn đọng theo NGÀY (gộp toàn vùng) — cho biểu đồ xu hướng.
     #  gt120_giao = đơn GIAO tồn >120h (khách chờ lâu)
-    #  red_tra_lc = đơn ĐỎ Trả+Luân chuyển (Trả>120h + LC giao>36h + LC trả>48h) — cột g_red
+    #  red_tra_lc = đơn ĐỎ Trả+Luân chuyển (Trả>120h + LC giao>48h + LC trả>48h) — cột g_red
     td_raw = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,order_type,g_gt120,g_red" % since)
-    # đơn đỏ tách riêng từng loại (ngưỡng đúng): Trả>120h · LC giao>36h · LC trả>48h
+    # đơn đỏ tách riêng từng loại (ngưỡng đúng): Trả>120h · LC giao>48h · LC trả>48h
     RED_FIELD = {"RETURN": "red_return", "TRANSPORT_DELIVERY": "red_lcgiao",
                  "TRANSPORT_RETURN": "red_lctra"}
     tdd = {}
@@ -433,7 +433,7 @@ def gen_html(data):
             _COL = {"bad": "var(--bad)", "orng": "#ff9d5c", "warn": "var(--warn)"}
             for title, field, accent in (
                     ("↩️ Đơn TRẢ quá hạn &gt;120h theo ngày", "red_return", "bad"),
-                    ("🚚 LC GIAO quá hạn &gt;36h theo ngày", "red_lcgiao", "orng"),
+                    ("🚚 LC GIAO quá hạn &gt;48h theo ngày", "red_lcgiao", "orng"),
                     ("↩️ LC TRẢ quá hạn &gt;48h theo ngày", "red_lctra", "warn")):
                 vals = [v[field] for v in td_red]
                 P.append("<div class='sec' style='color:%s'>%s</div>" % (_COL[accent], title))
