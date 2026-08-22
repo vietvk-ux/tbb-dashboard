@@ -1,17 +1,16 @@
 """GTalk userId của 7 AM Vùng TBB — dùng để tag @AM trong tin cảnh báo.
-Fill userId thật khi có. Nếu chưa có (""), tin vẫn gửi bình thường (chỉ hiển thị text @Tên,
-không trigger notification).
+Fill Identity ID (từ Back Office → Official Groups). Nếu chưa có ("") → tin vẫn gửi
+bình thường (không tag).
 """
 
 AM_USER_ID = {
-    "Nguyễn Công Nam": "",
-    "Bùi Văn Đông": "",
-    "Hoàng Gia Đạt": "",
-    "Đinh Văn Thu": "",
-    "Nguyễn Đức Thịnh": "",
-    "Lê Minh Khiết": "",
-    "Nguyễn Tuấn Việt": "",
-    # thêm nếu còn AM khác
+    "Nguyễn Công Nam": "1717084",
+    "Bùi Văn Đông": "1870269",
+    "Hoàng Gia Đạt": "3029684",
+    "Đinh Văn Thu": "1874111",
+    "Nguyễn Đức Thịnh": "3060167",
+    "Bế Ngọc Chuyển": "200024",
+    "Điêu Chính Luân": "1870046",
 }
 
 
