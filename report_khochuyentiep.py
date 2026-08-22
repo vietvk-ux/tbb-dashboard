@@ -18,14 +18,17 @@ def _n(x):
 
 
 def _bucket_row(bk):
-    """Format bucket dict {'<24h':X, '24-72h':X, '72-120h':X, '>120h':X}."""
+    """Format bucket dict {'<24h':X, '24-72h':X, '72-120h':X, '>120h':X}.
+    🟠 cam = 24h-120h (cần xử lý sớm) · 🔴 đỏ = >120h (xử lý ngay)."""
     lt24 = bk.get("<24h", 0)
     _24_72 = bk.get("24-72h", 0)
     _72_120 = bk.get("72-120h", 0)
     gt120 = bk.get(">120h", 0)
-    # Icon đỏ nếu >120h > 0
+    # Cam nếu bucket 24-72 hoặc 72-120 > 0
+    mid_24_72 = f"🟠 **{_n(_24_72)}**" if _24_72 > 0 else _n(_24_72)
+    mid_72_120 = f"🟠 **{_n(_72_120)}**" if _72_120 > 0 else _n(_72_120)
     tail = f"🔴 >120h: **{_n(gt120)}**" if gt120 > 0 else f">120h: {_n(gt120)}"
-    return f"   `<24h:` {_n(lt24)} · `24-72h:` {_n(_24_72)} · `72-120h:` {_n(_72_120)} · {tail}"
+    return f"   `<24h:` {_n(lt24)} · `24-72h:` {mid_24_72} · `72-120h:` {mid_72_120} · {tail}"
 
 
 def build_msg(transit):
@@ -45,6 +48,10 @@ def build_msg(transit):
     tg = sum(t["giao"] for t in transit)
     tt = sum(t["tra"] for t in transit)
     tover = sum(t["over120"] for t in transit)
+    # Cam: đơn quá 24h nhưng chưa quá 120h (24-72 + 72-120 của cả 2 nhóm)
+    tmid = sum((t["giao_g"].get("24-72h", 0) + t["giao_g"].get("72-120h", 0)
+                + t["tra_g"].get("24-72h", 0) + t["tra_g"].get("72-120h", 0))
+               for t in transit)
     L += [
         "━━━━━━━━━━━━━━━━━━━━━━",
         "▶️ **TỔNG QUAN 3 KHO CHUYỂN TIẾP**",
@@ -52,8 +59,10 @@ def build_msg(transit):
         f"🚚 LC giao: **{_n(tg)}** đơn",
         f"↩️ LC trả: **{_n(tt)}** đơn",
     ]
+    if tmid > 0:
+        L.append(f"🟠 Quá 24h (chưa >120h): **{_n(tmid)}** đơn → cần xử lý sớm")
     if tover > 0:
-        L.append(f"🔴 Quá 120h: **{_n(tover)}** đơn → cần xử lý gấp")
+        L.append(f"🔴 Quá 120h: **{_n(tover)}** đơn → xử lý NGAY")
     L.append("")
 
     # Chi tiết từng kho
