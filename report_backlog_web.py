@@ -266,22 +266,6 @@ def render_summary(entries, key, types, hero_lbl, tr=False):
                  % (_n(rtypes[ot]), _esc(lbl)))
     P.append("</section>")
 
-    # theo tỉnh
-    provs = {}
-    for e in entries:
-        tot = sec_total(e[key], types)
-        if tot <= 0:
-            continue
-        o120 = sec_groups(e[key], types)[">120h"]
-        p = provs.setdefault(e["prov"], {"total": 0, "over120": 0, "bc": 0})
-        p["total"] += tot; p["over120"] += o120; p["bc"] += 1
-    P.append("<div class='subh'>🗺 Theo tỉnh · tồn nhiều → ít</div>")
-    P.append("<table><tr><th>Tỉnh</th><th>BC</th><th>Tổng tồn</th><th>&gt;120h</th></tr>")
-    for pv, v in sorted(provs.items(), key=lambda kv: -kv[1]["total"]):
-        ucls = "bad" if v["over120"] > 0 else "mut"
-        P.append("<tr><td>%s</td><td>%d</td><td><b>%s</b></td><td><span class='pill %s'>%s</span></td></tr>"
-                 % (_esc(PROV_NAME.get(pv, pv)), v["bc"], _n(v["total"]), ucls, _n(v["over120"])))
-    P.append("</table>")
 
     # top 5 BC >120h
     ub = []
