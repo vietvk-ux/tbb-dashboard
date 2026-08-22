@@ -194,6 +194,8 @@ def main():
             L.append(f"{i}. 🔴 {b['bc']} · AM {b['am']} — **{b['pct']}%** · {_n(b['vol'])} đơn")
         L.append("")
 
+    L.append(f"📱 **[Xem chi tiết Trend](https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/trend.html)**")
+    L.append("")
     L.append(f"_🤖 Recap tháng · Vùng TBB · {now.strftime('%d/%m/%Y')}_")
     msg = "\n".join(L)
     print(f"[INFO] Msg {len(msg)} chars · {len(bc_stats)} BC · {len(am_stats)} AM")

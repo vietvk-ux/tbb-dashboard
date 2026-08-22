@@ -111,6 +111,8 @@ def main():
             L.append(f"{i}. {r['bc']} · AM {r['am']} — {r['w1']}% ▲ {r['delta']:.1f}đ (từ {r['w0']}%)")
         L.append("")
 
+    L.append(f"📱 **[Xem chi tiết Trend](https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/trend.html)**")
+    L.append("")
     L.append(f"_🤖 Recap tuần BC · Vùng TBB · {now.strftime('%d/%m %H:%M')}_")
     msg = "\n".join(L)
     print(f"[INFO] Msg {len(msg)} chars · drop={len(drop)} imp={len(imp)} red={len(red)}")

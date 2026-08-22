@@ -78,6 +78,8 @@ def build_msg(transit):
             "",
         ]
 
+    L.append(f"📱 **[Xem chi tiết Kho chuyển tiếp](https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/khochuyentiep.html)**")
+    L.append("")
     L.append(f"_🤖 Kho chuyển tiếp · Vùng TBB · {now.strftime('%H:%M %d/%m')}_")
     return "\n".join(L)
 

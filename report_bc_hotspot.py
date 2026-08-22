@@ -116,6 +116,8 @@ def main():
             L.append(f"• {bc} · AM **{am}** → cần gọi ngay")
         L.append("")
 
+    L.append(f"📱 **[Xem chi tiết EOD](https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html)**")
+    L.append("")
     L.append(f"_🤖 BC Điểm nóng · Vùng TBB · sáng {now.strftime('%H:%M')}_")
     msg = "\n".join(L)
     print(f"[INFO] Msg {len(msg)} chars · low_gtc={len(low_gtc)} high_backlog={len(high_backlog)} intersect={len(intersect)}")

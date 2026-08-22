@@ -102,7 +102,7 @@ def main():
         f"• Đơn 72-120h cấp bách → escalate lên GĐV/AM cấp cao",
         f"• Đơn >120h: đã trễ, cần call center khách hàng xin lỗi",
         "",
-        f"_🤖 Cảnh báo SLA · Vùng TBB · {now.strftime('%H:%M %d/%m')}_",
+        f"📱 **[Xem chi tiết Backlog](https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/backlog.html)**", "", f"_🤖 Cảnh báo SLA · Vùng TBB · {now.strftime('%H:%M %d/%m')}_",
     ]
     msg = "\n".join(L)
     print(f"[INFO] Msg {len(msg)} chars · {len(critical_bcs)} BC critical (top {len(top_bcs)})")

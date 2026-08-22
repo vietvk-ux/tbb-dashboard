@@ -89,6 +89,8 @@ def main():
                 L.append(f"   {j}. {b['bc']} — **{b['pct']}%** ({b['vol']:,} đơn/tuần)")
         L.append("")
 
+    L.append(f"📱 **[Xem chi tiết Trend](https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/trend.html)**")
+    L.append("")
     L.append(f"_🤖 Ranking BC theo AM · Vùng TBB · {now.strftime('%d/%m %H:%M')}_")
     msg = "\n".join(L)
     print(f"[INFO] Msg {len(msg)} chars · {len(am_summary)} AM")
