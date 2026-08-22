@@ -31,5 +31,6 @@ jobs:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           GTALK_OA_TOKEN: ${{ secrets.GTALK_OA_TOKEN }}
           GTALK_CHANNEL_ID: ${{ secrets.GTALK_CHANNEL_ID }}
+          GTALK_CHANNEL_ID_2: ${{ secrets.GTALK_CHANNEL_ID_2 }}
           OVERVIEW_DRY: ${{ github.event.inputs.dry }}
         run: python report_overview.py

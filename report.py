@@ -364,7 +364,8 @@ def format_report(agg, include_cod=False):
 
 # ==== GTALK SEND ====
 def send_gtalk(text, oa_token, channel_id):
-    """Gửi text vào GTalk. Chia nhỏ nếu > 4200 ký tự."""
+    """Gửi text vào GTalk. Chia nhỏ nếu > 4200 ký tự.
+    Fan-out sang GTALK_CHANNEL_ID_2 nếu env này set (channel phụ, silent fail)."""
     MAX = 4200
     parts = []
     while len(text) > MAX:
@@ -372,22 +373,36 @@ def send_gtalk(text, oa_token, channel_id):
         if cut < 0: cut = MAX
         parts.append(text[:cut]); text = text[cut:]
     parts.append(text)
-    for i, p in enumerate(parts):
-        body = {
-            "oaToken": oa_token,
-            "channelId": channel_id,
-            "clientMsgId": str(int(time.time() * 1000) + i),
-            "content": {
-                "text": p + (f"\n_(phần {i+1}/{len(parts)})_" if len(parts) > 1 else ""),
-                "parseMode": "MARKDOWN",
-            },
-        }
-        r = requests.post("https://mbff.ghn.vn/api/gtalk/send-message", json=body, timeout=20)
-        r.raise_for_status()
-        d = r.json()
-        if d.get("errorCode") != "success":
-            raise RuntimeError(f"GTalk API lỗi: {d}")
-        time.sleep(0.3)
+
+    channels = [channel_id]
+    ch2 = os.environ.get("GTALK_CHANNEL_ID_2", "").strip()
+    if ch2 and ch2 != channel_id:
+        channels.append(ch2)
+
+    for idx, ch in enumerate(channels):
+        is_primary = (idx == 0)
+        try:
+            for i, p in enumerate(parts):
+                body = {
+                    "oaToken": oa_token,
+                    "channelId": ch,
+                    "clientMsgId": str(int(time.time() * 1000) + i),
+                    "content": {
+                        "text": p + (f"\n_(phần {i+1}/{len(parts)})_" if len(parts) > 1 else ""),
+                        "parseMode": "MARKDOWN",
+                    },
+                }
+                r = requests.post("https://mbff.ghn.vn/api/gtalk/send-message", json=body, timeout=20)
+                r.raise_for_status()
+                d = r.json()
+                if d.get("errorCode") != "success":
+                    raise RuntimeError(f"GTalk API lỗi: {d}")
+                time.sleep(0.3)
+        except Exception as e:
+            if is_primary:
+                raise
+            print(f"[WARN] Gửi channel phụ {ch} fail (bỏ qua): {str(e)[:150]}")
+            break
 
 
 def main():
