@@ -91,7 +91,21 @@ def main():
     bc_this = _fetch_range(url, key, m_start.isoformat(), m_end.isoformat())
 
     if not vung_this or not bc_this:
-        raise SystemExit(f"Không có data cho tháng {month}/{month_year}")
+        # Supabase chưa có đủ data 1 tháng → gửi tin thông báo thay vì fail
+        now = datetime.now(VN)
+        msg = "\n".join([
+            "📆 **RECAP THÁNG · VÙNG TÂY BẮC BỘ**",
+            f"⏰ {now.strftime('%d/%m/%Y')}",
+            "",
+            f"_⚠️ Chưa đủ dữ liệu cho tháng **{month:02d}/{month_year}** trong Supabase._",
+            f"_Supabase sync-23h mới bắt đầu → cần chờ tháng đầy đủ để recap._",
+            "",
+            f"_🤖 Recap tháng · Vùng TBB · {now.strftime('%d/%m/%Y')}_"
+        ])
+        print(f"[INFO] Msg {len(msg)} chars · empty month {month}/{month_year}")
+        send_gtalk(msg, oa, ch)
+        print("[INFO] Đã gửi tin thông báo empty vào GTalk")
+        return
 
     # Vùng metrics
     pct_this = _avg_pct(vung_this)
