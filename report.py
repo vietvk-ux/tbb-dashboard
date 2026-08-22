@@ -12,6 +12,19 @@ from datetime import date, datetime, timedelta
 # %GTC cuối ngày CHỈ tính chuyến kết thúc TỪ giờ này (VN) trở đi — loại chuyến đóng
 # sớm buổi sáng (thường là đuôi hôm trước). Đổi bằng env EOD_TRIP_CUTOFF_HOUR.
 EOD_TRIP_CUTOFF_HOUR = int(os.environ.get("EOD_TRIP_CUTOFF_HOUR", "10") or "10")
+# Xuất phát MUỘN nếu chuyến đầu tiên trong ngày bắt đầu từ giờ này (VN) trở đi.
+EOD_LATE_START_HOUR = int(os.environ.get("EOD_LATE_START_HOUR", "9") or "9")
+
+
+def _vn_time(ts):
+    """UTC ISO ('...Z') → datetime giờ VN (UTC+7). None nếu không đọc được."""
+    if not ts:
+        return None
+    try:
+        s = str(ts).replace("Z", "").split(".")[0]
+        return datetime.strptime(s, "%Y-%m-%dT%H:%M:%S") + timedelta(hours=7)
+    except Exception:
+        return None
 
 
 def _ended_after_cutoff(end_time_utc, cutoff_hour=EOD_TRIP_CUTOFF_HOUR):
@@ -19,12 +32,8 @@ def _ended_after_cutoff(end_time_utc, cutoff_hour=EOD_TRIP_CUTOFF_HOUR):
     Không đọc được giờ → GIỮ (không loại nhầm)."""
     if not end_time_utc:
         return True
-    try:
-        s = str(end_time_utc).replace("Z", "").split(".")[0]
-        vn = datetime.strptime(s, "%Y-%m-%dT%H:%M:%S") + timedelta(hours=7)
-        return vn.hour >= cutoff_hour
-    except Exception:
-        return True
+    vn = _vn_time(end_time_utc)
+    return vn.hour >= cutoff_hour if vn else True
 
 import aiohttp
 import requests
@@ -84,10 +93,15 @@ async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem):
             "hub_id": str(hub_id), "status": "FINISHED",
             "offset": 0, "limit": 200, "page": 1, "size": 200, "reverse": 1,
         }, hub_id, token)
+    # GIỮ mọi chuyến FINISHED hôm nay để đọc GIỜ XUẤT PHÁT thật; đánh dấu after_cutoff
+    # (kết thúc ≥10h) — chỉ chuyến after_cutoff mới bóc item & tính %GTC như cũ.
     return [{"tripCode": t["tripCode"], "hub_id": hub_id, "bc": hub_name,
-             "driver_id": t.get("driverId") or "", "driver_name": t.get("driverName") or "—"}
+             "driver_id": t.get("driverId") or "", "driver_name": t.get("driverName") or "—",
+             "start_time": t.get("startTime"), "end_time": t.get("endTime"),
+             "start_date_index": t.get("startDateIndex"),
+             "after_cutoff": _ended_after_cutoff(t.get("endTime"))}
             for t in (d.get("data") or [])
-            if t.get("endDateIndex") == yyyymmdd and _ended_after_cutoff(t.get("endTime"))]
+            if t.get("endDateIndex") == yyyymmdd]
 
 
 async def _fetch_all_items(session, token, hub_id, trip_code):
@@ -140,6 +154,9 @@ async def fetch_report(token, target_date):
         logger.info("Found %d FINISHED trips on %s", len(all_trips), yyyymmdd)
 
         async def per_trip(t):
+            # Chuyến kết thúc trước 10h: KHÔNG bóc item (không tính %GTC), chỉ dùng giờ xuất phát.
+            if not t.get("after_cutoff"):
+                return {**t, "items": []}
             try:
                 items = await _trip_items(session, token, t["hub_id"], t["tripCode"], sem)
                 return {**t, "items": items}
@@ -209,6 +226,23 @@ def aggregate(payload):
             dkey = f"{t.get('driver_id','')}|{t['bc']}"
             drv_trips[dkey] = drv_trips.get(dkey, 0) + 1
 
+    # 2b) GIỜ XUẤT PHÁT / KẾT THÚC theo NV. Giờ xuất phát CHỈ lấy từ chuyến BẮT ĐẦU
+    #     trong ngày (startDateIndex==hôm nay) — loại chuyến qua đêm (bắt đầu hôm trước,
+    #     kết thúc hôm nay) khỏi "giờ ra hàng". Kết thúc lấy muộn nhất trong ngày.
+    _d = payload["date"]
+    today_idx = _d.year * 10000 + _d.month * 100 + _d.day
+    drv_start, drv_end = {}, {}
+    for t in ok:
+        dkey = f"{t.get('driver_id','')}|{t['bc']}"
+        en = _vn_time(t.get("end_time"))
+        if en and (dkey not in drv_end or en > drv_end[dkey]):
+            drv_end[dkey] = en
+        if t.get("start_date_index") != today_idx:
+            continue  # chuyến qua đêm — không tính vào giờ xuất phát
+        st = _vn_time(t.get("start_time"))
+        if st and (dkey not in drv_start or st < drv_start[dkey]):
+            drv_start[dkey] = st
+
     # 3) Tổng hợp từ đơn đã gộp (unique)
     provs, bcs, drivers = {}, {}, {}
     for rec in best.values():
@@ -234,8 +268,19 @@ def aggregate(payload):
     bc_list = sorted([{**v, "trips": bc_trips.get(v["bc"], 0), "gtc": gtc(v),
                        "ltc": ltc_bc.get(v["bc"], 0)} for v in bcs.values()],
                      key=lambda x: -x["total"])
+    def _drv_time(v):
+        dkey = f"{v['driver_id']}|{v['bc']}"
+        st, en = drv_start.get(dkey), drv_end.get(dkey)
+        span = round((en - st).total_seconds() / 60) if (st and en and en > st) else None
+        return {
+            "start": st.strftime("%H:%M") if st else None,
+            "end": en.strftime("%H:%M") if en else None,
+            "start_h": st.hour + st.minute / 60 if st else None,
+            "span_min": span,
+            "late": (st.hour >= EOD_LATE_START_HOUR) if st else False,
+        }
     driver_list = sorted([{**v, "trips": drv_trips.get(f"{v['driver_id']}|{v['bc']}", 0), "gtc": gtc(v),
-                           "ltc": ltc_drv.get(f"{v['driver_id']}|{v['bc']}", 0)}
+                           "ltc": ltc_drv.get(f"{v['driver_id']}|{v['bc']}", 0), **_drv_time(v)}
                           for v in drivers.values() if v["total"] > 0],
                          key=lambda x: (x["gtc"] if x["gtc"] is not None else 999))
     # PHÂN BIỆT TRÙNG TÊN trong cùng bưu cục: thêm đuôi #id (2 NV khác id cùng tên)

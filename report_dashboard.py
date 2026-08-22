@@ -343,6 +343,43 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
                      "<td></td><td></td></tr>" % (len(ot) - 20))
         P.append("</tbody></table></section>")
 
+    # ===== ⏰ Kỷ luật ra hàng: NV xuất phát muộn & thời lượng =====
+    def _fmt_span(m):
+        if not m or m <= 0:
+            return "—"
+        return "%dh%02d" % (m // 60, m % 60)
+    timed = [dr for dr in agg["drivers"] if dr.get("start_h") is not None]
+    late = sorted([dr for dr in timed if dr.get("late")],
+                  key=lambda x: -x["start_h"])
+    P.append("<div class='sec' style='color:var(--warn)'>⏰ Kỷ luật ra hàng</div>")
+    P.append("<section class='card'>")
+    if not timed:
+        P.append("<div class='note' style='margin:0'>Không đọc được giờ chuyến.</div>")
+    else:
+        avg_h = sum(dr["start_h"] for dr in timed) / len(timed)
+        avg_s = "%02d:%02d" % (int(avg_h), round((avg_h - int(avg_h)) * 60))
+        P.append("<div class='note' style='margin:0 0 8px'>Giờ xuất phát TB vùng <b>%s</b> · "
+                 "<b>%d/%d</b> NV xuất phát muộn (≥%dh). "
+                 "<i>Giờ = chuyến sớm nhất→muộn nhất trong ngày.</i></div>"
+                 % (avg_s, len(late), len(timed), int(os.environ.get("EOD_LATE_START_HOUR", "9") or "9")))
+        if not late:
+            P.append("<div class='ok' style='margin:0'>✅ Không có NV nào xuất phát muộn.</div>")
+        else:
+            P.append("<table class='drv'><thead><tr><th class='rank'>#</th>"
+                     "<th class='lft'>Nhân viên · Bưu cục</th><th>Xuất phát</th>"
+                     "<th>Kết thúc</th><th>Thời lượng</th></tr></thead><tbody>")
+            for i, dr in enumerate(late[:20], 1):
+                P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
+                         "<td class='rd'>%s</td><td>%s</td><td>%s</td></tr>"
+                         % (i, _esc(dr["driver_name"]), _esc(dr["bc"]),
+                            _esc(dr.get("start") or "—"), _esc(dr.get("end") or "—"),
+                            _fmt_span(dr.get("span_min"))))
+            if len(late) > 20:
+                P.append("<tr><td></td><td class='nv' style='color:var(--mut)'>… và %d người khác</td>"
+                         "<td></td><td></td><td></td></tr>" % (len(late) - 20))
+            P.append("</tbody></table>")
+    P.append("</section>")
+
     # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
     cod_by_bc = {}
     for dr in agg["drivers"]:
