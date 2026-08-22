@@ -15,6 +15,7 @@ from datetime import datetime, timezone, timedelta
 
 import aiohttp
 from report import _post, _get_hubs, TokenExpiredError, CONCURRENCY
+from am_map import AM_OF
 
 logger = logging.getLogger("backlog-web")
 VN = timezone(timedelta(hours=7))
@@ -356,6 +357,35 @@ def render_red_section(entries):
                      "<td><span class='pill bad'>%s</span></td></tr>"
                      % (_esc(name), _n(r["DELIVER"]), _n(r["RETURN"]),
                         _n(r["TRANSPORT_DELIVERY"]), _n(r["TRANSPORT_RETURN"]), _n(r["total"])))
+        P.append("</table></div>")
+
+    # Đơn backlog theo AM (cao → thấp)
+    am = {}
+    for e in entries:
+        amn = AM_OF.get(e["name"])
+        if not amn:
+            continue
+        r = red_of(e)
+        a = am.get(amn)
+        if a is None:
+            a = {ot: 0 for ot, _, _ in RED_LABELS}
+            a["total"] = 0
+            a["bc"] = 0
+            am[amn] = a
+        for ot, _, _ in RED_LABELS:
+            a[ot] += r[ot]
+        a["total"] += r["total"]
+        a["bc"] += 1
+    am_rows = sorted(am.items(), key=lambda kv: -kv[1]["total"])
+    if am_rows:
+        P.append("<div class='subh'>🧑‍💼 Đơn backlog theo AM · cao → thấp</div>")
+        P.append("<div class='scroll'><table><tr><th>AM</th><th>BC</th><th>Giao&gt;120</th><th>Trả&gt;120</th>"
+                 "<th>LCg&gt;36</th><th>LCt&gt;48</th><th>Tổng backlog</th></tr>")
+        for amn, a in am_rows:
+            P.append("<tr><td>%s</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+                     "<td><span class='pill bad'>%s</span></td></tr>"
+                     % (_esc(amn), a["bc"], _n(a["DELIVER"]), _n(a["RETURN"]),
+                        _n(a["TRANSPORT_DELIVERY"]), _n(a["TRANSPORT_RETURN"]), _n(a["total"])))
         P.append("</table></div>")
     return P
 
