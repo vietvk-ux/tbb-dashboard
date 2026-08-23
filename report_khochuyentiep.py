@@ -21,8 +21,8 @@ def _bucket_row(bk):
     """Format bucket dict {'<24h':X, '24-72h':X, '72-120h':X, '>120h':X}.
     🟠 cam = 24h-120h (cần xử lý sớm) · 🔴 đỏ = >120h (xử lý ngay)."""
     lt24 = bk.get("<24h", 0)
-    _24_72 = bk.get("24-72h", 0)
-    _72_120 = bk.get("72-120h", 0)
+    _24_72 = bk.get("24–72h", 0)
+    _72_120 = bk.get("72–120h", 0)
     gt120 = bk.get(">120h", 0)
     # Cam nếu bucket 24-72 hoặc 72-120 > 0
     mid_24_72 = f"🟠 **{_n(_24_72)}**" if _24_72 > 0 else _n(_24_72)
@@ -49,8 +49,8 @@ def build_msg(transit):
     tt = sum(t["tra"] for t in transit)
     tover = sum(t["over120"] for t in transit)
     # Cam: đơn quá 24h nhưng chưa quá 120h (24-72 + 72-120 của cả 2 nhóm)
-    tmid = sum((t["giao_g"].get("24-72h", 0) + t["giao_g"].get("72-120h", 0)
-                + t["tra_g"].get("24-72h", 0) + t["tra_g"].get("72-120h", 0))
+    tmid = sum((t["giao_g"].get("24–72h", 0) + t["giao_g"].get("72–120h", 0)
+                + t["tra_g"].get("24–72h", 0) + t["tra_g"].get("72–120h", 0))
                for t in transit)
     L += [
         "━━━━━━━━━━━━━━━━━━━━━━",
