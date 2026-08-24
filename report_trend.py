@@ -292,7 +292,7 @@ def _ns_today_card(rows, min_today=30, min_prior=3, topn=15):
         avg = sum(d["prior"]) / len(d["prior"])
         if avg <= 0:
             continue
-        cand.append({**d, "avg": avg, "ratio": d["today"] / avg})
+        cand.append({**d, "avg": avg, "diff": d["today"] - avg})
     dm = "%s/%s" % (latest[8:10], latest[5:7])
     lbl = "%s <span style='font-weight:500;color:var(--mut)'>(ngày %s · NV có GTC hôm nay &gt; %d đơn)</span>" % (label, dm, min_today)
     if not cand:
@@ -303,17 +303,19 @@ def _ns_today_card(rows, min_today=30, min_prior=3, topn=15):
     def _tbl(items):
         trs = []
         for i, a in enumerate(items, 1):
-            cls = "up" if a["ratio"] >= 1 else "down"
+            dv = round(a["diff"])
+            cls = "up" if dv >= 0 else "down"
+            dcell = ("+%s" % _n(dv)) if dv >= 0 else ("−%s" % _n(abs(dv)))
             trs.append("<tr><td class='rk'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
-                       "<td>%s</td><td>%s</td><td class='%s'>×%s</td></tr>"
+                       "<td>%s</td><td>%s</td><td class='%s'>%s</td></tr>"
                        % (i, _esc(a["ten"]), _esc(a["bc"]), _n(a["today"]),
-                          _n(round(a["avg"])), cls, ("%.1f" % a["ratio"]).replace(".", ",")))
+                          _n(round(a["avg"])), cls, dcell))
         return ("<table class='t'><thead><tr><th class='rk'>#</th><th>Nhân viên</th>"
-                "<th>GTC nay</th><th>TB/ngày</th><th>×TB</th></tr></thead><tbody>"
+                "<th>GTC nay</th><th>TB/ngày</th><th>Nay−TB</th></tr></thead><tbody>"
                 + "".join(trs) + "</tbody></table>")
 
-    best = sorted(cand, key=lambda x: -x["ratio"])[:topn]
-    worst = sorted(cand, key=lambda x: x["ratio"])[:topn]
+    best = sorted(cand, key=lambda x: -x["diff"])[:topn]
+    worst = sorted(cand, key=lambda x: x["diff"])[:topn]
     inner = ("<div class='mh up'>🏆 Bứt phá — cao hơn ngày thường nhất</div>" + _tbl(best)
              + "<div class='mh down'>🔻 Sa sút — thấp hơn ngày thường nhất</div>" + _tbl(worst))
     return "<div class='sec' style='color:var(--good)'>%s</div><section class='card'>%s</section>" % (lbl, inner)
