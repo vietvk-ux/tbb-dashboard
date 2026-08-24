@@ -310,8 +310,6 @@ def gen_html(rows):
              "<span class='arw'>đơn/giờ · giờ ra hàng →</span></a>")
     P.append("<a class='eod' href='khochuyentiep.html'><span>📦 Kho Chuyển Tiếp</span>"
              "<span class='arw'>tồn luân chuyển →</span></a>")
-    P.append("<a class='eod' href='vngh.html'><span>🛍️ Đơn TikTok</span>"
-             "<span class='arw'>tiến độ theo bưu cục →</span></a>")
 
     # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
     am_rows = {}
@@ -556,13 +554,7 @@ def main():
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
 
-    # Trang đơn TikTok (VNGH) — tiến độ theo bưu cục, dùng lại rows (không fetch lại)
-    try:
-        import report_vngh
-        with open(os.path.join(outdir, "vngh.html"), "w", encoding="utf-8") as f:
-            f.write(report_vngh.gen_html(rows))
-    except Exception as e:
-        logger.warning("Tạo vngh.html lỗi (bỏ qua): %s", str(e)[:150])
+    # (Trang đơn TikTok vngh.html đã bỏ 24/08 — 3 chỉ số TikTok vẫn giữ ở dải chỉ số index)
 
     # Trang hiệu suất chuyến đi NV — dùng lại rows (giờ XP/đóng, đơn/giờ, scan, đang chạy)
     try:
