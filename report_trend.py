@@ -122,6 +122,8 @@ def fetch_trend(days=90):
     bc = _get_all(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,gtc,gtb,don_giao" % since30)
     # Nhân viên 30 ngày (để xếp COD GTB / đơn GTB cao nhất)
     nv30 = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=driver_id,ten_nv,buu_cuc,cod_gtb,gtb,don_giao" % since30)
+    # GTC theo NGÀY 30 ngày (so đơn GTC ngày gần nhất vs TB của chính NV)
+    nv_gtc = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=ngay,driver_id,ten_nv,buu_cuc,gtc" % since30)
     # Tồn đọng theo NGÀY (gộp toàn vùng) — cho biểu đồ xu hướng.
     #  gt120_giao = đơn GIAO tồn >120h (khách chờ lâu)
     #  red_tra_lc = đơn ĐỎ Trả+Luân chuyển (Trả>120h + LC giao>48h + LC trả>48h) — cột g_red
@@ -141,11 +143,8 @@ def fetch_trend(days=90):
         if ot in RED_FIELD:
             a[RED_FIELD[ot]] += r.get("g_red") or 0
     tondong = sorted(tdd.values(), key=lambda x: x["ngay"])
-    # Xếp hạng %GTC nhân viên tuần/tháng (view v_nv_tuan, v_nv_thang; chưa tạo → [])
     return {
-        "vung": vung, "bc30": bc, "nv30": nv30, "tondong": tondong,
-        "thang_top": _get_safe(url, key, "v_nv_thang?order=pct_cur.desc,dg_cur.desc&limit=8"),
-        "thang_bot": _get_safe(url, key, "v_nv_thang?order=pct_cur.asc,dg_cur.desc&limit=8"),
+        "vung": vung, "bc30": bc, "nv30": nv30, "nv_gtc": nv_gtc, "tondong": tondong,
         "nangsuat": _get_safe(url, key, "v_nv_nangsuat?order=nang_suat.desc&limit=20"),
     }
 
@@ -261,6 +260,63 @@ def _rank_card(label, note, top_rows, bot_rows):
         if bot_rows:
             inner += "<div class='mh down'>🔻 %GTC thấp nhất</div>" + _rank_table(bot_rows)
     return "<div class='sec'>%s</div><section class='card'>%s</section>" % (label, inner)
+
+
+def _ns_today_card(rows, min_today=30, min_prior=3, topn=15):
+    """So NĂNG SUẤT: đơn GTC NGÀY GẦN NHẤT của NV vs TB đơn GTC/ngày của CHÍNH NV
+    (các ngày trước trong 30 ngày). Chỉ NV có GTC ngày gần nhất > min_today.
+    → top bứt phá (cao hơn ngày thường nhất) + top sa sút (thấp hơn nhất)."""
+    label = "⚡ Năng suất GTC — ngày gần nhất vs TB 30 ngày"
+    if not rows:
+        return ("<div class='sec' style='color:var(--good)'>%s</div>"
+                "<section class='card'><div class='none'>Chưa đủ dữ liệu.</div></section>" % label)
+    latest = max(r["ngay"] for r in rows)
+    drv = {}
+    for r in rows:
+        did = str(r.get("driver_id") or "") or ("%s|%s" % (r.get("ten_nv") or "", r.get("buu_cuc") or ""))
+        d = drv.setdefault(did, {"ten": r.get("ten_nv"), "bc": r.get("buu_cuc"),
+                                 "today": None, "prior": []})
+        if r.get("ten_nv"): d["ten"] = r["ten_nv"]
+        if r.get("buu_cuc"): d["bc"] = r["buu_cuc"]
+        g = r.get("gtc") or 0
+        if r["ngay"] == latest:
+            d["today"] = g
+        else:
+            d["prior"].append(g)
+    cand = []
+    for d in drv.values():
+        if d["today"] is None or d["today"] <= min_today:
+            continue
+        if len(d["prior"]) < min_prior:
+            continue
+        avg = sum(d["prior"]) / len(d["prior"])
+        if avg <= 0:
+            continue
+        cand.append({**d, "avg": avg, "ratio": d["today"] / avg})
+    dm = "%s/%s" % (latest[8:10], latest[5:7])
+    lbl = "%s <span style='font-weight:500;color:var(--mut)'>(ngày %s · NV có GTC hôm nay &gt; %d đơn)</span>" % (label, dm, min_today)
+    if not cand:
+        return ("<div class='sec' style='color:var(--good)'>%s</div>"
+                "<section class='card'><div class='none'>Chưa có NV nào đạt ngưỡng (cần ≥%d ngày lịch sử + GTC hôm nay &gt; %d).</div></section>"
+                % (lbl, min_prior, min_today))
+
+    def _tbl(items):
+        trs = []
+        for i, a in enumerate(items, 1):
+            cls = "up" if a["ratio"] >= 1 else "down"
+            trs.append("<tr><td class='rk'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
+                       "<td>%s</td><td>%s</td><td class='%s'>×%s</td></tr>"
+                       % (i, _esc(a["ten"]), _esc(a["bc"]), _n(a["today"]),
+                          _n(round(a["avg"])), cls, ("%.1f" % a["ratio"]).replace(".", ",")))
+        return ("<table class='t'><thead><tr><th class='rk'>#</th><th>Nhân viên</th>"
+                "<th>GTC nay</th><th>TB/ngày</th><th>×TB</th></tr></thead><tbody>"
+                + "".join(trs) + "</tbody></table>")
+
+    best = sorted(cand, key=lambda x: -x["ratio"])[:topn]
+    worst = sorted(cand, key=lambda x: x["ratio"])[:topn]
+    inner = ("<div class='mh up'>🏆 Bứt phá — cao hơn ngày thường nhất</div>" + _tbl(best)
+             + "<div class='mh down'>🔻 Sa sút — thấp hơn ngày thường nhất</div>" + _tbl(worst))
+    return "<div class='sec' style='color:var(--good)'>%s</div><section class='card'>%s</section>" % (lbl, inner)
 
 
 def _ns_card(rows):
@@ -505,9 +561,8 @@ def gen_nhanvien_html(data):
     P.append(_ns_card(data.get("nangsuat") or []))
     # Top 10 COD GTB / đơn GTB cao nhất (30 ngày) — tiền thu hộ kẹt/đơn hỏng
     P.append(_cod_card(data.get("nv30") or []))
-    # Xếp hạng %GTC nhân viên tuần / tháng
-    P.append(_rank_card("🏅 Xếp hạng %GTC nhân viên · THÁNG (30 ngày gần nhất)", "≥ 1 tháng dữ liệu",
-                        data.get("thang_top") or [], data.get("thang_bot") or []))
+    # Năng suất GTC: đơn GTC ngày gần nhất vs TB của chính NV (top bứt phá / sa sút)
+    P.append(_ns_today_card(data.get("nv_gtc") or []))
     P.append("<a class='eod' href='trend.html'><span>📈 Xu hướng theo ngày</span>"
              "<span class='arw'>biểu đồ %GTC →</span></a>")
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
