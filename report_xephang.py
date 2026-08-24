@@ -22,6 +22,7 @@ PROV_NAME = {"LCA": "Lào Cai", "YBA": "Yên Bái", "SLA": "Sơn La",
 
 # Trọng số (BC/AM có đủ 5; NV bỏ 'red' rồi chuẩn hoá lại)
 W = {"gtc": .35, "ns": .20, "kyluat": .20, "red": .15, "cod": .10}
+WINDOW_DAYS = 30              # cửa sổ đánh giá (ngày gần nhất)
 NS_HI, NS_LO = 120, 30        # năng suất GTC/ngày làm: ≥120→100, ≤30→0
 COD_CAP = 2_000_000            # COD kẹt/đơn ≥2 triệu → 0 điểm
 RED_CAP = 0.5                  # đơn đỏ / (đơn giao TB ngày) ≥0.5 → 0 điểm
@@ -39,7 +40,7 @@ def _clamp(v):
     return max(0.0, min(100.0, v))
 
 
-def _sub(a, red=None):
+def _sub(a, red=None, days=WINDOW_DAYS):
     """Chấm điểm con 0-100 từ số liệu gộp. a: don,gtc,gtb,cod,wd,xp,ontime."""
     don, gtc, gtb, cod, wd = a["don"], a["gtc"], a["gtb"], a["cod"], a["wd"]
     xp, ontime = a["xp"], a["ontime"]
@@ -51,7 +52,7 @@ def _sub(a, red=None):
     codper = (cod / gtb) if gtb else 0
     s["cod"] = _clamp(100 - min(codper / COD_CAP, 1) * 100)
     if red is not None:
-        daily = don / 7.0
+        daily = don / max(days, 1)          # đơn giao TB ngày (theo số ngày dữ liệu thật)
         ratio = (red / daily) if daily else 0
         s["red"] = _clamp(100 - min(ratio / RED_CAP, 1) * 100)
     return s, ns, codper
@@ -86,7 +87,7 @@ def fetch():
            or os.environ.get("SUPABASE_ANON_KEY", "").strip())
     if not (url and key):
         return None
-    since = (datetime.now(VN).date() - timedelta(days=6)).isoformat()
+    since = (datetime.now(VN).date() - timedelta(days=WINDOW_DAYS - 1)).isoformat()
     nv = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=ngay,driver_id,buu_cuc,tinh,"
                   "ten_nv,don_giao,gtc,gtb,cod_gtb,gio_xuat_phat,xuat_phat_muon" % since)
     td_all = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,buu_cuc,order_type,g_red" % since)
@@ -107,7 +108,8 @@ def _agg0(tinh=None, bc=None):
 def build(data):
     """→ danh sách AM (mỗi AM có bcs, mỗi bc có nvs), đã chấm điểm + màu nhóm-3."""
     red_by_bc = data["red_by_bc"]
-    # 1) Gộp theo NHÂN VIÊN (7 ngày)
+    ndays = len({r["ngay"] for r in data["nv"]}) or WINDOW_DAYS  # số ngày dữ liệu thật
+    # 1) Gộp theo NHÂN VIÊN (cửa sổ đánh giá)
     nvagg = {}
     for r in data["nv"]:
         k = (r.get("driver_id") or "", r.get("buu_cuc") or "")
@@ -158,7 +160,7 @@ def build(data):
         for f in ("don", "gtc", "gtb", "cod", "wd", "xp", "ontime"):
             x[f] += b[f]
         x["red"] += red_by_bc.get(bc, 0)
-        sub, ns, codper = _sub(b, red=red_by_bc.get(bc, 0))
+        sub, ns, codper = _sub(b, red=red_by_bc.get(bc, 0), days=ndays)
         b["sub"] = sub; b["ns"] = ns; b["codper"] = codper
         b["red"] = red_by_bc.get(bc, 0)
         b["comp"] = _composite(sub, True)
@@ -166,7 +168,7 @@ def build(data):
 
     ams = []
     for am, x in amagg.items():
-        sub, ns, codper = _sub(x, red=x["red"])
+        sub, ns, codper = _sub(x, red=x["red"], days=ndays)
         x["sub"] = sub; x["ns"] = ns; x["codper"] = codper
         x["comp"] = _composite(sub, True)
         # màu nhóm-3 cho BC trong AM
@@ -269,9 +271,10 @@ def gen_html(data):
 
     n_bc = sum(len(a["bcs_sorted"]) for a in ams)
     n_nv = sum(len(b["nvs_sorted"]) for a in ams for b in a["bcs_sorted"])
-    dstr = (data.get("since") or "")[5:].replace("-", "/")
+    earliest = min((r["ngay"] for r in data["nv"]), default=data.get("since") or "")
+    dstr = earliest[5:].replace("-", "/")
     P.append("<section class='hero'>")
-    P.append("<div class='hlbl'>THẺ ĐIỂM ĐÁNH GIÁ · 7 NGÀY (từ %s)</div>" % dstr)
+    P.append("<div class='hlbl'>THẺ ĐIỂM ĐÁNH GIÁ · 30 NGÀY GẦN NHẤT (từ %s)</div>" % dstr)
     P.append("<div class='htitle'>%d AM · %d bưu cục · %d nhân viên</div>" % (len(ams), n_bc, n_nv))
     P.append("<div class='hsub'>Điểm tổng hợp 0–100 · %GTC 35 · Năng suất 20 · Kỷ luật 20 · Tồn đỏ 15 · COD 10</div>")
     P.append("<div class='leg'><span><b style='background:var(--bad)'></b>Tệ nhất (1/3 cuối)</span>"
@@ -283,7 +286,7 @@ def gen_html(data):
     for i, a in enumerate(ams, 1):
         P.append("<details class='%s'><summary>"
                  "<span class='rk'>%d</span>"
-                 "<span class='nm'>%s<span class='s2'>%d bưu cục · %s đơn/7ngày</span></span>"
+                 "<span class='nm'>%s<span class='s2'>%d bưu cục · %s đơn/30ngày</span></span>"
                  "<span class='score %s'>%s</span></summary>"
                  % (a["color"], i, _esc(a["am"]), len(a["bcs_sorted"]), _n(a["don"]),
                     a["color"], a["comp"]))
@@ -317,6 +320,6 @@ def gen_html(data):
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Điểm tổng hợp = %GTC·35 + Năng suất·20 + Kỷ luật·20 + Tồn đỏ·15 + COD·10 "
              "(NV: bỏ Tồn đỏ, chuẩn hoá lại 4). Màu theo NHÓM 3 (tỉ lệ) trong từng cấp.<br>"
-             "Năng suất = GTC/ngày làm · Kỷ luật = %% ngày xuất phát &lt;9h · nguồn Supabase 7 ngày</div>")
+             "Năng suất = GTC/ngày làm · Kỷ luật = %% ngày xuất phát &lt;9h · nguồn Supabase 30 ngày</div>")
     P.append("</div></body></html>")
     return "\n".join(P)
