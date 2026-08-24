@@ -79,8 +79,8 @@ def _flags(m):
     return fl
 
 
-def _row(i, m, show_scan=True):
-    fl = _flags(m)
+def _row(i, m, show_scan=True, show_flags=True):
+    fl = _flags(m) if show_flags else []
     flg = ("<div class='flags'>⚠ %s</div>" % " · ".join(fl)) if fl else ""
     dph = ("<span class='pill sm %s'>%s</span>"
            % (_dph_cls(m["dph"]), str(m["dph"]).replace(".", ",") if m["dph"] is not None else "—"))
@@ -179,7 +179,7 @@ def gen_html(rows):
     if hi:
         P.append(thead)
         for i, m in enumerate(hi[:15], 1):
-            P.append(_row(i, m))
+            P.append(_row(i, m, show_flags=False))
         P.append("</tbody></table>")
     else:
         P.append("<div class='none'>Chưa đủ dữ liệu chuyến kết thúc.</div>")
