@@ -235,7 +235,7 @@ details[open]{background:var(--card2)}
 .sc-sm.good{background:rgba(47,208,122,.16);color:var(--good)}
 .sc-sm.warn{background:rgba(247,185,85,.16);color:var(--warn)}
 .sc-sm.bad{background:rgba(242,88,95,.16);color:var(--bad)}
-.mini{color:var(--mut);font-size:10.5px;font-weight:500}
+.mini{display:block;margin-top:2px;color:var(--mut);font-size:10.5px;font-weight:500}
 .eod{display:flex;align-items:center;justify-content:space-between;text-decoration:none;color:var(--txt);background:linear-gradient(135deg,#20264a,#191f38);border:1px solid #313a63;border-radius:14px;padding:14px 16px;margin:14px 0 8px;font-weight:700;font-size:14px}
 .eod .arw{color:#aeb6e0;font-size:12px;font-weight:600}
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:20px 0 4px}
