@@ -15,7 +15,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
-from report import _get_hubs, _post, _fetch_all_items, CONCURRENCY, TokenExpiredError
+from report import _get_hubs, _post, _fetch_all_items, CONCURRENCY, TokenExpiredError, _vn_time
 from am_map import AM_OF
 
 logger = logging.getLogger("live")
@@ -113,7 +113,10 @@ async def fetch_live(token):
 
                 def _drv0(did, dn):
                     return {"id": did, "name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0,
-                            "ltc": 0, "vngh": 0, "vngh_gtc": 0}
+                            "ltc": 0, "vngh": 0, "vngh_gtc": 0,
+                            # hiệu suất chuyến đi: giờ xuất phát/kết thúc, scan, tiến độ chuyến đang chạy
+                            "st": None, "en": None, "scan_ok": 0, "scan_tot": 0,
+                            "ot_done": 0, "ot_tot": 0}
 
                 def _dk(did, dn):
                     # GỘP theo driver_id (phân biệt 2 người TRÙNG TÊN); thiếu id → theo tên
@@ -122,6 +125,10 @@ async def fetch_live(token):
                 async def _it(t, is_ontrip):
                     dn = t.get("driverName") or "—"
                     did = str(t.get("driverId") or "")
+                    # meta chuyến: giờ, ngày bắt đầu, đang chạy?, scan (đếm ở dưới)
+                    meta = {"start": t.get("startTime"), "end": t.get("endTime"),
+                            "sdi": t.get("startDateIndex"), "ot": is_ontrip,
+                            "scan_ok": 0, "scan_tot": 0}
                     try:
                         async with sem:
                             items = await _fetch_all_items(session, token, hid, t["tripCode"])
@@ -132,21 +139,26 @@ async def fetch_live(token):
                         # PICK: (mã đơn, tài xế, đã lấy thành công?)
                         picks = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True)
                                  for x in items if x.get("type") == "PICK"]
-                        return (did, dn, recs, picks)
+                        for x in items:
+                            if x.get("type") == "DELIVER":
+                                meta["scan_tot"] += 1
+                                if x.get("isScanned") is True:
+                                    meta["scan_ok"] += 1
+                        return (did, dn, recs, picks, meta)
                     except Exception:
-                        return (did, dn, [], [])
+                        return (did, dn, [], [], meta)
 
                 res = await asyncio.gather(
                     *([_it(t, True) for t in ontrip] + [_it(t, False) for t in fin]))
                 drivers = {}
                 # Mỗi chuyến (dù trùng đơn) vẫn tính là 1 chuyến của tài xế
-                for did, dn, _recs, _picks in res:
+                for did, dn, _recs, _picks, _meta in res:
                     drivers.setdefault(_dk(did, dn), _drv0(did, dn))["chuyen"] += 1
                 # GỘP theo MÃ ĐƠN: 1 đơn gán nhiều chuyến chỉ tính 1 lần.
                 # Ưu tiên bản ghi: đã giao > đã xử lý > chuyến đang chạy (đơn còn treo
                 # tính cho chuyến hiện tại). GTC=đơn giao xong ở BẤT KỲ chuyến nào.
                 best = {}
-                for did, dn, recs, _picks in res:
+                for did, dn, recs, _picks, _meta in res:
                     for oc, rdid, rdn, succ, att, ot in recs:
                         if not oc:
                             continue
@@ -167,7 +179,7 @@ async def fetch_live(token):
                             d["vngh_gtc"] += 1
                 # LTC (lấy thành công): gộp mã đơn PICK, thành công ở bất kỳ chuyến nào
                 bestp = {}
-                for did, dn, _recs, picks in res:
+                for did, dn, _recs, picks, _meta in res:
                     for oc, rdid, rdn, psucc in picks:
                         if not oc:
                             continue
@@ -178,6 +190,25 @@ async def fetch_live(token):
                     d = drivers.setdefault(_dk(rdid, rdn), _drv0(rdid, rdn))
                     if psucc:
                         d["ltc"] += 1
+                # HIỆU SUẤT CHUYẾN ĐI: giờ xuất phát (chuyến bắt đầu HÔM NAY) / kết thúc,
+                # số đơn đã scan, tiến độ chuyến ĐANG CHẠY (đã giao/tổng).
+                for did, dn, recs, _picks, meta in res:
+                    d = drivers.setdefault(_dk(did, dn), _drv0(did, dn))
+                    d["scan_ok"] += meta["scan_ok"]; d["scan_tot"] += meta["scan_tot"]
+                    if meta["sdi"] == ymd:
+                        st = _vn_time(meta["start"])
+                        if st and (d["st"] is None or st < d["st"]):
+                            d["st"] = st
+                    en = _vn_time(meta["end"])
+                    if en and (d["en"] is None or en > d["en"]):
+                        d["en"] = en
+                    if meta["ot"]:
+                        for oc, rdid, rdn, succ, att, ot in recs:
+                            if not oc:
+                                continue
+                            d["ot_tot"] += 1
+                            if succ:
+                                d["ot_done"] += 1
                 # PHÂN BIỆT TRÙNG TÊN trong cùng bưu cục: thêm đuôi #id
                 namec = Counter(d["name"] for d in drivers.values())
                 for d in drivers.values():
@@ -275,6 +306,8 @@ def gen_html(rows):
              "<span class='arw'>biểu đồ %GTC →</span></a>")
     P.append("<a class='eod' href='nhanvien.html'><span>⚡ Năng suất Nhân viên</span>"
              "<span class='arw'>xếp hạng GTC/ngày →</span></a>")
+    P.append("<a class='eod' href='chuyendi.html'><span>🚚 Hiệu suất chuyến đi</span>"
+             "<span class='arw'>đơn/giờ · giờ ra hàng →</span></a>")
     P.append("<a class='eod' href='khochuyentiep.html'><span>📦 Kho Chuyển Tiếp</span>"
              "<span class='arw'>tồn luân chuyển →</span></a>")
     P.append("<a class='eod' href='vngh.html'><span>🛍️ Đơn TikTok</span>"
@@ -530,6 +563,14 @@ def main():
             f.write(report_vngh.gen_html(rows))
     except Exception as e:
         logger.warning("Tạo vngh.html lỗi (bỏ qua): %s", str(e)[:150])
+
+    # Trang hiệu suất chuyến đi NV — dùng lại rows (giờ XP/đóng, đơn/giờ, scan, đang chạy)
+    try:
+        import report_chuyendi
+        with open(os.path.join(outdir, "chuyendi.html"), "w", encoding="utf-8") as f:
+            f.write(report_chuyendi.gen_html(rows))
+    except Exception as e:
+        logger.warning("Tạo chuyendi.html lỗi (bỏ qua): %s", str(e)[:150])
 
     # JSON dữ liệu cho BOT đọc trực tiếp (khớp 100% trang) — cạnh dashboard
     payload = {
