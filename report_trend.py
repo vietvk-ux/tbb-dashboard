@@ -631,6 +631,14 @@ def main():
         f.write(gen_nhanvien_html(data))
     with open(os.path.join(outdir, "khochuyentiep.html"), "w", encoding="utf-8") as f:
         f.write(gen_transit_html(transit))
+    # Trang xếp hạng tổng hợp (scorecard AM→BC→NV) — đọc Supabase 7 ngày
+    try:
+        import report_xephang
+        xdata = report_xephang.fetch()
+        with open(os.path.join(outdir, "xephang.html"), "w", encoding="utf-8") as f:
+            f.write(report_xephang.gen_html(xdata))
+    except Exception as e:
+        logger.warning("Tạo xephang.html lỗi (bỏ qua): %s", str(e)[:150])
     logger.info("Đã tạo trend + nhanvien + khochuyentiep.html (%d ngày · transit %s kho).",
                 len(data["vung"]) if data and data.get("vung") else 0,
                 len(transit) if transit else 0)

@@ -308,6 +308,8 @@ def gen_html(rows):
              "<span class='arw'>xếp hạng GTC/ngày →</span></a>")
     P.append("<a class='eod' href='chuyendi.html'><span>🚚 Hiệu suất chuyến đi</span>"
              "<span class='arw'>đơn/giờ · giờ ra hàng →</span></a>")
+    P.append("<a class='eod' href='xephang.html'><span>🏆 Xếp hạng tổng hợp</span>"
+             "<span class='arw'>AM · bưu cục · NV →</span></a>")
     P.append("<a class='eod' href='khochuyentiep.html'><span>📦 Kho Chuyển Tiếp</span>"
              "<span class='arw'>tồn luân chuyển →</span></a>")
 
