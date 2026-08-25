@@ -1,9 +1,9 @@
 """
 TRANG XẾP HẠNG TỔNG HỢP (scorecard) — đánh giá AM → Bưu cục → Nhân viên.
-Điểm tổng hợp 0-100 từ ma trận chỉ số (Supabase 7 ngày). Xếp TỆ→TỐT mỗi cấp;
-màu theo NHÓM 3 (tỉ lệ): 1/3 cuối 🔴 · 1/3 giữa 🟡 · 1/3 đầu 🟢.
+Điểm tổng hợp 0-100 từ ma trận chỉ số (Supabase — THÁNG dương lịch hiện tại, tự
+reset đầu mỗi tháng). Xếp TỆ→TỐT mỗi cấp; màu NHÓM 3 (tỉ lệ): 1/3 cuối 🔴 · giữa 🟡 · 1/3 đầu 🟢.
 
-Trọng số "Cân bằng vận hành": %GTC 35 · Năng suất 20 · Kỷ luật 20 · Tồn đỏ 15 · COD 10.
+Trọng số: %GTC 35 · Năng suất 20 · Tồn đỏ 20 · COD 15 · Kỷ luật 10 (dict W).
 Cấp NV không có Tồn đỏ → chuẩn hoá lại 4 chỉ số còn lại.
 
 Đọc Supabase (như report_trend). report_trend.main() gọi gen_html() → docs/<slug>/xephang.html.
@@ -87,17 +87,21 @@ def fetch():
            or os.environ.get("SUPABASE_ANON_KEY", "").strip())
     if not (url and key):
         return None
-    since = (datetime.now(VN).date() - timedelta(days=WINDOW_DAYS - 1)).isoformat()
+    today = datetime.now(VN).date()
+    since = today.replace(day=1).isoformat()   # từ NGÀY 1 THÁNG HIỆN TẠI (tự reset đầu tháng)
     nv = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=ngay,driver_id,buu_cuc,tinh,"
                   "ten_nv,don_giao,gtc,gtb,cod_gtb,gio_xuat_phat,xuat_phat_muon" % since)
-    td_all = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,buu_cuc,order_type,g_red" % since)
+    # Tồn đỏ = SNAPSHOT MỚI NHẤT (đơn đỏ là tồn hiện tại, không cộng dồn theo tháng) — lookback 10 ngày
+    td_since = (today - timedelta(days=10)).isoformat()
+    td_all = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,buu_cuc,order_type,g_red" % td_since)
     latest = max((r["ngay"] for r in td_all), default=None)
     red_by_bc = {}
     for r in td_all:
         if r["ngay"] != latest:
             continue
         red_by_bc[r["buu_cuc"]] = red_by_bc.get(r["buu_cuc"], 0) + (r.get("g_red") or 0)
-    return {"nv": nv, "red_by_bc": red_by_bc, "since": since, "td_day": latest}
+    return {"nv": nv, "red_by_bc": red_by_bc, "since": since, "td_day": latest,
+            "month": today.month, "year": today.year}
 
 
 def _agg0(tinh=None, bc=None):
@@ -289,8 +293,9 @@ def gen_html(data):
     n_nv = sum(len(b["nvs_sorted"]) for a in ams for b in a["bcs_sorted"])
     earliest = min((r["ngay"] for r in data["nv"]), default=data.get("since") or "")
     dstr = earliest[5:].replace("-", "/")
+    mlabel = "THÁNG %d/%d" % (data.get("month") or 0, data.get("year") or 0)
     P.append("<section class='hero'>")
-    P.append("<div class='hlbl'>THẺ ĐIỂM ĐÁNH GIÁ · 30 NGÀY GẦN NHẤT (từ %s)</div>" % dstr)
+    P.append("<div class='hlbl'>THẺ ĐIỂM ĐÁNH GIÁ · %s (từ %s đến nay)</div>" % (mlabel, dstr))
     P.append("<div class='htitle'>%d AM · %d bưu cục · %d nhân viên</div>" % (len(ams), n_bc, n_nv))
     P.append("<div class='hsub'>Điểm tổng hợp 0–100 · %GTC 35 · Năng suất 20 · Tồn đỏ 20 · COD 15 · Kỷ luật 10</div>")
     P.append("<div class='leg'><span><b style='background:var(--bad)'></b>Tệ nhất (1/3 cuối)</span>"
@@ -302,7 +307,7 @@ def gen_html(data):
     for i, a in enumerate(ams, 1):
         P.append("<details class='%s'><summary>"
                  "<span class='rk'>%d</span>"
-                 "<span class='nm'>%s<span class='s2'>%d bưu cục · %s đơn/30ngày</span></span>"
+                 "<span class='nm'>%s<span class='s2'>%d bưu cục · %s đơn/tháng</span></span>"
                  "<span class='score %s'>%s</span></summary>"
                  % (a["color"], i, _esc(a["am"]), len(a["bcs_sorted"]), _n(a["don"]),
                     a["color"], a["comp"]))
@@ -345,6 +350,6 @@ def gen_html(data):
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Điểm tổng hợp = %GTC·35 + Năng suất·20 + Tồn đỏ·20 + COD·15 + Kỷ luật·10 "
              "(NV: bỏ Tồn đỏ, chuẩn hoá lại 4). Màu theo NHÓM 3 (tỉ lệ) trong từng cấp.<br>"
-             "Năng suất = GTC/ngày làm · Kỷ luật = %% ngày xuất phát &lt;9h · nguồn Supabase 30 ngày</div>")
+             "Năng suất = GTC/ngày làm · Kỷ luật = %% ngày xuất phát &lt;9h · nguồn Supabase · theo THÁNG dương lịch (tự reset đầu tháng)</div>")
     P.append("</div></body></html>")
     return "\n".join(P)
