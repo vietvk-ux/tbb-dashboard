@@ -1,7 +1,7 @@
 # HỆ THỐNG BÁO CÁO VẬN HÀNH VÙNG TÂY BẮC BỘ (TBB) — GHN
 
 Tài liệu tổng hợp để **tiếp tục làm việc ở phiên sau / trên máy khác**. Repo: `vietvk-ux/tbb-dashboard` (public). Chủ: Vũ Khắc Việt (vietvk@ghn.vn) — GĐV Vùng TBB.
-Cập nhật gần nhất: 23/08/2026.
+Cập nhật gần nhất: 25/08/2026.
 
 > Nguyên tắc bảo mật: KHÔNG in/echo/commit giá trị `NHANH_TOKEN`, `SUPABASE_SERVICE_KEY`, `GTALK_OA_TOKEN`, PAT. Đặt qua `gh secret set` / GitHub Actions secrets. Dữ liệu số KHÔNG lưu trong repo — chỉ deploy lên GitHub Pages + Supabase.
 
@@ -15,12 +15,16 @@ Cập nhật gần nhất: 23/08/2026.
 
 ### URL trang web (slug bí mật)
 Gốc: `https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/`
-- `index.html` / `live.html` — GẦN REALTIME (mỗi ~15').
-- `eod.html` — CUỐI NGÀY (chốt ~23:30).
+**Trang chính + 7 trang phụ:**
+- `index.html` / `live.html` — TRANG CHÍNH, GẦN REALTIME (mỗi ~15'). Có 3 chỉ số TikTok (VNGH) toàn vùng ở dải chỉ số.
+- `eod.html` — CUỐI NGÀY (chốt ~23:30). Gồm mục "⏰ Kỷ luật ra hàng".
 - `backlog.html` — TỒN ĐỌNG (Lấy·Giao·Trả + Luân chuyển + đơn đỏ quá hạn).
-- `vngh.html` — ĐƠN TIKTOK SHOP (mã VNGH).
 - `trend.html` — XU HƯỚNG (đọc từ Supabase).
+- `nhanvien.html` — NĂNG SUẤT NV (GTC/ngày làm · COD GTB/đơn · Năng suất Nay−TB).
 - `khochuyentiep.html` — kho chuyển tiếp (tồn LC theo mốc giờ).
+- `chuyendi.html` — HIỆU SUẤT CHUYẾN ĐI (đơn/giờ · giờ ra hàng · scan · đang chạy). *(Trang 7, thêm 24/08)*
+- `xephang.html` — XẾP HẠNG TỔNG HỢP (scorecard AM→BC→NV, điểm 0-100). *(Trang 8, thêm 24/08)*
+- ~~`vngh.html`~~ — ĐÃ XOÁ 24/08 (giữ chỉ số TikTok ở trang chính).
 
 ---
 
@@ -48,6 +52,18 @@ Gốc: `https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/`
 - Ngưỡng muộn: env `EOD_LATE_START_HOUR` (mặc định **9h** VN).
 - Hiển thị: mục "⏰ Kỷ luật ra hàng" trên `eod.html` (giờ XP TB vùng, số NV muộn, bảng NV muộn xếp muộn nhất trước).
 - Không tốn thêm call API (chuyến <10h không bóc item, chỉ đọc giờ).
+
+### Trang 7 — HIỆU SUẤT CHUYẾN ĐI (`chuyendi.html`, thêm 24/08) — LIVE ~15'
+- `report_chuyendi.py::gen_html(rows)`, dùng lại `report_live.fetch_live` (KHÔNG tốn call API). `fetch_live` thu thêm mỗi NV: `st`/`en` (giờ xuất phát chuyến bắt đầu HÔM NAY / giờ đóng muộn nhất, qua `_vn_time`), `scan_ok`/`scan_tot` (`isScanned`), `ot_done`/`ot_tot` (tiến độ chuyến ĐANG CHẠY).
+- **Đơn/giờ = GTC ÷ (giờ đóng − giờ mở), CHỈ xếp NV đã đóng HẾT chuyến (`ot_tot==0` + cửa sổ ≥2h)** → số trọn vẹn; NV còn chạy xuống mục "🏃 đang chạy".
+- Ngưỡng (theo phân phối thật, trung vị đơn/giờ vùng ~4): cần chú ý = đơn/giờ **<2.5**; muộn **≥9h**; scan **<40%**. Bố cục: hero + dải 6 chỉ số · 🔴 cần chú ý · 🟢 hiệu suất cao · 🧑‍💼 theo AM (drill NV) · 🏃 đang chạy.
+
+### Trang 8 — XẾP HẠNG TỔNG HỢP (`xephang.html`, thêm 24/08) — Supabase 30 ngày
+- `report_xephang.py`, đọc **Supabase 30 ngày gần nhất** (`WINDOW_DAYS=30`; đánh giá ổn định, không live). `report_trend.main()` sinh trang.
+- **Điểm tổng hợp 0-100**, scorecard 3 cấp **AM → bưu cục → nhân viên** (`<details>` lồng), xếp TỆ→TỐT mỗi cấp.
+- **Trọng số (dict `W`, user chỉnh 25/08):** %GTC **35** · Năng suất (GTC/ngày làm) **20** · Tồn đỏ (Σ`g_red` ngày mới nhất) **20** · COD kẹt/đơn **15** · Kỷ luật (% ngày XP<9h) **10**. Cấp NV bỏ Tồn đỏ → chuẩn hoá lại 4.
+- Chuẩn hoá con: NS ≥120→100/≤30→0 (`NS_HI/NS_LO`); COD ≥2tr/đơn→0 (`COD_CAP`); tồn đỏ ratio=đỏ/(đơn giao TB ngày thật)≥0.5→0 (`RED_CAP`). Đổi các hằng số này để tinh chỉnh.
+- **Màu theo NHÓM 3 (tỉ lệ)** (`_tcolor`): mỗi cấp xếp tăng dần, 1/3 cuối 🔴 · giữa 🟡 · 1/3 đầu 🟢 — luôn đủ 3 màu.
 
 ---
 
@@ -95,10 +111,10 @@ Gốc: `https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/`
 | Script | Vai trò | Workflow (giờ VN) |
 |---|---|---|
 | `report.py` | ENGINE fetch+aggregate; gửi tin trip | (dùng chung) |
-| `report_live.py` (+`report_vngh.py`) | trang trực tiếp + TikTok + fallback | `live-30m.yml` (mỗi ~15') |
+| `report_live.py` (+`report_chuyendi.py`) | trang chính + hiệu suất chuyến đi + fallback | `live-30m.yml` (mỗi ~15') |
 | `report_dashboard.py` | trang cuối ngày (eod.html) | `live-30m.yml` slot ~23:30 |
 | `report_backlog_web.py` | trang tồn đọng | `live-30m.yml` |
-| `report_trend.py` | trang xu hướng (từ Supabase) | (deploy cùng) |
+| `report_trend.py` (+`report_xephang.py`) | xu hướng + nhân viên + kho chuyển tiếp + **xếp hạng tổng hợp** (từ Supabase) | (deploy cùng live-30m) |
 | `report_khochuyentiep.py` | kho chuyển tiếp | `khochuyentiep-8h-16h-22h.yml` |
 | `report_db_sync.py` (+`db_sync.py`) | ghi Supabase | `sync-23h.yml` (~23:35) |
 | `report_morning.py` | bản tin "việc cần làm hôm nay" | `morning-730.yml` (07:30, kích bởi cron-job.org) |
@@ -128,4 +144,11 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 5. Nhóm GTalk TBB đã đủ bản tin — KHÔNG tự thêm bot/tin mới nếu user không yêu cầu.
 
 ## 8. MỎ DỮ LIỆU CHƯA KHAI THÁC (khảo sát 22/08 từ get-trip-items) — đề xuất tiếp
-Đã làm #2 (giờ xuất phát). Còn: **#1 lý do giao hỏng** `failCode/failNote` (mạnh nhất — biết vì sao GTB), #3 `isScanned` (% đơn cầm hàng thực), #4 `collectCodFailedAmount` (COD hỏng đã/chưa thu), #5 năng suất đơn/chuyến, #6 đơn theo huyện/xã (lat/lng).
+Đã làm **#2 giờ xuất phát/đơn-giờ (chuyendi.html)** + **#3 isScanned** (cột scan trong chuyendi). Còn: **#1 lý do giao hỏng** `failCode/failNote` (mạnh nhất — biết vì sao GTB; `failNote` có sẵn chữ đọc được: "Không liên lạc được"/"Khách hẹn"/"NV gặp sự cố"…), #4 `collectCodFailedAmount` (COD hỏng đã/chưa thu), #5 năng suất đơn/chuyến, #6 đơn theo huyện/xã (lat/lng).
+
+## 9. NHẬT KÝ THAY ĐỔI GẦN ĐÂY (24–25/08)
+- Thêm trang 7 `chuyendi.html` (hiệu suất chuyến đi) + trang 8 `xephang.html` (xếp hạng tổng hợp AM→BC→NV).
+- **XOÁ `vngh.html`** + `report_vngh.py` (giữ 3 chỉ số TikTok ở trang chính).
+- `nhanvien.html`: bỏ "Xếp hạng %GTC tháng", thay bằng "Năng suất Nay−TB" (đơn GTC ngày gần nhất vs TB chính NV, lọc >30 đơn, top 15 bứt phá/sa sút).
+- Supabase: cột kỷ luật ra hàng (`gio_xuat_phat/gio_ket_thuc/thoi_luong_phut/xuat_phat_muon` ở `bao_cao_nhan_vien`; `gio_xuat_phat_tb/so_nv_muon` ở `bao_cao_vung`) — migration `supabase_migration_kyluat.sql` đã chạy, backfill 21–22/08.
+- Theo dõi dung lượng Supabase (task nhắc 20/09; giữ retention 60 ngày).
