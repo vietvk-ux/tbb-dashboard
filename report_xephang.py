@@ -21,7 +21,7 @@ PROV_NAME = {"LCA": "Lào Cai", "YBA": "Yên Bái", "SLA": "Sơn La",
              "DBI": "Điện Biên", "LCH": "Lai Châu"}
 
 # Trọng số (BC/AM có đủ 5; NV bỏ 'red' rồi chuẩn hoá lại)
-W = {"gtc": .35, "ns": .20, "kyluat": .20, "red": .15, "cod": .10}
+W = {"gtc": .35, "ns": .20, "kyluat": .10, "red": .20, "cod": .15}
 WINDOW_DAYS = 30              # cửa sổ đánh giá (ngày gần nhất)
 NS_HI, NS_LO = 120, 30        # năng suất GTC/ngày làm: ≥120→100, ≤30→0
 COD_CAP = 2_000_000            # COD kẹt/đơn ≥2 triệu → 0 điểm
@@ -276,7 +276,7 @@ def gen_html(data):
     P.append("<section class='hero'>")
     P.append("<div class='hlbl'>THẺ ĐIỂM ĐÁNH GIÁ · 30 NGÀY GẦN NHẤT (từ %s)</div>" % dstr)
     P.append("<div class='htitle'>%d AM · %d bưu cục · %d nhân viên</div>" % (len(ams), n_bc, n_nv))
-    P.append("<div class='hsub'>Điểm tổng hợp 0–100 · %GTC 35 · Năng suất 20 · Kỷ luật 20 · Tồn đỏ 15 · COD 10</div>")
+    P.append("<div class='hsub'>Điểm tổng hợp 0–100 · %GTC 35 · Năng suất 20 · Tồn đỏ 20 · COD 15 · Kỷ luật 10</div>")
     P.append("<div class='leg'><span><b style='background:var(--bad)'></b>Tệ nhất (1/3 cuối)</span>"
              "<span><b style='background:var(--warn)'></b>Chấp nhận (giữa)</span>"
              "<span><b style='background:var(--good)'></b>Tốt (1/3 đầu)</span></div>")
@@ -318,7 +318,7 @@ def gen_html(data):
 
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
-    P.append("<div class='foot'>Điểm tổng hợp = %GTC·35 + Năng suất·20 + Kỷ luật·20 + Tồn đỏ·15 + COD·10 "
+    P.append("<div class='foot'>Điểm tổng hợp = %GTC·35 + Năng suất·20 + Tồn đỏ·20 + COD·15 + Kỷ luật·10 "
              "(NV: bỏ Tồn đỏ, chuẩn hoá lại 4). Màu theo NHÓM 3 (tỉ lệ) trong từng cấp.<br>"
              "Năng suất = GTC/ngày làm · Kỷ luật = %% ngày xuất phát &lt;9h · nguồn Supabase 30 ngày</div>")
     P.append("</div></body></html>")
