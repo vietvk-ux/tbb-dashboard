@@ -265,49 +265,7 @@ def render_summary(entries, key, types, hero_lbl, tr=False):
         P.append("<div class='ty'><div class='v'>%s</div><div class='l'>%s</div></div>"
                  % (_n(rtypes[ot]), _esc(lbl)))
     P.append("</section>")
-
-
-    # top 5 BC >120h
-    ub = []
-    for e in entries:
-        o120 = sec_groups(e[key], types)[">120h"]
-        if o120 > 0:
-            ub.append((e["name"], o120, sec_total(e[key], types)))
-    ub.sort(key=lambda x: -x[1])
-    if ub:
-        P.append("<div class='subh'>🔴 Top bưu cục tồn &gt;120h (ưu tiên xử lý)</div>")
-        P.append("<table><tr><th>Bưu cục</th><th>&gt;120h</th><th>Tổng</th></tr>")
-        for name, o120, tot in ub[:5]:
-            P.append("<tr><td>%s</td><td><span class='pill bad'>%s</span></td><td>%s</td></tr>"
-                     % (_esc(name), _n(o120), _n(tot)))
-        P.append("</table>")
-
-    # Theo AM (tồn nhiều → ít · bấm mở xem bưu cục)
-    am, am_bcs = {}, {}
-    for e in entries:
-        amn = AM_OF.get(e["name"])
-        if not amn:
-            continue
-        t = sec_total(e[key], types)
-        o120 = sec_groups(e[key], types)[">120h"]
-        a = am.setdefault(amn, {"tot": 0, "o120": 0, "bc": 0})
-        a["tot"] += t
-        a["o120"] += o120
-        a["bc"] += 1
-        am_bcs.setdefault(amn, []).append((e["name"], t, o120))
-    am_rows = sorted(am.items(), key=lambda kv: -kv[1]["tot"])
-    if am_rows:
-        P.append("<div class='subh'>🧑‍💼 Theo AM · tồn nhiều → ít · bấm xem bưu cục</div>")
-        for amn, a in am_rows:
-            P.append("<details class='bc'><summary>")
-            P.append("<div><div class='bcn'>%s</div><div class='bcm'>🏤 %d BC · <span style='color:var(--bad)'>🔴 &gt;120h %s</span></div></div>"
-                     % (_esc(amn), a["bc"], _n(a["o120"])))
-            P.append("<div class='bcr'><span class='tot'>%s</span></div></summary>" % _n(a["tot"]))
-            P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th><th>Tổng tồn</th><th>&gt;120h</th></tr>")
-            for name, t, o120 in sorted(am_bcs[amn], key=lambda x: -x[1]):
-                ov = ("<span class='pill bad'>%s</span>" % _n(o120)) if o120 > 0 else "<span class='muted'>0</span>"
-                P.append("<tr><td>%s</td><td><b>%s</b></td><td>%s</td></tr>" % (_esc(name), _n(t), ov))
-            P.append("</table></div></div></details>")
+    # (Đã bỏ "Top bưu cục >120h" và "Theo AM" theo yêu cầu — chỉ giữ số tổng quan.)
     return P
 
 
@@ -356,55 +314,7 @@ def render_red_section(entries):
         P.append("<div class='st bad'><div class='sv bad'>%s</div><div class='sl'>%s</div></div>"
                  % (_n(tot[ot]), _esc(lbl)))
     P.append("</section>")
-    rows = [(e["name"], red_of(e)) for e in entries]
-    rows = [x for x in rows if x[1]["total"] > 0]
-    rows.sort(key=lambda x: -x[1]["total"])
-    if rows:
-        P.append("<div class='subh'>🔴 Top bưu cục đơn backlog nhiều nhất</div>")
-        P.append("<div class='scroll'><table><tr><th>Bưu cục</th><th>Giao&gt;120</th><th>Trả&gt;120</th>"
-                 "<th>LCg&gt;48</th><th>LCt&gt;48</th><th>Tổng backlog</th></tr>")
-        for name, r in rows[:10]:
-            P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                     "<td><span class='pill bad'>%s</span></td></tr>"
-                     % (_esc(name), _n(r["DELIVER"]), _n(r["RETURN"]),
-                        _n(r["TRANSPORT_DELIVERY"]), _n(r["TRANSPORT_RETURN"]), _n(r["total"])))
-        P.append("</table></div>")
-
-    # Đơn backlog theo AM (cao → thấp · bấm mở xem bưu cục)
-    am, am_bcs = {}, {}
-    for e in entries:
-        amn = AM_OF.get(e["name"])
-        if not amn:
-            continue
-        r = red_of(e)
-        a = am.get(amn)
-        if a is None:
-            a = {ot: 0 for ot, _, _ in RED_LABELS}
-            a["total"] = 0
-            a["bc"] = 0
-            am[amn] = a
-        for ot, _, _ in RED_LABELS:
-            a[ot] += r[ot]
-        a["total"] += r["total"]
-        a["bc"] += 1
-        am_bcs.setdefault(amn, []).append((e["name"], r))
-    am_rows = sorted(am.items(), key=lambda kv: -kv[1]["total"])
-    if am_rows:
-        P.append("<div class='subh'>🧑‍💼 Đơn backlog theo AM · cao → thấp · bấm xem bưu cục</div>")
-        for amn, a in am_rows:
-            P.append("<details class='bc' data-u='%s'><summary>" % ("1" if a["total"] > 0 else "0"))
-            P.append("<div><div class='bcn'>%s</div><div class='bcm'>🏤 %d BC · Giao&gt;120 %s · Trả %s · LCg %s · LCt %s</div></div>"
-                     % (_esc(amn), a["bc"], _n(a["DELIVER"]), _n(a["RETURN"]),
-                        _n(a["TRANSPORT_DELIVERY"]), _n(a["TRANSPORT_RETURN"])))
-            P.append("<div class='bcr'><span class='pill bad'>%s</span></div></summary>" % _n(a["total"]))
-            P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th><th>Giao&gt;120</th>"
-                     "<th>Trả&gt;120</th><th>LCg&gt;48</th><th>LCt&gt;48</th><th>Tổng</th></tr>")
-            for name, r in sorted(am_bcs[amn], key=lambda x: -x[1]["total"]):
-                red = ("<span class='pill bad'>%s</span>" % _n(r["total"])) if r["total"] > 0 else "<span class='muted'>0</span>"
-                P.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>"
-                         % (_esc(name), _n(r["DELIVER"]), _n(r["RETURN"]),
-                            _n(r["TRANSPORT_DELIVERY"]), _n(r["TRANSPORT_RETURN"]), red))
-            P.append("</table></div></div></details>")
+    # (Đã bỏ "Top bưu cục" và "Theo AM" theo yêu cầu — chỉ giữ số tổng quan.)
     return P
 
 
@@ -431,7 +341,7 @@ def build_html(entries, hub_count):
 
     # ===== 🚨 ĐƠN ĐỎ QUÁ HẠN (ưu tiên) =====
     P.append("<div class='sec first' id='do'>🚨 Đơn backlog — quá hạn cần xử lý</div>")
-    P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;48h · LC trả&gt;48h · danh sách BC dưới sắp theo tổng backlog</div>")
+    P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;48h · LC trả&gt;48h</div>")
     P += render_red_section(entries)
 
     # ===== BÁO CÁO 1: LẤY-GIAO-TRẢ =====
@@ -444,48 +354,11 @@ def build_html(entries, hub_count):
     P.append("<div class='secsub'>Đơn luân chuyển giao / trả tồn tại kho (mọi trạng thái đóng kiện)</div>")
     P += render_summary(entries, "tr", TR_TYPES, "🔁 Tổng tồn luân chuyển toàn vùng", tr=True)
 
-    # ===== DANH SÁCH BƯU CỤC (sắp theo TỔNG ĐƠN ĐỎ) =====
-    P.append("<div class='sec' id='bc'>🏤 Tất cả bưu cục (%d)</div>" % len(active))
-    P.append("<div class='secsub'>Sắp theo TỔNG ĐƠN BACKLOG nhiều → ít · bấm để xem chi tiết theo khung giờ</div>")
-    P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục / tỉnh...' oninput='filt()'>")
-
-    def bc_sort_key(e):
-        red = red_of(e)["total"]
-        t = sec_total(e["lgt"], LGT_TYPES) + sec_total(e["tr"], TR_TYPES)
-        return (-red, -t)
-
-    for e in sorted(active, key=bc_sort_key):
-        lgt_tot = sec_total(e["lgt"], LGT_TYPES)
-        tr_tot = sec_total(e["tr"], TR_TYPES)
-        r = red_of(e)
-        u = "1" if r["total"] > 0 else "0"
-        key = _esc((e["name"] + " " + PROV_NAME.get(e["prov"], e["prov"])).lower())
-        # meta = các chỉ số đỏ khác 0
-        parts = ["%s %s" % (short, _n(r[ot])) for ot, _, short in RED_LABELS if r[ot] > 0]
-        meta = " · ".join(parts) if parts else "không có đơn backlog"
-        badge = ("<span class='pill bad'>%s</span>" % _n(r["total"])) if r["total"] > 0 \
-            else "<span class='pill mut'>0</span>"
-        P.append("<details class='bc' data-u='%s' data-k=\"%s\">" % (u, key))
-        P.append("<summary><div><div class='bcn'>%s</div><div class='bcm'>🔴 %s</div></div>"
-                 "<div class='bcr'>%s</div></summary>"
-                 % (_esc(e["name"]), meta, badge))
-        P.append("<div class='dtl'>")
-        P.append("<div class='cap'>Tổng tồn: 📦 Lấy·Giao·Trả %s · 🔁 Luân chuyển %s</div>"
-                 % (_n(lgt_tot), _n(tr_tot)))
-        if lgt_tot > 0:
-            P.append("<div class='cap'>📦 Lấy · Giao · Trả</div>")
-            P.append(render_detail_table(e["lgt"], LGT_TYPES))
-        if tr_tot > 0:
-            P.append("<div class='cap'>🔁 Luân chuyển</div>")
-            P.append(render_detail_table(e["tr"], TR_TYPES))
-        P.append("</div></details>")
+    # (Đã bỏ mục "🏤 Tất cả bưu cục" (chi tiết theo bưu cục) theo yêu cầu — chỉ giữ số tổng quan.)
 
     P.append("<div class='foot'>Nguồn: nhanh.ghn.vn · (1) Đơn tồn tại bưu cục chưa xử lý (mọi trạng thái) · "
              "(2) Tồn đọng luân chuyển giao/trả<br>"
              "Số cập nhật lúc chạy · trang tự làm mới mỗi 5 phút · dữ liệu làm mới ~30 phút/lần</div>")
-    P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();"
-             "document.querySelectorAll('details.bc').forEach(function(e){"
-             "e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
     P.append("</div></body></html>")
     return "\n".join(P)
 
