@@ -354,11 +354,48 @@ def build_html(entries, hub_count):
     P.append("<div class='secsub'>Đơn luân chuyển giao / trả tồn tại kho (mọi trạng thái đóng kiện)</div>")
     P += render_summary(entries, "tr", TR_TYPES, "🔁 Tổng tồn luân chuyển toàn vùng", tr=True)
 
-    # (Đã bỏ mục "🏤 Tất cả bưu cục" (chi tiết theo bưu cục) theo yêu cầu — chỉ giữ số tổng quan.)
+    # ===== DANH SÁCH BƯU CỤC (sắp theo TỔNG ĐƠN ĐỎ) =====
+    P.append("<div class='sec' id='bc'>🏤 Tất cả bưu cục (%d)</div>" % len(active))
+    P.append("<div class='secsub'>Sắp theo TỔNG ĐƠN BACKLOG nhiều → ít · bấm để xem chi tiết theo khung giờ</div>")
+    P.append("<input class='search' id='q' placeholder='🔎 Tìm bưu cục / tỉnh...' oninput='filt()'>")
+
+    def bc_sort_key(e):
+        red = red_of(e)["total"]
+        t = sec_total(e["lgt"], LGT_TYPES) + sec_total(e["tr"], TR_TYPES)
+        return (-red, -t)
+
+    for e in sorted(active, key=bc_sort_key):
+        lgt_tot = sec_total(e["lgt"], LGT_TYPES)
+        tr_tot = sec_total(e["tr"], TR_TYPES)
+        r = red_of(e)
+        u = "1" if r["total"] > 0 else "0"
+        key = _esc((e["name"] + " " + PROV_NAME.get(e["prov"], e["prov"])).lower())
+        # meta = các chỉ số đỏ khác 0
+        parts = ["%s %s" % (short, _n(r[ot])) for ot, _, short in RED_LABELS if r[ot] > 0]
+        meta = " · ".join(parts) if parts else "không có đơn backlog"
+        badge = ("<span class='pill bad'>%s</span>" % _n(r["total"])) if r["total"] > 0 \
+            else "<span class='pill mut'>0</span>"
+        P.append("<details class='bc' data-u='%s' data-k=\"%s\">" % (u, key))
+        P.append("<summary><div><div class='bcn'>%s</div><div class='bcm'>🔴 %s</div></div>"
+                 "<div class='bcr'>%s</div></summary>"
+                 % (_esc(e["name"]), meta, badge))
+        P.append("<div class='dtl'>")
+        P.append("<div class='cap'>Tổng tồn: 📦 Lấy·Giao·Trả %s · 🔁 Luân chuyển %s</div>"
+                 % (_n(lgt_tot), _n(tr_tot)))
+        if lgt_tot > 0:
+            P.append("<div class='cap'>📦 Lấy · Giao · Trả</div>")
+            P.append(render_detail_table(e["lgt"], LGT_TYPES))
+        if tr_tot > 0:
+            P.append("<div class='cap'>🔁 Luân chuyển</div>")
+            P.append(render_detail_table(e["tr"], TR_TYPES))
+        P.append("</div></details>")
 
     P.append("<div class='foot'>Nguồn: nhanh.ghn.vn · (1) Đơn tồn tại bưu cục chưa xử lý (mọi trạng thái) · "
              "(2) Tồn đọng luân chuyển giao/trả<br>"
              "Số cập nhật lúc chạy · trang tự làm mới mỗi 5 phút · dữ liệu làm mới ~30 phút/lần</div>")
+    P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();"
+             "document.querySelectorAll('details.bc').forEach(function(e){"
+             "e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
     P.append("</div></body></html>")
     return "\n".join(P)
 
