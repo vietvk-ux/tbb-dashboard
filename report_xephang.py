@@ -164,6 +164,7 @@ def build(data):
         b["sub"] = sub; b["ns"] = ns; b["codper"] = codper
         b["red"] = red_by_bc.get(bc, 0)
         b["comp"] = _composite(sub, True)
+        b["am"] = am
         x["bcs"].append(b)
 
     ams = []
@@ -258,6 +259,21 @@ def _mx(sub, ns, codper, red=None, don=None):
     return "<div class='mx'>" + " · ".join(parts) + "</div>"
 
 
+def _nv_block(nvs):
+    """Bảng nhân viên trong 1 bưu cục (đã xếp tệ→tốt, có màu nhóm-3)."""
+    P = ["<div class='sub3'>"]
+    for v in nvs:
+        kl = ("%.0f%%" % v["sub"]["kyluat"]) if v["sub"]["kyluat"] is not None else "—"
+        gtc = ("%.0f" % v["sub"]["gtc"]) if v["sub"]["gtc"] is not None else "—"
+        ns = ("%.0f" % v["ns"]) if v["ns"] is not None else "—"
+        P.append("<div class='row'><span class='nm'>%s"
+                 "<span class='mini'>GTC %s · NS %s · KL %s</span></span>"
+                 "<span class='sc-sm %s'>%s</span></div>"
+                 % (_esc(v["ten"]), gtc, ns, kl, v["color"], v["comp"]))
+    P.append("</div>")
+    return "".join(P)
+
+
 def gen_html(data):
     now = datetime.now(VN)
     P = [_HEAD, "<div class='wrap'>",
@@ -303,17 +319,26 @@ def gen_html(data):
                         _n(b["don"]), b["color"], b["comp"]))
             P.append("<div class='body'>")
             P.append(_mx(b["sub"], b["ns"], b["codper"], red=b.get("red")))
-            # NV trong BC (tệ→tốt)
-            P.append("<div class='sub3 %s' style='border-left-color:var(--line)'>" % "")
-            for v in b["nvs_sorted"]:
-                kl = ("%.0f%%" % v["sub"]["kyluat"]) if v["sub"]["kyluat"] is not None else "—"
-                gtc = ("%.0f" % v["sub"]["gtc"]) if v["sub"]["gtc"] is not None else "—"
-                ns = ("%.0f" % v["ns"]) if v["ns"] is not None else "—"
-                P.append("<div class='row'><span class='nm'>%s"
-                         "<span class='mini'>GTC %s · NS %s · KL %s</span></span>"
-                         "<span class='sc-sm %s'>%s</span></div>"
-                         % (_esc(v["ten"]), gtc, ns, kl, v["color"], v["comp"]))
-            P.append("</div></div></details>")
+            P.append(_nv_block(b["nvs_sorted"]))          # NV trong BC (tệ→tốt)
+            P.append("</div></details>")
+        P.append("</div></details>")
+
+    # ===== XẾP HẠNG BƯU CỤC TOÀN VÙNG (tệ→tốt) — màu nhóm-3 theo TẤT CẢ bưu cục =====
+    all_bc = sorted([b for a in ams for b in a["bcs_sorted"]], key=lambda b: b["comp"])
+    for i, b in enumerate(all_bc):
+        b["gcolor"] = _tcolor(i, len(all_bc))
+    P.append("<div class='sec'>🏤 Xếp hạng bưu cục toàn vùng (tệ → tốt) · bấm mở xem nhân viên</div>")
+    for i, b in enumerate(all_bc, 1):
+        prov = PROV_NAME.get(b.get("tinh"), b.get("tinh") or "")
+        P.append("<details class='%s'><summary>"
+                 "<span class='rk'>%d</span>"
+                 "<span class='nm'>%s<span class='s2'>%s · %s · %d NV · %s đơn</span></span>"
+                 "<span class='score %s'>%s</span></summary>"
+                 % (b["gcolor"], i, _esc(b["bc"]), _esc(b.get("am") or "—"), _esc(prov),
+                    len(b["nvs_sorted"]), _n(b["don"]), b["gcolor"], b["comp"]))
+        P.append("<div class='body'>")
+        P.append(_mx(b["sub"], b["ns"], b["codper"], red=b.get("red")))
+        P.append(_nv_block(b["nvs_sorted"]))
         P.append("</div></details>")
 
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
