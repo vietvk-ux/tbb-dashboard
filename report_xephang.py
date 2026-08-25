@@ -11,10 +11,22 @@ Cấp NV không có Tồn đỏ → chuẩn hoá lại 4 chỉ số còn lại.
 from __future__ import annotations
 import html
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 from report_trend import _get_all
 from am_map import AM_OF
+
+
+def _month_range(today, offset):
+    """offset 0 = tháng hiện tại, -1 = tháng trước. → (ngày đầu, ngày cuối, tháng, năm)."""
+    y, m = today.year, today.month + offset
+    while m < 1:
+        m += 12; y -= 1
+    while m > 12:
+        m -= 12; y += 1
+    first = date(y, m, 1)
+    nxt = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
+    return first, nxt - timedelta(days=1), m, y
 
 VN = timezone(timedelta(hours=7))
 PROV_NAME = {"LCA": "Lào Cai", "YBA": "Yên Bái", "SLA": "Sơn La",
@@ -81,19 +93,23 @@ def _tcolor(idx, n):
     return "bad" if frac < 1 / 3 else ("warn" if frac < 2 / 3 else "good")
 
 
-def fetch():
+def fetch(offset=0):
+    """offset 0 = tháng hiện tại, -1 = tháng trước."""
     url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
     key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
            or os.environ.get("SUPABASE_ANON_KEY", "").strip())
     if not (url and key):
         return None
     today = datetime.now(VN).date()
-    since = today.replace(day=1).isoformat()   # từ NGÀY 1 THÁNG HIỆN TẠI (tự reset đầu tháng)
-    nv = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=ngay,driver_id,buu_cuc,tinh,"
-                  "ten_nv,don_giao,gtc,gtb,cod_gtb,gio_xuat_phat,xuat_phat_muon" % since)
-    # Tồn đỏ = SNAPSHOT MỚI NHẤT (đơn đỏ là tồn hiện tại, không cộng dồn theo tháng) — lookback 10 ngày
-    td_since = (today - timedelta(days=10)).isoformat()
-    td_all = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,buu_cuc,order_type,g_red" % td_since)
+    first, last, m, y = _month_range(today, offset)
+    since = first.isoformat()
+    until = min(last, today).isoformat()       # không lấy tương lai
+    nv = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&ngay=lte.%s&select=ngay,driver_id,buu_cuc,"
+                  "tinh,ten_nv,don_giao,gtc,gtb,cod_gtb,gio_xuat_phat,xuat_phat_muon" % (since, until))
+    # Tồn đỏ = SNAPSHOT (tồn hiện tại, không cộng dồn): tháng này = mới nhất; tháng trước = cuối tháng đó.
+    td_since = (first - timedelta(days=3)).isoformat()
+    td_all = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&ngay=lte.%s&select=ngay,buu_cuc,order_type,g_red"
+                      % (td_since, until))
     latest = max((r["ngay"] for r in td_all), default=None)
     red_by_bc = {}
     for r in td_all:
@@ -101,7 +117,7 @@ def fetch():
             continue
         red_by_bc[r["buu_cuc"]] = red_by_bc.get(r["buu_cuc"], 0) + (r.get("g_red") or 0)
     return {"nv": nv, "red_by_bc": red_by_bc, "since": since, "td_day": latest,
-            "month": today.month, "year": today.year}
+            "month": m, "year": y}
 
 
 def _agg0(tinh=None, bc=None):
@@ -247,7 +263,24 @@ details[open]{background:var(--card2)}
 .eod .arw{color:#aeb6e0;font-size:12px;font-weight:600}
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:20px 0 4px}
 .empty{color:var(--mut);text-align:center;padding:30px 20px;font-size:13px}
+.mtoggle{display:flex;gap:8px;margin:2px 0 12px}
+.mt{flex:1;text-align:center;padding:10px;border-radius:12px;text-decoration:none;font-weight:700;font-size:13px;
+color:var(--mut);background:var(--card);border:1px solid var(--line)}
+.mt.on{color:var(--txt);background:linear-gradient(135deg,#20264a,#191f38);border-color:#3a4470}
 </style></head><body>"""
+
+
+def write_pages(outdir):
+    """Sinh xephang.html (tháng này) + xephang_prev.html (tháng trước) + nút chuyển."""
+    today = datetime.now(VN).date()
+    _, _, cm, _ = _month_range(today, 0)
+    _, _, pm, _ = _month_range(today, -1)
+    lc = [("📅 Tháng %d" % cm, "xephang.html", True), ("Tháng %d" % pm, "xephang_prev.html", False)]
+    lp = [("Tháng %d" % cm, "xephang.html", False), ("📅 Tháng %d" % pm, "xephang_prev.html", True)]
+    with open(os.path.join(outdir, "xephang.html"), "w", encoding="utf-8") as f:
+        f.write(gen_html(fetch(0), lc))
+    with open(os.path.join(outdir, "xephang_prev.html"), "w", encoding="utf-8") as f:
+        f.write(gen_html(fetch(-1), lp))
 
 
 def _mx(sub, ns, codper, red=None, don=None):
@@ -278,15 +311,26 @@ def _nv_block(nvs):
     return "".join(P)
 
 
-def gen_html(data):
+def _toggle(links):
+    if not links:
+        return ""
+    P = ["<div class='mtoggle'>"]
+    for label, url, active in links:
+        P.append("<a class='mt%s' href='%s'>%s</a>" % (" on" if active else "", url, _esc(label)))
+    P.append("</div>")
+    return "".join(P)
+
+
+def gen_html(data, links=None):
     now = datetime.now(VN)
     P = [_HEAD, "<div class='wrap'>",
          "<header class='top'><div class='brand'>🏆 XẾP HẠNG TỔNG HỢP</div>"
-         "<div class='ts'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m")]
+         "<div class='ts'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m"),
+         _toggle(links)]
     ams = build(data) if data else []
     if not ams:
-        P.append("<div class='empty'>⚙️ Chưa đủ dữ liệu Supabase để xếp hạng.<br>"
-                 "Số liệu lưu mỗi tối — quay lại sau vài ngày.</div></div></body></html>")
+        P.append("<div class='empty'>📅 Tháng này chưa có dữ liệu để xếp hạng.<br>"
+                 "Chọn tháng khác ở nút trên, hoặc quay lại sau vài ngày.</div></div></body></html>")
         return "\n".join(P)
 
     n_bc = sum(len(a["bcs_sorted"]) for a in ams)
