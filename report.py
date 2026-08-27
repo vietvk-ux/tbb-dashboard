@@ -14,6 +14,9 @@ from datetime import date, datetime, timedelta
 EOD_TRIP_CUTOFF_HOUR = int(os.environ.get("EOD_TRIP_CUTOFF_HOUR", "10") or "10")
 # Xuất phát MUỘN nếu chuyến đầu tiên trong ngày bắt đầu từ giờ này (VN) trở đi.
 EOD_LATE_START_HOUR = int(os.environ.get("EOD_LATE_START_HOUR", "9") or "9")
+# NGÀY VẬN HÀNH 10h→10h: gộp chuyến của ngày D đóng sau nửa đêm (endDateIndex=D+1, <10h)
+# để không rơi số. Chỉ dùng khi CHỐT ngày D vào sáng D+1 (đủ dữ liệu). Mặc định TẮT.
+EOD_OPERATING_DAY = os.environ.get("EOD_OPERATING_DAY", "").strip().lower() in ("1", "true", "yes")
 
 
 def _vn_time(ts):
@@ -87,7 +90,7 @@ async def _get_hubs(session, token):
     return [h for h in (d.get("data") or []) if any(p in (h.get("locationName") or "") for p in TBB_PREFIXES)]
 
 
-async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem):
+async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem, next_ymd=None):
     async with sem:
         d = await _post(session, "/lastmile/trip/get-trip-list-by-hub", {
             "hub_id": str(hub_id), "status": "FINISHED",
@@ -95,13 +98,20 @@ async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem):
         }, hub_id, token)
     # GIỮ mọi chuyến FINISHED hôm nay để đọc GIỜ XUẤT PHÁT thật; đánh dấu after_cutoff
     # (kết thúc ≥10h) — chỉ chuyến after_cutoff mới bóc item & tính %GTC như cũ.
-    return [{"tripCode": t["tripCode"], "hub_id": hub_id, "bc": hub_name,
-             "driver_id": t.get("driverId") or "", "driver_name": t.get("driverName") or "—",
-             "start_time": t.get("startTime"), "end_time": t.get("endTime"),
-             "start_date_index": t.get("startDateIndex"),
-             "after_cutoff": _ended_after_cutoff(t.get("endTime"))}
-            for t in (d.get("data") or [])
-            if t.get("endDateIndex") == yyyymmdd]
+    # NGÀY VẬN HÀNH (next_ymd đặt): thêm chuyến của HÔM NAY đóng SAU NỬA ĐÊM (endDateIndex
+    #   = ngày mai, kết thúc <10h) — coi như after_cutoff=True để KHÔNG rơi khỏi báo cáo.
+    out = []
+    for t in (d.get("data") or []):
+        edi = t.get("endDateIndex")
+        base = {"tripCode": t["tripCode"], "hub_id": hub_id, "bc": hub_name,
+                "driver_id": t.get("driverId") or "", "driver_name": t.get("driverName") or "—",
+                "start_time": t.get("startTime"), "end_time": t.get("endTime"),
+                "start_date_index": t.get("startDateIndex")}
+        if edi == yyyymmdd:
+            out.append({**base, "after_cutoff": _ended_after_cutoff(t.get("endTime"))})
+        elif next_ymd and edi == next_ymd and not _ended_after_cutoff(t.get("endTime")):
+            out.append({**base, "after_cutoff": True})   # đóng sau nửa đêm → tính vào hôm nay
+    return out
 
 
 async def _fetch_all_items(session, token, hub_id, trip_code):
@@ -141,13 +151,18 @@ async def _trip_items(session, token, hub_id, trip_code, sem):
 
 async def fetch_report(token, target_date):
     yyyymmdd = target_date.year * 10000 + target_date.month * 100 + target_date.day
+    next_ymd = None
+    if EOD_OPERATING_DAY:
+        nd = target_date + timedelta(days=1)
+        next_ymd = nd.year * 10000 + nd.month * 100 + nd.day
+        logger.info("NGÀY VẬN HÀNH 10h→10h bật — gộp chuyến %s đóng sau nửa đêm (endDate=%s <10h)", yyyymmdd, next_ymd)
     sem = asyncio.Semaphore(CONCURRENCY)
     timeout = aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=30)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         hubs = await _get_hubs(session, token)
         logger.info("Fetched %d hubs TBB", len(hubs))
         trip_lists = await asyncio.gather(*[
-            _finished_trips(session, token, h["locationCode"], h["locationName"], yyyymmdd, sem)
+            _finished_trips(session, token, h["locationCode"], h["locationName"], yyyymmdd, sem, next_ymd)
             for h in hubs
         ])
         all_trips = [t for lst in trip_lists for t in lst]

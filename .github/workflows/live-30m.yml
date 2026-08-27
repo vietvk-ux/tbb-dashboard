@@ -15,6 +15,10 @@ on:
         description: 'Gửi GTalk khi tạo eod? 1=có, 0=không'
         required: false
         default: '1'
+      opday:
+        description: 'Ngày vận hành 10h→10h (gộp chuyến đóng sau nửa đêm)? 1=có. Chỉ dùng khi chốt ngày cũ (sáng hôm sau)'
+        required: false
+        default: ''
   schedule:
     # Mỗi 15' trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h).
     # Đây chỉ là BACKUP — lịch chính do cron-job.org kích (GitHub schedule hay bỏ lượt).
@@ -68,6 +72,7 @@ jobs:
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           EOD_DATE: ${{ github.event.inputs.eod_date }}
+          EOD_OPERATING_DAY: ${{ github.event.inputs.opday }}
           DASH_SLUG: 9c7e4b21a6f0
           DASH_URL: https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html
           DASH_SEND: '0'   # eod.html chỉ cập nhật trang, KHÔNG gửi nhóm (tránh trùng với 'Tổng quan cuối ngày' 23:05)
