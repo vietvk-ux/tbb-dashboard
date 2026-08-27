@@ -11,6 +11,7 @@ import asyncio
 import html
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
@@ -78,12 +79,20 @@ def _cls(p):
     return "bad" if p < 60 else ("warn" if p < 80 else "good")
 
 
-def _get(url, key, path):
+def _get(url, key, path, tries=3):
     ep = "%s/rest/v1/%s" % (url.rstrip("/"), path)
     h = {"apikey": key, "Authorization": "Bearer " + key}
-    r = requests.get(ep, headers=h, timeout=60)
-    r.raise_for_status()
-    return r.json()
+    last = None
+    for i in range(tries):
+        try:
+            r = requests.get(ep, headers=h, timeout=(15, 90))  # (connect, read)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last = e
+            if i < tries - 1:
+                time.sleep(2 * (i + 1))   # backoff 2s, 4s
+    raise last
 
 
 def _get_safe(url, key, path):
@@ -613,6 +622,24 @@ def gen_transit_html(transit):
     return "\n".join(P)
 
 
+def _preserve_or(outdir, fn, fallback_html):
+    """Supabase lỗi → GIỮ trang LIVE đang tốt (không đè trắng); nếu live cũng hỏng → ghi fallback.
+    Trả True nếu giữ được bản live tốt."""
+    base = "https://vietvk-ux.github.io/tbb-dashboard/%s/" % os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
+    try:
+        r = requests.get(base + fn, timeout=30)
+        bad = ("Chưa cấu hình" in r.text) or ("chưa có dữ liệu" in r.text.lower())
+        if r.status_code == 200 and not bad and len(r.text) > 800:
+            with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
+                f.write(r.text)
+            return True
+    except Exception:
+        pass
+    with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
+        f.write(fallback_html)
+    return False
+
+
 def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
@@ -624,19 +651,42 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
+    # Kho chuyển tiếp dùng dữ liệu LIVE nhanh.ghn.vn (độc lập Supabase) — luôn tạo.
     transit = fetch_transit()
+    with open(os.path.join(outdir, "khochuyentiep.html"), "w", encoding="utf-8") as f:
+        f.write(gen_transit_html(transit))
+
+    if data is None:
+        # Supabase timeout/lỗi → KHÔNG đè trắng: giữ trang cũ đang LIVE (trend/nhanvien/xephang).
+        k1 = _preserve_or(outdir, "trend.html", gen_html(None))
+        k2 = _preserve_or(outdir, "nhanvien.html", gen_nhanvien_html(None))
+        try:
+            import report_xephang
+            ph = report_xephang.gen_html(None)
+            _preserve_or(outdir, "xephang.html", ph)
+            _preserve_or(outdir, "xephang_prev.html", ph)
+        except Exception:
+            pass
+        logger.warning("Supabase None — GIỮ trang cũ (trend giữ=%s · nhanvien giữ=%s).", k1, k2)
+        return
+
     with open(os.path.join(outdir, "trend.html"), "w", encoding="utf-8") as f:
         f.write(gen_html(data))
     with open(os.path.join(outdir, "nhanvien.html"), "w", encoding="utf-8") as f:
         f.write(gen_nhanvien_html(data))
-    with open(os.path.join(outdir, "khochuyentiep.html"), "w", encoding="utf-8") as f:
-        f.write(gen_transit_html(transit))
     # Trang xếp hạng tổng hợp (scorecard AM→BC→NV) — tháng này + tháng trước
     try:
         import report_xephang
         report_xephang.write_pages(outdir)
     except Exception as e:
-        logger.warning("Tạo xephang.html lỗi (bỏ qua): %s", str(e)[:150])
+        logger.warning("Tạo xephang.html lỗi — GIỮ trang cũ: %s", str(e)[:150])
+        try:
+            import report_xephang
+            ph = report_xephang.gen_html(None)
+            _preserve_or(outdir, "xephang.html", ph)
+            _preserve_or(outdir, "xephang_prev.html", ph)
+        except Exception:
+            pass
     logger.info("Đã tạo trend + nhanvien + khochuyentiep.html (%d ngày · transit %s kho).",
                 len(data["vung"]) if data and data.get("vung") else 0,
                 len(transit) if transit else 0)
