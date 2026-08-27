@@ -15,7 +15,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
-from report import _get_hubs, _post, _fetch_all_items, CONCURRENCY, TokenExpiredError, _vn_time
+from report import _get_hubs, _post, _fetch_all_items, CONCURRENCY, TokenExpiredError, _vn_time, _ended_after_cutoff
 from am_map import AM_OF
 
 logger = logging.getLogger("live")
@@ -109,7 +109,10 @@ async def fetch_live(token):
                                         hid, token)
                     return r.get("data") or []
                 ontrip = await _list("ON_TRIP")
-                fin = [t for t in await _list("FINISHED") if t.get("endDateIndex") == ymd]
+                # Chỉ tính chuyến kết thúc ≥10h VN của HÔM NAY → loại chuyến hôm qua đóng
+                # sau nửa đêm (endDateIndex=hôm nay, <10h) khỏi số "trực tiếp hôm nay".
+                fin = [t for t in await _list("FINISHED")
+                       if t.get("endDateIndex") == ymd and _ended_after_cutoff(t.get("endTime"))]
 
                 def _drv0(did, dn):
                     return {"id": did, "name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0,
