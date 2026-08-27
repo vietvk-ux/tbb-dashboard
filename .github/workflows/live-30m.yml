@@ -23,6 +23,8 @@ on:
     # Mỗi 15' trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h).
     # Đây chỉ là BACKUP — lịch chính do cron-job.org kích (GitHub schedule hay bỏ lượt).
     - cron: '*/15 23,0-16 * * *'
+    # Slot CHỐT EOD muộn nhất: VN 23:59 (UTC 16:59) — chạy dữ liệu tới cuối ngày.
+    - cron: '59 16 * * *'
 
 permissions:
   contents: read
@@ -58,16 +60,16 @@ jobs:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_backlog_web.py
-      - name: Xác định EOD window (VN 23:25–23:44 → chỉ slot ~23:30)
+      - name: Xác định EOD window (VN 23:45–23:59 → chốt cuối ngày, chạy dữ liệu muộn nhất)
         id: eodwin
         run: |
           VNH=$(TZ=Asia/Ho_Chi_Minh date +%H); VNM=$(TZ=Asia/Ho_Chi_Minh date +%M)
-          if [ "${{ github.event.inputs.force_eod }}" = "1" ] || { [ "$VNH" = "23" ] && [ "$VNM" -ge 25 ] && [ "$VNM" -le 44 ]; }; then
+          if [ "${{ github.event.inputs.force_eod }}" = "1" ] || { [ "$VNH" = "23" ] && [ "$VNM" -ge 45 ]; }; then
             echo "iseod=1" >> "$GITHUB_OUTPUT"; echo "→ EOD: tạo eod.html"
           else
             echo "iseod=0" >> "$GITHUB_OUTPUT"; echo "→ slot thường: giữ eod.html cũ"
           fi
-      - name: EOD ~23:30 — CHỈ tạo eod.html (KHÔNG gửi nhóm; tin cuối ngày đã có 'Tổng quan cuối ngày' 23:05)
+      - name: EOD ~23:59 — CHỈ tạo eod.html (KHÔNG gửi nhóm; tin cuối ngày đã có 'Tổng quan cuối ngày' 23:05)
         if: steps.eodwin.outputs.iseod == '1'
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
