@@ -292,9 +292,9 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ Giao TC</div></div>" % _n(g["success"]))
     vngh_gtc = g.get("vngh_gtc")
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🛍️ TikTok gán</div></div>" % _n(g.get("vngh_total", 0)))
-    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(g.get("ltc", 0)))
     P.append("<div class='st'><div class='sv %s'>%s</div><div class='sl'>🛍️ %%GTC TikTok</div></div>"
              % (_cls(vngh_gtc), ("%s%%" % vngh_gtc) if vngh_gtc is not None else "—"))
+    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(g.get("ltc", 0)))
     P.append("</section>")
 
     # ===== Banner chưa gán giao =====
