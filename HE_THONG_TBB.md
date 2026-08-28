@@ -1,7 +1,7 @@
 # HỆ THỐNG BÁO CÁO VẬN HÀNH VÙNG TÂY BẮC BỘ (TBB) — GHN
 
 Tài liệu tổng hợp để **tiếp tục làm việc ở phiên sau / trên máy khác**. Repo: `vietvk-ux/tbb-dashboard` (public). Chủ: Vũ Khắc Việt (vietvk@ghn.vn) — GĐV Vùng TBB.
-Cập nhật gần nhất: 25/08/2026.
+Cập nhật gần nhất: 28/08/2026.
 
 > Nguyên tắc bảo mật: KHÔNG in/echo/commit giá trị `NHANH_TOKEN`, `SUPABASE_SERVICE_KEY`, `GTALK_OA_TOKEN`, PAT. Đặt qua `gh secret set` / GitHub Actions secrets. Dữ liệu số KHÔNG lưu trong repo — chỉ deploy lên GitHub Pages + Supabase.
 
@@ -152,3 +152,12 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 - `nhanvien.html`: bỏ "Xếp hạng %GTC tháng", thay bằng "Năng suất Nay−TB" (đơn GTC ngày gần nhất vs TB chính NV, lọc >30 đơn, top 15 bứt phá/sa sút).
 - Supabase: cột kỷ luật ra hàng (`gio_xuat_phat/gio_ket_thuc/thoi_luong_phut/xuat_phat_muon` ở `bao_cao_nhan_vien`; `gio_xuat_phat_tb/so_nv_muon` ở `bao_cao_vung`) — migration `supabase_migration_kyluat.sql` đã chạy, backfill 21–22/08.
 - Theo dõi dung lượng Supabase (task nhắc 20/09; giữ retention 60 ngày).
+
+### Nhật ký 25–28/08
+- **Xếp hạng (`xephang.html`)**: trọng số user chỉnh 25/08 = %GTC 35 · Năng suất 20 · **Tồn đỏ 20 · COD 15 · Kỷ luật 10** (dict `W`). Cửa sổ đổi sang **THÁNG dương lịch** (`fetch(offset)`, ngày 1 → nay, tự reset đầu tháng) + **nút xem tháng trước** (`write_pages` sinh `xephang.html` + `xephang_prev.html`, toggle `.mtoggle`). Thêm mục **"🏤 Xếp hạng bưu cục TOÀN VÙNG"** (54 BC phẳng, màu nhóm-3 theo tất cả BC, drill NV).
+- **Tồn đọng (`backlog.html`)**: BỎ "Top bưu cục >120h" + "Theo AM" ở 2 mục **Lấy·Giao·Trả** và **Luân chuyển** (chỉ giữ hero + khung giờ + theo loại). GIỮ Top BC + Theo AM ở mục **Đơn backlog (đơn đỏ)** + mục "🏤 Tất cả bưu cục" (danh sách + tìm kiếm).
+- **LỖI EOD UNDERCOUNT (27/08)**: chuyến của ngày D đóng SAU nửa đêm → `endDateIndex=D+1` + <10h → rơi khỏi cả 2 báo cáo (26/08 hụt 185 NV: 21k thay vì ~37.8k). Fix opt-in: env `EOD_OPERATING_DAY=1` (mặc định TẮT — automation 23:30 KHÔNG đổi) → `_finished_trips(...,next_ymd)` gộp chuyến `endDate=D+1` <10h. Input `opday` cho `live-30m.yml` để chốt lại 1 ngày cũ: `gh workflow run live-30m.yml -f force_eod=1 -f eod_date=YYYY-MM-DD -f opday=1 -f send=0`. (User giữ mốc chốt 23:30, không đổi lịch.)
+- **TRANG TRỰC TIẾP lọc 10h (27/08)**: `report_live.fetch_live` nay lọc FINISHED bằng `_ended_after_cutoff` (≥10h) → không lẫn chuyến hôm qua đóng sau nửa đêm vào số "hôm nay". Ảnh hưởng index + chuyendi + chỉ số TikTok.
+- **CHỐNG TRẮNG TRANG Supabase (27/08)**: `report_trend._get` retry 3× + timeout (15,90); `report_trend.main` khi fetch Supabase lỗi → GIỮ trang cũ (`_preserve_or`) thay vì đè "Chưa cấu hình". (trend/nhanvien/xephang.)
+- **CHUYENDI đổi cột Scan → %GTC (27/08)**: `isScanned=True` thực chất ⟺ đơn giao HỎNG đã quét (không phải "cầm hàng") → cột "Scan" đổi thành **%GTC** (gtc/total, màu đỏ<60/vàng<80/xanh≥80, `GTC_MIN=60`). Mục "🏃 đang chạy" gộp **AM → bưu cục → nhân viên** (drill) thay bảng phẳng.
+- **EOD dải chỉ số (28/08)**: bỏ 2 thẻ GTB & COD GTB khỏi strip, thêm **🛍️ TikTok gán** (`vngh_total`) + **🛍️ %GTC TikTok** (`vngh_gtc`). Thứ tự: Đơn giao · Giao TC · TikTok gán · %GTC TikTok · LTC. (Hero + mục "nguy hiểm COD" vẫn giữ GTB/COD.)
