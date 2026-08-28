@@ -17,18 +17,14 @@ def _n(x):
     return "{:,}".format(int(x or 0)).replace(",", ".")
 
 
-def _bucket_row(bk):
-    """Format bucket dict {'<24h':X, '24-72h':X, '72-120h':X, '>120h':X}.
-    🟠 cam = 24h-120h (cần xử lý sớm) · 🔴 đỏ = >120h (xử lý ngay)."""
-    lt24 = bk.get("<24h", 0)
-    _24_72 = bk.get("24–72h", 0)
-    _72_120 = bk.get("72–120h", 0)
-    gt120 = bk.get(">120h", 0)
-    # Cam nếu bucket 24-72 hoặc 72-120 > 0
-    mid_24_72 = f"🟠 **{_n(_24_72)}**" if _24_72 > 0 else _n(_24_72)
-    mid_72_120 = f"🟠 **{_n(_72_120)}**" if _72_120 > 0 else _n(_72_120)
-    tail = f"🔴 >120h: **{_n(gt120)}**" if gt120 > 0 else f">120h: {_n(gt120)}"
-    return f"   `<24h:` {_n(lt24)} · `24-72h:` {mid_24_72} · `72-120h:` {mid_72_120} · {tail}"
+def _bucket_lines(bk):
+    """Trả list 4 dòng, mỗi bucket 1 dòng. Màu: 🟢 <24h · 🟡 24–72h · 🟠 72–120h · 🔴 >120h."""
+    return [
+        f"  🟢 <24h: **{_n(bk.get('<24h', 0))}**",
+        f"  🟡 24–72h: **{_n(bk.get('24–72h', 0))}**",
+        f"  🟠 72–120h: **{_n(bk.get('72–120h', 0))}**",
+        f"  🔴 >120h: **{_n(bk.get('>120h', 0))}**",
+    ]
 
 
 def build_msg(transit):
@@ -71,10 +67,11 @@ def build_msg(transit):
             "━━━━━━━━━━━━━━━━━━━━━━",
             f"▶️ 📦 **KHO {t['name'].upper()}**",
             "━━━━━━━━━━━━━━━━━━━━━━",
-            f"🚚 LC giao ({_n(t['giao'])} đơn)",
-            _bucket_row(t["giao_g"]),
-            f"↩️ LC trả ({_n(t['tra'])} đơn)",
-            _bucket_row(t["tra_g"]),
+            f"🚚 LC giao: **{_n(t['giao'])}** đơn",
+            *_bucket_lines(t["giao_g"]),
+            "",
+            f"↩️ LC trả: **{_n(t['tra'])}** đơn",
+            *_bucket_lines(t["tra_g"]),
             "",
         ]
 
