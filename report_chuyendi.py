@@ -4,7 +4,7 @@ Dùng lại `rows` từ report_live.fetch_live (mỗi driver đã có st/en/scan
 fetch lại. report_live.main() gọi gen_html() và ghi docs/<slug>/chuyendi.html.
 
 Chỉ số: giờ xuất phát (chuyến bắt đầu hôm nay) → giờ đóng chuyến muộn nhất, thời
-lượng, đơn/giờ (GTC ÷ giờ làm), đơn/chuyến, % đã scan, tiến độ chuyến đang chạy.
+lượng, đơn/giờ (GTC ÷ giờ làm), đơn/chuyến, %GTC (giao thành công/tổng), tiến độ chuyến đang chạy.
 """
 from __future__ import annotations
 from datetime import datetime
@@ -16,7 +16,7 @@ from am_map import AM_OF
 # đặt ngưỡng theo phân phối thật để không gắn cờ cả vùng).
 DPH_MIN = 2.5      # đơn/giờ dưới mức này = chậm (đáy phân phối)
 LATE_H = 9         # xuất phát từ 9h = muộn
-SCAN_MIN = 40      # % đã scan rất thấp mới cảnh báo (vùng dùng scan không đều)
+GTC_MIN = 60       # %GTC dưới mức này = kém (cảnh báo)
 MIN_ORDERS = 10    # tối thiểu đơn để vào bảng hiệu suất (tránh nhiễu mẫu nhỏ)
 
 # CSS bổ sung (report_live._CSS thiếu các class này)
@@ -53,19 +53,26 @@ def _metrics(d, bc, prov):
     gtc = d.get("gtc", 0)
     dph = round(gtc / span_h, 1) if (span_h and span_h > 0) else None
     start_h = st.hour + st.minute / 60 if st else None
-    scan_tot = d.get("scan_tot", 0)
-    scan_pct = round(d.get("scan_ok", 0) * 100 / scan_tot) if scan_tot else None
+    total = d.get("total", 0)
+    gtc_pct = round(gtc * 100 / total) if total else None
     chuyen = d.get("chuyen", 0)
-    dpc = round(d.get("total", 0) / chuyen) if chuyen else 0
+    dpc = round(total / chuyen) if chuyen else 0
     late = start_h is not None and start_h >= LATE_H
     return {
         "name": d.get("name"), "bc": bc, "prov": prov, "chuyen": chuyen,
-        "total": d.get("total", 0), "gtc": gtc, "dpc": dpc, "dph": dph,
+        "total": total, "gtc": gtc, "dpc": dpc, "dph": dph,
         "start": st.strftime("%H:%M") if st else None,
         "end": en.strftime("%H:%M") if en else None,
-        "start_h": start_h, "span_h": span_h, "scan_pct": scan_pct, "late": late,
+        "start_h": start_h, "span_h": span_h, "gtc_pct": gtc_pct, "late": late,
         "ot_done": d.get("ot_done", 0), "ot_tot": d.get("ot_tot", 0),
     }
+
+
+def _gtc_cls(p):
+    """Màu theo chuẩn %GTC toàn dashboard: đỏ <60 · vàng <80 · xanh ≥80."""
+    if p is None:
+        return "na"
+    return "bad" if p < 60 else ("warn" if p < 80 else "good")
 
 
 def _flags(m):
@@ -74,26 +81,25 @@ def _flags(m):
         fl.append("muộn")
     if m["dph"] is not None and m["dph"] < DPH_MIN:
         fl.append("chậm")
-    if m["scan_pct"] is not None and m["scan_pct"] < SCAN_MIN:
-        fl.append("scan")
+    if m["gtc_pct"] is not None and m["gtc_pct"] < GTC_MIN:
+        fl.append("%GTC kém")
     return fl
 
 
-def _row(i, m, show_scan=True, show_flags=True):
+def _row(i, m, show_gtc=True, show_flags=True):
     fl = _flags(m) if show_flags else []
     flg = ("<div class='flags'>⚠ %s</div>" % " · ".join(fl)) if fl else ""
     dph = ("<span class='pill sm %s'>%s</span>"
            % (_dph_cls(m["dph"]), str(m["dph"]).replace(".", ",") if m["dph"] is not None else "—"))
     win = ("%s→%s" % (m["start"] or "—", m["end"] or "—"))
-    scan = ""
-    if show_scan:
-        sc = m["scan_pct"]
-        scls = "na" if sc is None else ("good" if sc >= 70 else ("warn" if sc >= SCAN_MIN else "bad"))
-        scan = "<td class='%s'>%s</td>" % (scls, ("%d%%" % sc) if sc is not None else "—")
+    gcell = ""
+    if show_gtc:
+        p = m["gtc_pct"]
+        gcell = "<td class='%s'>%s</td>" % (_gtc_cls(p), ("%d%%" % p) if p is not None else "—")
     return ("<tr><td class='rk'>%d</td><td class='nv'>%s<div class='sc'>%s</div>%s</td>"
             "<td>%s</td><td>%s</td><td>%s</td><td class='win'>%s</td>%s</tr>"
             % (i, _esc(m["name"]), _esc(m["bc"]), flg, _n(m["chuyen"]), _n(m["dpc"]),
-               dph, win, scan))
+               dph, win, gcell))
 
 
 def gen_html(rows):
@@ -110,7 +116,7 @@ def gen_html(rows):
     # để loại chuyến lẻ buổi sáng gây đơn/giờ ảo.
     eff = [m for m in drv if _is_done_eff(m)]
     timed = [m for m in drv if m["start_h"] is not None]
-    # Cần chú ý = NV đã đóng chuyến nhưng đơn/giờ ĐÁY (chậm). Muộn/scan chỉ là badge.
+    # Cần chú ý = NV đã đóng chuyến nhưng đơn/giờ ĐÁY (chậm). Muộn/%GTC kém chỉ là badge.
     can_chu_y = sorted([m for m in eff if m["dph"] < DPH_MIN], key=lambda x: x["dph"])
     hi = sorted([m for m in eff if m["total"] >= 20], key=lambda x: -x["dph"])
     dang_chay = sorted([m for m in drv if m["ot_tot"] > 0], key=lambda x: -x["ot_tot"])
@@ -120,9 +126,8 @@ def gen_html(rows):
     active = sum(1 for m in drv if m["total"] > 0 or m["chuyen"] > 0)
     sum_gtc = sum(m["gtc"] for m in eff); sum_h = sum(m["span_h"] for m in eff)
     dph_vung = round(sum_gtc / sum_h, 1) if sum_h else None
-    scan_ok = sum(r_d.get("scan_ok", 0) for r in rows for r_d in r.get("drivers", []))
-    scan_tot = sum(r_d.get("scan_tot", 0) for r in rows for r_d in r.get("drivers", []))
-    scan_vung = round(scan_ok * 100 / scan_tot) if scan_tot else None
+    reg_gtc = sum(m["gtc"] for m in drv); reg_tot = sum(m["total"] for m in drv)
+    gtc_vung = round(reg_gtc * 100 / reg_tot) if reg_tot else None
     avg_h = sum(m["start_h"] for m in timed) / len(timed) if timed else None
     xp_tb = ("%02d:%02d" % (int(avg_h), round((avg_h - int(avg_h)) * 60))) if avg_h is not None else "—"
 
@@ -149,21 +154,21 @@ def gen_html(rows):
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>⚡ Đơn/giờ TB</div></div>"
              % (str(dph_vung).replace(".", ",") if dph_vung is not None else "—"))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🕗 Giờ XP TB</div></div>" % xp_tb)
-    P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>📷 Đã scan</div></div>"
-             % (("%d%%" % scan_vung) if scan_vung is not None else "—"))
+    P.append("<div class='st'><div class='sv %s'>%s</div><div class='sl'>🎯 %%GTC vùng</div></div>"
+             % (_gtc_cls(gtc_vung), ("%d%%" % gtc_vung) if gtc_vung is not None else "—"))
     P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🐢 Cần chú ý</div></div>" % len(can_chu_y))
     P.append("<div class='st'><div class='sv'>%d</div><div class='sl'>🏃 Đang chạy</div></div>" % len(dang_chay))
     P.append("</section>")
 
     thead = ("<table class='drv'><thead><tr><th class='rk'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
-             "<th>Ch</th><th>Đơn/ch</th><th>Đơn/giờ</th><th>XP→Đóng</th><th>Scan</th></tr></thead><tbody>")
+             "<th>Ch</th><th>Đơn/ch</th><th>Đơn/giờ</th><th>XP→Đóng</th><th>%GTC</th></tr></thead><tbody>")
 
     # 🔴 NV cần chú ý
     P.append("<div class='sec' style='color:var(--bad)'>🔴 NV cần chú ý — hiệu suất chuyến đi thấp</div>")
     P.append("<section class='card'>")
     P.append("<div class='note'>NV <b>đã đóng chuyến</b>, xếp theo <b>đơn/giờ thấp nhất</b> (&lt; %s). "
-             "Badge ⚠ nếu kèm <b>xuất phát muộn ≥%dh</b> / <b>scan &lt;%d%%</b>.</div>"
-             % (str(DPH_MIN).replace(".", ","), LATE_H, SCAN_MIN))
+             "Badge ⚠ nếu kèm <b>xuất phát muộn ≥%dh</b> / <b>%%GTC &lt;%d%%</b>.</div>"
+             % (str(DPH_MIN).replace(".", ","), LATE_H, GTC_MIN))
     if can_chu_y:
         P.append(thead)
         for i, m in enumerate(can_chu_y[:25], 1):
@@ -212,9 +217,9 @@ def gen_html(rows):
                          str(dpha).replace(".", ",") if dpha is not None else "—", x["late"]))
             ds = sorted(x["drv"], key=lambda m: (0, m["dph"]) if _is_done_eff(m) else (1, 999))
             P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>Đơn/giờ</th>"
-                     "<th>XP</th><th>Scan</th></tr></thead><tbody>")
+                     "<th>XP</th><th>%GTC</th></tr></thead><tbody>")
             for m in ds:
-                sc = m["scan_pct"]
+                p = m["gtc_pct"]
                 if _is_done_eff(m):
                     dcell = "<span class='pill sm %s'>%s</span>" % (_dph_cls(m["dph"]), str(m["dph"]).replace(".", ","))
                 elif m["ot_tot"] > 0:
@@ -222,10 +227,10 @@ def gen_html(rows):
                 else:
                     dcell = "—"
                 P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td>"
-                         "<td class='%s'>%s</td><td>%s</td></tr>"
+                         "<td class='%s'>%s</td><td class='%s'>%s</td></tr>"
                          % (_esc(m["name"]), _n(m["total"]), dcell,
                             "bad" if m["late"] else "", m["start"] or "—",
-                            ("%d%%" % sc) if sc is not None else "—"))
+                            _gtc_cls(p), ("%d%%" % p) if p is not None else "—"))
             P.append("</tbody></table></div></details>")
         P.append("</section>")
 
@@ -252,7 +257,7 @@ def gen_html(rows):
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Đơn/giờ = đơn giao thành công ÷ (giờ đóng − giờ xuất phát) · "
-             "Scan = %% đơn đã quét cầm hàng · giờ XP = chuyến bắt đầu trong ngày sớm nhất<br>"
+             "%%GTC = đơn giao thành công / tổng đơn gán · giờ XP = chuyến bắt đầu trong ngày sớm nhất<br>"
              "Số LIVE từ nhanh.ghn.vn · tự cập nhật ~15'</div>")
     P.append("</div></body></html>")
     return "\n".join(P)
