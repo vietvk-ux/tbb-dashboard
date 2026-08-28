@@ -290,9 +290,12 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
     P.append("<section class='strip'>")
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📦 Đơn giao</div></div>" % _n(g["total"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ Giao TC</div></div>" % _n(g["success"]))
-    P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>❌ GTB</div></div>" % _n(total_gtb))
+    vngh_need = g.get("vngh_total", 0) - g.get("vngh_success", 0)   # đơn TikTok còn phải giao
+    vngh_gtc = g.get("vngh_gtc")
+    P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>🛍️ TikTok cần giao</div></div>" % _n(vngh_need))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(g.get("ltc", 0)))
-    P.append("<div class='st'><div class='sv'>%.0f<span style=\"font-size:12px\">tr</span></div><div class='sl'>💰 COD GTB</div></div>" % (total_cod / 1e6))
+    P.append("<div class='st'><div class='sv %s'>%s</div><div class='sl'>🛍️ %%GTC TikTok</div></div>"
+             % (_cls(vngh_gtc), ("%s%%" % vngh_gtc) if vngh_gtc is not None else "—"))
     P.append("</section>")
 
     # ===== Banner chưa gán giao =====
