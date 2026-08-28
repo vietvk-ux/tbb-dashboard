@@ -234,22 +234,48 @@ def gen_html(rows):
             P.append("</tbody></table></div></details>")
         P.append("</section>")
 
-    # 🏃 NV đang chạy
+    # 🏃 NV đang chạy — gộp AM → bưu cục → nhân viên (bấm mở drill như trang chính)
+    def _pcls(pc):
+        return "good" if pc >= 70 else ("warn" if pc >= 45 else "bad")
     P.append("<div class='sec' style='color:var(--warn)'>🏃 NV còn chuyến ĐANG CHẠY (chưa đóng)</div>")
-    P.append("<section class='card'>")
+    P.append("<section class='card' style='padding:2px 10px'>")
     if dang_chay:
         tot_done = sum(m["ot_done"] for m in dang_chay); tot_tot = sum(m["ot_tot"] for m in dang_chay)
-        P.append("<div class='note'>%d người · đã giao <b>%s/%s</b> đơn · chưa tính vào đơn/giờ tới khi đóng chuyến.</div>"
+        P.append("<div class='note'>%d người · đã giao <b>%s/%s</b> đơn · bấm AM để xem bưu cục → nhân viên. "
+                 "Chưa tính vào đơn/giờ tới khi đóng chuyến.</div>"
                  % (len(dang_chay), _n(tot_done), _n(tot_tot)))
-        P.append("<table class='drv'><thead><tr><th class='rk'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
-                 "<th>Đã giao</th><th>Tổng</th><th>Tiến độ</th></tr></thead><tbody>")
-        for i, m in enumerate(dang_chay[:25], 1):
-            pc = round(m["ot_done"] * 100 / m["ot_tot"]) if m["ot_tot"] else 0
-            pcls = "good" if pc >= 70 else ("warn" if pc >= 45 else "bad")
-            P.append("<tr><td class='rk'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
-                     "<td>%s</td><td>%s</td><td><span class='pill sm %s'>%d%%</span></td></tr>"
-                     % (i, _esc(m["name"]), _esc(m["bc"]), _n(m["ot_done"]), _n(m["ot_tot"]), pcls, pc))
-        P.append("</tbody></table>")
+        # gộp AM → BC → NV
+        amg = {}
+        for m in dang_chay:
+            amn = AM_OF.get(m["bc"]) or "(chưa gán AM)"
+            a = amg.setdefault(amn, {"done": 0, "tot": 0, "bcs": {}})
+            a["done"] += m["ot_done"]; a["tot"] += m["ot_tot"]
+            b = a["bcs"].setdefault(m["bc"], {"done": 0, "tot": 0, "nv": []})
+            b["done"] += m["ot_done"]; b["tot"] += m["ot_tot"]; b["nv"].append(m)
+        for amn, a in sorted(amg.items(), key=lambda kv: -kv[1]["tot"]):
+            nvc = sum(len(b["nv"]) for b in a["bcs"].values())
+            apc = round(a["done"] * 100 / a["tot"]) if a["tot"] else 0
+            P.append("<details class='bc'><summary>"
+                     "<span class='amn'>%s</span>"
+                     "<span class='ammet'>%d NV · đã giao %s/%s · <span class='pill sm %s'>%d%%</span> ▾</span>"
+                     "</summary><div class='dtl'>"
+                     % (_esc(amn), nvc, _n(a["done"]), _n(a["tot"]), _pcls(apc), apc))
+            for bc, b in sorted(a["bcs"].items(), key=lambda kv: -kv[1]["tot"]):
+                bpc = round(b["done"] * 100 / b["tot"]) if b["tot"] else 0
+                P.append("<details class='bc sub'><summary>"
+                         "<span class='amn' style='font-size:13px'>%s</span>"
+                         "<span class='ammet'>%d NV · %s/%s · <span class='pill sm %s'>%d%%</span></span>"
+                         "</summary><div class='dtl'>"
+                         % (_esc(bc), len(b["nv"]), _n(b["done"]), _n(b["tot"]), _pcls(bpc), bpc))
+                P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đã giao</th>"
+                         "<th>Tổng</th><th>Tiến độ</th></tr></thead><tbody>")
+                for m in sorted(b["nv"], key=lambda x: -x["ot_tot"]):
+                    pc = round(m["ot_done"] * 100 / m["ot_tot"]) if m["ot_tot"] else 0
+                    P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td>"
+                             "<td><span class='pill sm %s'>%d%%</span></td></tr>"
+                             % (_esc(m["name"]), _n(m["ot_done"]), _n(m["ot_tot"]), _pcls(pc), pc))
+                P.append("</tbody></table></div></details>")
+            P.append("</div></details>")
     else:
         P.append("<div class='none'>Không có chuyến đang chạy.</div>")
     P.append("</section>")
