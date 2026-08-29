@@ -1,7 +1,7 @@
 # HỆ THỐNG BÁO CÁO VẬN HÀNH VÙNG TÂY BẮC BỘ (TBB) — GHN
 
 Tài liệu tổng hợp để **tiếp tục làm việc ở phiên sau / trên máy khác**. Repo: `vietvk-ux/tbb-dashboard` (public). Chủ: Vũ Khắc Việt (vietvk@ghn.vn) — GĐV Vùng TBB.
-Cập nhật gần nhất: 28/08/2026.
+Cập nhật gần nhất: 29/08/2026.
 
 > Nguyên tắc bảo mật: KHÔNG in/echo/commit giá trị `NHANH_TOKEN`, `SUPABASE_SERVICE_KEY`, `GTALK_OA_TOKEN`, PAT. Đặt qua `gh secret set` / GitHub Actions secrets. Dữ liệu số KHÔNG lưu trong repo — chỉ deploy lên GitHub Pages + Supabase.
 
@@ -161,3 +161,8 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 - **CHỐNG TRẮNG TRANG Supabase (27/08)**: `report_trend._get` retry 3× + timeout (15,90); `report_trend.main` khi fetch Supabase lỗi → GIỮ trang cũ (`_preserve_or`) thay vì đè "Chưa cấu hình". (trend/nhanvien/xephang.)
 - **CHUYENDI đổi cột Scan → %GTC (27/08)**: `isScanned=True` thực chất ⟺ đơn giao HỎNG đã quét (không phải "cầm hàng") → cột "Scan" đổi thành **%GTC** (gtc/total, màu đỏ<60/vàng<80/xanh≥80, `GTC_MIN=60`). Mục "🏃 đang chạy" gộp **AM → bưu cục → nhân viên** (drill) thay bảng phẳng.
 - **EOD dải chỉ số (28/08)**: bỏ 2 thẻ GTB & COD GTB khỏi strip, thêm **🛍️ TikTok gán** (`vngh_total`) + **🛍️ %GTC TikTok** (`vngh_gtc`). Thứ tự: Đơn giao · Giao TC · TikTok gán · %GTC TikTok · LTC. (Hero + mục "nguy hiểm COD" vẫn giữ GTB/COD.)
+- **TRANG TRỰC TIẾP dải chỉ số (28/08)**: bỏ thẻ ❌ GTB thao tác, thêm **🛒 LTC** ở cuối. Thứ tự: Đã gán · Chưa gán · Đang chạy · GTC nay · TikTok gán · TikTok GTC · %GTC TikTok · LTC.
+
+### Nhật ký 29/08
+- **CHUYENDI (`chuyendi.html`) thêm 2 thẻ dải** sau "🏃 Đang chạy": **🕘 XP muộn ≥9h** (`late_count = Σ NV có cờ late`, kỷ luật ra hàng — NV xuất phát sau 9h) + **📦 Còn phải giao** (`on_road = Σ(ot_tot−ot_done)` của NV đang chạy = đơn đang trên đường, dự báo áp lực cuối ngày). Strip đủ 8 thẻ: Chuyến · Đơn/giờ TB · Giờ XP TB · %GTC vùng · Cần chú ý · Đang chạy · XP muộn ≥9h · Còn phải giao.
+- **NÚT LÀM MỚI (FAB) trang chính** (`report_live.gen_html`): nút tròn `⟳` cố định góc phải-dưới màn hình (`.fab position:fixed`, tôn trọng `env(safe-area-inset-bottom)` để tránh vạch home). Bấm → `location.replace(pathname+'?t='+Date.now())` (cache-buster, luôn lấy bản mới nhất trên GitHub Pages CDN), nút xoay khi tải (`.spin`). Trang vẫn giữ auto-refresh 5' (`<meta http-equiv=refresh 300>`).
