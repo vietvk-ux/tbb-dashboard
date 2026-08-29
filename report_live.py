@@ -408,6 +408,10 @@ def gen_html(rows):
              "document.querySelectorAll('.bc').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
              "e.style.display=s?'':'none';if(s)n++;});"
              "document.getElementById('empty').style.display=n?'none':'block';}</script>")
+    P.append("<button id='rf' class='fab' onclick='rf()' aria-label='Làm mới'>"
+             "<span class='rfi'>⟳</span></button>")
+    P.append("<script>function rf(){var b=document.getElementById('rf');"
+             "b.classList.add('spin');location.replace(location.pathname+'?t='+Date.now());}</script>")
     P.append("</div></body></html>")
     return "\n".join(P)
 
@@ -513,6 +517,16 @@ table.drv tbody tr:last-child td{border-bottom:none}
 td.nv{font-weight:600;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:24px 0 4px}
+
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:50;
+width:52px;height:52px;border:none;border-radius:50%;cursor:pointer;
+background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;
+box-shadow:0 6px 18px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.06) inset;
+display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.fab:active{transform:scale(.92)}
+.fab .rfi{font-size:26px;line-height:1;font-weight:700}
+.fab.spin .rfi{animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
 </style></head><body>"""
 
 
