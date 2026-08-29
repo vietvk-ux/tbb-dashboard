@@ -130,6 +130,8 @@ def gen_html(rows):
     gtc_vung = round(reg_gtc * 100 / reg_tot) if reg_tot else None
     avg_h = sum(m["start_h"] for m in timed) / len(timed) if timed else None
     xp_tb = ("%02d:%02d" % (int(avg_h), round((avg_h - int(avg_h)) * 60))) if avg_h is not None else "—"
+    late_count = sum(1 for m in timed if m["late"])                     # NV xuất phát muộn (≥9h)
+    on_road = sum(m["ot_tot"] - m["ot_done"] for m in dang_chay)        # đơn NV đang chạy chưa giao (trên đường)
 
     P = ["<!doctype html><html lang='vi'><head><meta charset='utf-8'>",
          "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>",
@@ -158,6 +160,8 @@ def gen_html(rows):
              % (_gtc_cls(gtc_vung), ("%d%%" % gtc_vung) if gtc_vung is not None else "—"))
     P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🐢 Cần chú ý</div></div>" % len(can_chu_y))
     P.append("<div class='st'><div class='sv'>%d</div><div class='sl'>🏃 Đang chạy</div></div>" % len(dang_chay))
+    P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🕘 XP muộn ≥9h</div></div>" % late_count)
+    P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>📦 Còn phải giao</div></div>" % _n(on_road))
     P.append("</section>")
 
     thead = ("<table class='drv'><thead><tr><th class='rk'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
