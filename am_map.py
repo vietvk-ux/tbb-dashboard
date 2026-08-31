@@ -5,7 +5,7 @@ AM_OF = {
     # Nguyễn Công Nam
     "(LCH) Nậm Hàng": "Nguyễn Công Nam", "(LCA) Sa Pa": "Nguyễn Công Nam",
     "(LCH) Sìn Hồ": "Nguyễn Công Nam", "(LCH) Nậm Mạ": "Nguyễn Công Nam",
-    "(LCH) Tân Phong": "Nguyễn Công Nam", "(YBA) Văn Phú": "Nguyễn Công Nam",
+    "(LCH) Tân Phong": "Nguyễn Công Nam",
     "(LCH) Phong Thổ": "Nguyễn Công Nam", "(LCA) Lào Cai": "Nguyễn Công Nam",
     "(LCH) Bum Tở": "Nguyễn Công Nam", "(LCA) Bát Xát": "Nguyễn Công Nam",
     "(LCH) Bình Lư": "Nguyễn Công Nam", "(LCH) Than Uyên": "Nguyễn Công Nam",
@@ -38,4 +38,5 @@ AM_OF = {
     "(YBA) Lục Yên": "Bế Ngọc Chuyển", "(YBA) Đông Cuông": "Bế Ngọc Chuyển",
     "(YBA) Mậu A": "Bế Ngọc Chuyển", "(YBA) Bảo Ái": "Bế Ngọc Chuyển",
     "(YBA) Trấn Yên": "Bế Ngọc Chuyển", "(YBA) Mù Cang Chải": "Bế Ngọc Chuyển",
+    "(YBA) Văn Phú": "Bế Ngọc Chuyển",
 }
