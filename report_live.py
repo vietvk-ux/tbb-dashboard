@@ -59,9 +59,9 @@ def _bc_drv_details(r):
     P = ["<details class='bc sub %s'><summary>" % cls]
     P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
              "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
-    P.append("<div class='bcm'><span>📥 %s</span><span>✅ %s</span>"
+    P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
              "<span class='gtb'>❌ %s</span><span class='ltc'>LTC %s</span></div>"
-             % (_n(r["total"]), _n(r["gtc"]), _n(r["att"] - r["gtc"]), _n(r.get("ltc", 0))))
+             % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]), _n(r["att"] - r["gtc"]), _n(r.get("ltc", 0))))
     P.append("</summary><div class='dtl'>")
     drv = r.get("drivers", [])
     if drv:
@@ -332,8 +332,8 @@ def gen_html(rows):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
-                 % (v["bc"], _n(v["total"]), _n(v["gtc"]), _n(v["att"] - v["gtc"]), _n(v["ltc"])))
+        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
+                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["att"] - v["gtc"]), _n(v["ltc"])))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
