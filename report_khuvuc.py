@@ -176,15 +176,16 @@ def _svg_bars(series, unit="%", target=None):
     if target:
         yt = pad_t + (H - pad_t - pad_b) * (1 - target / top)
         P.append("<line x1='%d' y1='%.1f' x2='%d' y2='%.1f' class='tgt'/>" % (pad_l, yt, W, yt))
+    barw = min(bw * 0.68, 80)   # chặn bề rộng cột để 1-2 cột không bị kéo dài cả biểu đồ
     for i, (lab, val, cls) in enumerate(series):
-        x = pad_l + i * bw
+        cx = pad_l + i * bw + bw / 2
         h = (H - pad_t - pad_b) * (val / top)
         y = (H - pad_b) - h
         P.append("<rect x='%.1f' y='%.1f' width='%.1f' height='%.1f' rx='3' class='b %s'/>"
-                 % (x + bw * 0.16, y, bw * 0.68, max(h, 1), cls))
+                 % (cx - barw / 2, y, barw, max(h, 1), cls))
         P.append("<text x='%.1f' y='%.1f' class='bv'>%s%s</text>"
-                 % (x + bw / 2, y - 4, val, unit if unit == "%" else ""))
-        P.append("<text x='%.1f' y='%d' class='bx'>%s</text>" % (x + bw / 2, H - 12, _esc(lab)))
+                 % (cx, y - 4, val, unit if unit == "%" else ""))
+        P.append("<text x='%.1f' y='%d' class='bx'>%s</text>" % (cx, H - 12, _esc(lab)))
     P.append("</svg>")
     return "".join(P)
 
@@ -249,21 +250,21 @@ def build_html(days):
     # ----- XÃ KHÓ GIAO -----
     P.append("<div class='sec'>🔴 Xã/phường khó giao nhất · %GTC thấp → cao (≥20 đơn)</div>")
     hard = sorted([w for w in latest["wards"] if w[2] >= 20], key=lambda w: _pct(w[3], w[2]))[:15]
-    P.append("<table class='t'><thead><tr><th class='l'>Huyện</th><th class='l'>Xã/Phường</th><th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
+    P.append("<div class='tw'><table class='t'><thead><tr><th class='l'>Huyện</th><th class='l'>Xã/Phường</th><th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
     for dist, ward, n, g in hard:
         p = _pct(g, n)
         P.append("<tr><td class='l'>%s</td><td class='l'>%s</td><td>%d</td><td>%d</td>"
                  "<td><span class='pill %s'>%d%%</span></td></tr>" % (_esc(dist), _esc(ward), n, g, _cls(p), p))
-    P.append("</tbody></table>")
+    P.append("</tbody></table></div>")
 
     # ----- LẠC TUYẾN -----
     P.append("<div class='sec'>🧭 Đơn lạc tuyến · NV giao ngoài huyện địa bàn chính</div>")
-    P.append("<table class='t'><thead><tr><th class='l'>Bưu cục</th><th class='l'>Nhân viên</th><th class='l'>Địa bàn chính</th><th>Lạc tuyến</th></tr></thead><tbody>")
+    P.append("<div class='tw'><table class='t'><thead><tr><th class='l'>Bưu cục</th><th class='l'>Nhân viên</th><th class='l'>Địa bàn chính</th><th>Lạc tuyến</th></tr></thead><tbody>")
     for bc, nv, md, out, tt in latest["stray"][:15]:
         P.append("<tr><td class='l'>%s</td><td class='l'>%s</td><td class='l'>%s</td>"
                  "<td><b class='gtb'>%d</b>/%d</td></tr>"
                  % (_esc(bc.split(") ")[-1]), _esc(nv), _esc(md), out, tt))
-    P.append("</tbody></table>")
+    P.append("</tbody></table></div>")
 
     # ----- DRILL NV × XÃ theo bưu cục -----
     P.append("<div class='sec'>👤 GTC từng nhân viên theo xã/phường · bấm mở</div>")
@@ -411,6 +412,23 @@ details.bc.sub{margin:6px 0;border-radius:10px;background:rgba(255,255,255,.02)}
 .eod{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:9px 0;text-decoration:none;color:var(--txt);font-weight:600}
 .eod .arw{color:var(--mut);font-size:12px;font-weight:500}
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:16px 0 10px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px}
+/* ===== Tối ưu iPhone / màn hình hẹp ===== */
+@media (max-width:430px){
+  .wrap{padding:10px 10px calc(14px + env(safe-area-inset-bottom))}
+  .brand{font-size:15px}.note{font-size:11.5px;padding:8px 10px}
+  .strip{gap:6px}.st{padding:9px 3px}.sv{font-size:16px}.sl{font-size:9.5px}
+  .sec{font-size:12.5px;margin:16px 2px 7px}
+  .tab{font-size:12px;padding:7px 4px}
+  table.t th,table.t td,table.drv th,table.drv td{padding:5px 4px;font-size:11px}
+  table.t th,table.drv th{font-size:9px}
+  td.l,th.l{max-width:88px}
+  .pill{font-size:10.5px;padding:2px 6px}.pill.sm{font-size:9.5px}
+  .dtl{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 6px 9px}
+  details.bc summary{padding:9px 10px}.pmeta{font-size:11px}
+  .bcn{font-size:13px}
+  .eod{padding:11px 12px;font-size:14px}
+}
 </style></head><body>"""
 
 
