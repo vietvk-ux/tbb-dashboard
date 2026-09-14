@@ -32,6 +32,14 @@ def _esc(s):
     return html.escape(str(s))
 
 
+def _codm(v):
+    """COD GTB (đồng) → chuỗi triệu, vd 1.234.567 → '1,2'. <100k hiện '0'."""
+    v = v or 0
+    if v < 1e5:
+        return "0"
+    return ("%.1f" % (v / 1e6)).replace(".", ",")
+
+
 def _prov(name):
     return name[name.find("(") + 1:name.find(")")] if "(" in name else "?"
 
@@ -60,17 +68,17 @@ def _bc_drv_details(r):
     P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
              "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
     P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
-             "<span class='gtb'>❌ %s</span><span class='ltc'>LTC %s</span></div>"
-             % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]), _n(r["att"] - r["gtc"]), _n(r.get("ltc", 0))))
+             "<span class='gtb'>❌COD %str</span><span class='ltc'>LTC %s</span></div>"
+             % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]), _codm(r.get("cod_gtb", 0)), _n(r.get("ltc", 0))))
     P.append("</summary><div class='dtl'>")
     drv = r.get("drivers", [])
     if drv:
         P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th>"
-                 "<th>LTC</th><th>❌GTB</th><th>%GTC</th></tr></thead><tbody>")
+                 "<th>LTC</th><th>COD GTB</th><th>%GTC</th></tr></thead><tbody>")
         for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
             pc2 = _pct(d["gtc"], d["total"])
-            gtb2 = d["att"] - d["gtc"]
-            gtb_cell = ("<b class='gtb'>%s</b>" % _n(gtb2)) if gtb2 > 0 else "0"
+            cgtb = d.get("cod_gtb", 0)
+            gtb_cell = ("<b class='gtb'>%str</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
             ltc = d.get("ltc", 0)
             ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
             P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
@@ -116,7 +124,7 @@ async def fetch_live(token):
 
                 def _drv0(did, dn):
                     return {"id": did, "name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0,
-                            "ltc": 0, "vngh": 0, "vngh_gtc": 0,
+                            "ltc": 0, "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0,
                             # hiệu suất chuyến đi: giờ xuất phát/kết thúc, scan, tiến độ chuyến đang chạy
                             "st": None, "en": None, "scan_ok": 0, "scan_tot": 0,
                             "ot_done": 0, "ot_tot": 0}
@@ -135,9 +143,9 @@ async def fetch_live(token):
                     try:
                         async with sem:
                             items = await _fetch_all_items(session, token, hid, t["tripCode"])
-                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?)
+                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?, COD)
                         recs = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True,
-                                 x.get("isUpdated") is True, is_ontrip)
+                                 x.get("isUpdated") is True, is_ontrip, float(x.get("collectAmount") or 0))
                                 for x in items if x.get("type") == "DELIVER"]
                         # PICK: (mã đơn, tài xế, đã lấy thành công?)
                         picks = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True)
@@ -162,20 +170,22 @@ async def fetch_live(token):
                 # tính cho chuyến hiện tại). GTC=đơn giao xong ở BẤT KỲ chuyến nào.
                 best = {}
                 for did, dn, recs, _picks, _meta in res:
-                    for oc, rdid, rdn, succ, att, ot in recs:
+                    for oc, rdid, rdn, succ, att, ot, cod in recs:
                         if not oc:
                             continue
                         score = (4 if succ else 0) + (2 if att else 0) + (1 if ot else 0)
                         cur = best.get(oc)
                         if cur is None or score > cur[0]:
-                            best[oc] = (score, rdid, rdn, succ, att)
-                for oc, (score, rdid, rdn, succ, att) in best.items():
+                            best[oc] = (score, rdid, rdn, succ, att, cod)
+                for oc, (score, rdid, rdn, succ, att, cod) in best.items():
                     d = drivers.setdefault(_dk(rdid, rdn), _drv0(rdid, rdn))
                     d["total"] += 1
                     if succ:
                         d["gtc"] += 1
                     if att:
                         d["att"] += 1
+                        if not succ:               # GTB = đã thao tác nhưng giao HỎNG → COD kẹt
+                            d["cod_gtb"] += cod
                     if oc.startswith("VNGH"):        # đơn TikTok Shop → tiến độ theo nhân viên
                         d["vngh"] += 1
                         if succ:
@@ -206,7 +216,7 @@ async def fetch_live(token):
                     if en and (d["en"] is None or en > d["en"]):
                         d["en"] = en
                     if meta["ot"]:
-                        for oc, rdid, rdn, succ, att, ot in recs:
+                        for oc, rdid, rdn, succ, att, ot, cod in recs:
                             if not oc:
                                 continue
                             d["ot_tot"] += 1
@@ -224,10 +234,11 @@ async def fetch_live(token):
                 # Đơn TikTok Shop (mã VNGH) — gộp theo mã đơn giao, tiến độ theo bưu cục
                 h_vngh = sum(1 for oc in best if oc.startswith("VNGH"))
                 h_vngh_gtc = sum(1 for oc, v in best.items() if oc.startswith("VNGH") and v[3])
+                h_cod_gtb = sum(d["cod_gtb"] for d in drivers.values())
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc,
-                        "vngh": h_vngh, "vngh_gtc": h_vngh_gtc,
+                        "vngh": h_vngh, "vngh_gtc": h_vngh_gtc, "cod_gtb": h_cod_gtb,
                         "drivers": list(drivers.values())}
             except TokenExpiredError:
                 raise
@@ -242,20 +253,20 @@ async def fetch_live(token):
 def gen_html(rows):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0,
-         "vngh": 0, "vngh_gtc": 0}
+         "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0}
     prov = {}
     am = {}
     for r in rows:
         for k in R:
             R[k] += r.get(k, 0)
-        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0})
-        for k in ("backlog", "ontrip", "fin", "gtc", "att", "total", "ltc"):
+        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "cod_gtb": 0})
+        for k in ("backlog", "ontrip", "fin", "gtc", "att", "total", "ltc", "cod_gtb"):
             p[k] += r.get(k, 0)
         amn = AM_OF.get(r["name"])
         if amn:
-            a = am.setdefault(amn, {"bc": 0, "backlog": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0})
+            a = am.setdefault(amn, {"bc": 0, "backlog": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "cod_gtb": 0})
             a["bc"] += 1
-            for k in ("backlog", "gtc", "att", "total", "ltc"):
+            for k in ("backlog", "gtc", "att", "total", "ltc", "cod_gtb"):
                 a[k] += r.get(k, 0)
     reg_pct = _pct(R["gtc"], R["total"])
 
@@ -334,8 +345,8 @@ def gen_html(rows):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
-                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["att"] - v["gtc"]), _n(v["ltc"])))
+        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='gtb'>❌COD %str</span>·<span class='ltc'>LTC %s</span></div>"
+                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _codm(v.get("cod_gtb", 0)), _n(v["ltc"])))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
@@ -355,9 +366,9 @@ def gen_html(rows):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='gtb'>❌ %s</span>·<span class='ltc'>LTC %s</span></div>"
+        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='gtb'>❌COD %str</span>·<span class='ltc'>LTC %s</span></div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
-                    _n(v["att"] - v["gtc"]), _n(v["ltc"])))
+                    _codm(v.get("cod_gtb", 0)), _n(v["ltc"])))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(prov_rows.get(pv, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
@@ -380,19 +391,19 @@ def gen_html(rows):
                  % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
-                 "<span class='w'>⏳ %s</span><span>✅ %s</span><span class='gtb'>❌ %s</span>"
+                 "<span class='w'>⏳ %s</span><span>✅ %s</span><span class='gtb'>❌COD %str</span>"
                  "<span class='ltc'>LTC %s</span></div>"
                  % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
-                    _n(r["att"] - r["gtc"]), _n(r.get("ltc", 0))))
+                    _codm(r.get("cod_gtb", 0)), _n(r.get("ltc", 0))))
         P.append("</summary>")
         drv = r["drivers"]  # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao)
         P.append("<div class='dtl'>")
         if drv:
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>LTC</th><th>❌GTB</th><th>%GTC</th></tr></thead><tbody>")
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>LTC</th><th>COD GTB</th><th>%GTC</th></tr></thead><tbody>")
             for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
                 pc2 = _pct(d["gtc"], d["total"])
-                gtb2 = d["att"] - d["gtc"]  # GTB đã thao tác (đã xử lý nhưng không thành công)
-                gtb_cell = ("<b class='gtb'>%s</b>" % _n(gtb2)) if gtb2 > 0 else "0"
+                cgtb = d.get("cod_gtb", 0)  # COD kẹt trên đơn GTB (đã thao tác nhưng giao hỏng)
+                gtb_cell = ("<b class='gtb'>%str</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
                 ltc = d.get("ltc", 0)
                 ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
                 P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
@@ -403,7 +414,7 @@ def gen_html(rows):
             P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
         P.append("</div></details>")
 
-    P.append("<div class='foot'>🏃 đang chạy · 🏁 kết thúc hôm nay · 📥 đã gán · ⏳ chưa gán · ✅ GTC · ❌ GTB đã thao tác<br>"
+    P.append("<div class='foot'>🏃 đang chạy · 🏁 kết thúc hôm nay · 📥 đã gán · ⏳ chưa gán · ✅ GTC · ❌COD = tiền COD kẹt trên đơn GTB (triệu)<br>"
              "%GTC = GTC / tổng đơn gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
              "số LIVE gồm cả chuyến đã kết thúc trong ngày · nguồn nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
