@@ -345,41 +345,28 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
                      "<td></td><td></td></tr>" % (len(ot) - 20))
         P.append("</tbody></table></section>")
 
-    # ===== ⏰ Kỷ luật ra hàng: NV xuất phát muộn & thời lượng =====
-    def _fmt_span(m):
-        if not m or m <= 0:
-            return "—"
-        return "%dh%02d" % (m // 60, m % 60)
-    timed = [dr for dr in agg["drivers"] if dr.get("start_h") is not None]
-    late = sorted([dr for dr in timed if dr.get("late")],
-                  key=lambda x: -x["start_h"])
-    P.append("<div class='sec' style='color:var(--warn)'>⏰ Kỷ luật ra hàng</div>")
+    # ===== 💰 Top 10 bưu cục COD GTB cao nhất (tiền thu hộ kẹt trên đơn giao hỏng) =====
+    cod_bc = {}
+    for dr in agg["drivers"]:
+        cod_bc[dr["bc"]] = cod_bc.get(dr["bc"], 0) + (dr.get("gtb_cod", 0) or 0)
+    gtb_bc = {b["bc"]: (b["total"] - b["success"]) for b in agg["bcs"]}
+    top_bc = [(bc, cod) for bc, cod in sorted(cod_bc.items(), key=lambda x: -x[1]) if cod > 0][:10]
+    P.append("<div class='sec' style='color:var(--bad)'>💰 Top 10 bưu cục COD GTB cao nhất</div>")
     P.append("<section class='card'>")
-    if not timed:
-        P.append("<div class='note' style='margin:0'>Không đọc được giờ chuyến.</div>")
+    if not top_bc:
+        P.append("<div class='ok' style='margin:0'>✅ Không có COD GTB nào. Vùng ổn định.</div>")
     else:
-        avg_h = sum(dr["start_h"] for dr in timed) / len(timed)
-        avg_s = "%02d:%02d" % (int(avg_h), round((avg_h - int(avg_h)) * 60))
-        P.append("<div class='note' style='margin:0 0 8px'>Giờ xuất phát TB vùng <b>%s</b> · "
-                 "<b>%d/%d</b> NV xuất phát muộn (≥%dh). "
-                 "<i>Giờ = chuyến sớm nhất→muộn nhất trong ngày.</i></div>"
-                 % (avg_s, len(late), len(timed), int(os.environ.get("EOD_LATE_START_HOUR", "9") or "9")))
-        if not late:
-            P.append("<div class='ok' style='margin:0'>✅ Không có NV nào xuất phát muộn.</div>")
-        else:
-            P.append("<table class='drv'><thead><tr><th class='rank'>#</th>"
-                     "<th class='lft'>Nhân viên · Bưu cục</th><th>Xuất phát</th>"
-                     "<th>Kết thúc</th><th>Thời lượng</th></tr></thead><tbody>")
-            for i, dr in enumerate(late[:20], 1):
-                P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
-                         "<td class='rd'>%s</td><td>%s</td><td>%s</td></tr>"
-                         % (i, _esc(dr["driver_name"]), _esc(dr["bc"]),
-                            _esc(dr.get("start") or "—"), _esc(dr.get("end") or "—"),
-                            _fmt_span(dr.get("span_min"))))
-            if len(late) > 20:
-                P.append("<tr><td></td><td class='nv' style='color:var(--mut)'>… và %d người khác</td>"
-                         "<td></td><td></td><td></td></tr>" % (len(late) - 20))
-            P.append("</tbody></table>")
+        tot_cod = sum(cod_bc.values())
+        P.append("<div class='note' style='margin:0 0 8px'>Tiền thu hộ (COD) kẹt trên các đơn giao thất bại (GTB), "
+                 "gộp theo bưu cục · xếp <b>cao → thấp</b>. Tổng COD GTB vùng <b>%.0f triệu</b>.</div>"
+                 % (tot_cod / 1e6))
+        P.append("<table class='drv'><thead><tr><th class='rank'>#</th>"
+                 "<th class='lft'>Bưu cục</th><th>GTB đơn</th><th>COD GTB (tr)</th></tr></thead><tbody>")
+        for i, (bc, cod) in enumerate(top_bc, 1):
+            P.append("<tr><td class='rank'>%d</td><td class='nv'>%s</td><td>%s</td>"
+                     "<td><b class='cod'>%s</b></td></tr>"
+                     % (i, _esc(bc), _n(gtb_bc.get(bc, 0)), ("%.1f" % (cod / 1e6)).replace(".", ",")))
+        P.append("</tbody></table>")
     P.append("</section>")
 
     # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
