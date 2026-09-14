@@ -405,9 +405,9 @@ def gen_html(rows):
              "%GTC = GTC / tổng đơn gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
              "số LIVE gồm cả chuyến đã kết thúc trong ngày · nguồn nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
-             "document.querySelectorAll('.bc').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
-             "e.style.display=s?'':'none';if(s)n++;});"
-             "document.getElementById('empty').style.display=n?'none':'block';}</script>")
+             "document.querySelectorAll('.bc[data-k]').forEach(function(e){var k=e.dataset.k||'';"
+             "var s=(!q||k.indexOf(q)>=0);e.style.display=s?'':'none';if(s)n++;});"
+             "document.getElementById('empty').style.display=(q&&!n)?'block':'none';}</script>")
     P.append("<button id='rf' class='fab' onclick='rf()' aria-label='Làm mới'>"
              "<span class='rfi'>⟳</span></button>")
     P.append("<script>function rf(){var b=document.getElementById('rf');"
