@@ -270,7 +270,11 @@ def build_html(days):
     by_bc = collections.defaultdict(list)
     for bc, nv, dist, ward, n, g in latest["nv"]:
         by_bc[bc].append((nv, dist, ward, n, g))
-    for bc in sorted(by_bc):
+
+    def _bc_pct(bc):
+        rr = by_bc[bc]
+        return _pct(sum(r[4] for r in rr), sum(r[3] for r in rr))
+    for bc in sorted(by_bc, key=_bc_pct):   # bưu cục %GTC THẤP → CAO
         rows = by_bc[bc]
         bt = sum(r[3] for r in rows); bg = sum(r[4] for r in rows)
         bp = _pct(bg, bt)
