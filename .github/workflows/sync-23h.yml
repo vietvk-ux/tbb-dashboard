@@ -17,7 +17,7 @@ on:
     - cron: '35 16 * * *'
 
 permissions:
-  contents: read
+  contents: write   # commit khuvuc_data/ (bản đồ khu vực 30 ngày)
 
 concurrency:
   group: db-sync-23h
@@ -42,3 +42,15 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           EOD_DATE: ${{ github.event.inputs.date }}
         run: python report_db_sync.py
+      - name: Commit dữ liệu bản đồ khu vực (khuvuc_data/)
+        run: |
+          if [ -n "$(git status --porcelain khuvuc_data/)" ]; then
+            git config user.name "tbb-bot"
+            git config user.email "tbb-bot@users.noreply.github.com"
+            git pull --rebase --autostash origin main || true
+            git add khuvuc_data/
+            git commit -m "khuvuc_data: chốt bản đồ khu vực $(TZ=Asia/Ho_Chi_Minh date +%F)" || true
+            git push origin HEAD:main || true
+          else
+            echo "khuvuc_data không đổi — bỏ qua commit"
+          fi

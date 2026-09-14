@@ -139,13 +139,24 @@ async def _trip_items(session, token, hub_id, trip_code, sem):
         typ = x.get("type")
         if typ not in ("DELIVER", "PICK"):   # giữ cả LẤY (PICK) để tính LTC
             continue
-        recs.append({
+        rec = {
             "type": typ,
             "code": x.get("orderCode") or "",
             "succ": x.get("isSucceeded") is True,
             "att": x.get("isUpdated") is True,
             "cod": float(x.get("collectAmount") or 0),  # COD (dùng cho đơn GTB)
-        })
+        }
+        # GEO (chỉ đơn DELIVER) — dùng cho phân tích theo khu vực (report_khuvuc).
+        # Thuần cộng thêm; aggregate()/dedup_orders() KHÔNG đọc các field này.
+        if typ == "DELIVER":
+            info = x.get("deliverInfo") or x.get("receiverContact") or {}
+            rec["ward"] = info.get("wardName") or None
+            rec["dist"] = info.get("districtName") or None
+            rec["city"] = info.get("cityName") or None
+            lat, lng = info.get("lat"), info.get("lng")
+            rec["lat"] = lat if isinstance(lat, (int, float)) else None
+            rec["lng"] = lng if isinstance(lng, (int, float)) else None
+        recs.append(rec)
     return recs
 
 

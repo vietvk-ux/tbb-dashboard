@@ -60,6 +60,15 @@ def main():
     logger.info("XONG sync ngày %s · %d bưu cục · %d nhân viên · GTC %s%%.",
                 d, len(agg["bcs"]), len(agg["drivers"]), agg["grand"]["gtc"])
 
+    # BẢN ĐỒ KHU VỰC (trang 9): tái dùng payload đã bóc item + geo → KHÔNG tốn call API.
+    # Ghi file khuvuc_data/<ngày>.json (giữ 30 ngày). Lỗi KHÔNG làm hỏng sync chính.
+    try:
+        import report_khuvuc
+        p = report_khuvuc.write_day(report_khuvuc.build_day_payload(payload))
+        logger.info("Lưu bản đồ khu vực → %s", p)
+    except Exception as e:
+        logger.warning("Ghi dữ liệu khu vực lỗi (bỏ qua): %s", str(e)[:200])
+
     # Tồn đọng Lấy·Giao·Trả·Luân chuyển (số LIVE lúc chạy ~23h) → bảng bao_cao_ton_dong.
     # Lỗi (token/API/bảng chưa tạo) KHÔNG làm hỏng phần sync chính ở trên.
     try:

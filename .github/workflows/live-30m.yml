@@ -101,6 +101,10 @@ jobs:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_trend.py
+      - name: Tạo trang Bản đồ khu vực (khuvuc.html — đọc khuvuc_data/ trong repo)
+        env:
+          DASH_SLUG: 9c7e4b21a6f0
+        run: python report_khuvuc.py render
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
