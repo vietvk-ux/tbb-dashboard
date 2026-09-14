@@ -1,7 +1,7 @@
 # HỆ THỐNG BÁO CÁO VẬN HÀNH VÙNG TÂY BẮC BỘ (TBB) — GHN
 
 Tài liệu tổng hợp để **tiếp tục làm việc ở phiên sau / trên máy khác**. Repo: `vietvk-ux/tbb-dashboard` (public). Chủ: Vũ Khắc Việt (vietvk@ghn.vn) — GĐV Vùng TBB.
-Cập nhật gần nhất: 29/08/2026.
+Cập nhật gần nhất: 14/09/2026.
 
 > Nguyên tắc bảo mật: KHÔNG in/echo/commit giá trị `NHANH_TOKEN`, `SUPABASE_SERVICE_KEY`, `GTALK_OA_TOKEN`, PAT. Đặt qua `gh secret set` / GitHub Actions secrets. Dữ liệu số KHÔNG lưu trong repo — chỉ deploy lên GitHub Pages + Supabase.
 
@@ -166,3 +166,10 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 ### Nhật ký 29/08
 - **CHUYENDI (`chuyendi.html`) thêm 2 thẻ dải** sau "🏃 Đang chạy": **🕘 XP muộn ≥9h** (`late_count = Σ NV có cờ late`, kỷ luật ra hàng — NV xuất phát sau 9h) + **📦 Còn phải giao** (`on_road = Σ(ot_tot−ot_done)` của NV đang chạy = đơn đang trên đường, dự báo áp lực cuối ngày). Strip đủ 8 thẻ: Chuyến · Đơn/giờ TB · Giờ XP TB · %GTC vùng · Cần chú ý · Đang chạy · XP muộn ≥9h · Còn phải giao.
 - **NÚT LÀM MỚI (FAB) trang chính** (`report_live.gen_html`): nút tròn `⟳` cố định góc phải-dưới màn hình (`.fab position:fixed`, tôn trọng `env(safe-area-inset-bottom)` để tránh vạch home). Bấm → `location.replace(pathname+'?t='+Date.now())` (cache-buster, luôn lấy bản mới nhất trên GitHub Pages CDN), nút xoay khi tải (`.spin`). Trang vẫn giữ auto-refresh 5' (`<meta http-equiv=refresh 300>`).
+
+### Nhật ký 14/09
+- **CƠ CẤU AM — chuyển `(YBA) Văn Phú`**: từ **Nguyễn Công Nam → Bế Ngọc Chuyển** (sửa 1 file `am_map.py`, tự áp mọi trang xếp hạng theo AM). Sau đổi: Nam **12 BC** · Chuyển **11 BC** · tổng vẫn **54 BC**, không trùng key. Đã verify trên trang live (Văn Phú nằm dưới Bế Ngọc Chuyển). Quy trình chuẩn khi user báo đổi cơ cấu: sửa `am_map.py` → kiểm tên khớp hub + không trùng key → commit/push repo thật `vietvk-ux/tbb-dashboard` → deploy → verify Σ AM = tổng vùng.
+- **TRANG TRỰC TIẾP — thêm ⏳ chưa gán vào "Theo AM" + khối bưu cục**: dòng tóm tắt mỗi AM (`v["backlog"]`) và mỗi bưu cục con khi bấm mở (`_bc_drv_details`, `r["backlog"]`) nay hiển thị số **⏳ chưa gán**. Drill đầy đủ **AM (⏳ tổng) → bưu cục (⏳ từng BC) → nhân viên**; Σ ⏳ theo AM khớp tổng vùng.
+- **SỬA TÌM KIẾM BƯU CỤC (`report_live.filt()`)**: trước lọc mọi `.bc` (gồm thẻ AM/tỉnh/BC-con KHÔNG có `data-k`) → `e.dataset.k` undefined → TypeError, tìm kiếm hỏng. Nay chỉ lọc `.bc[data-k]` (54 bưu cục ở danh sách dưới cùng), fallback `k=''` an toàn, thông báo "không tìm thấy" chỉ hiện khi có từ khoá mà 0 kết quả. Đã test live: gõ "si ma cai"→1, "lào cai"→1, chuỗi rác→0 + báo trống, xoá→54, không lỗi JS.
+- **TOKEN nhanh.ghn.vn HẾT HẠN → refresh 14/09**: token cũ (đặt 13/08) chết ~13/09 → mọi run live-30m + sync-23h **failure** (`code 1003 "Token is not alive"`, HTTP 400 ở get-locations). Đã lấy token SESSION mới (F12 Console `copy(localStorage.SESSION)`), set secret `NHANH_TOKEN` cho **2 repo** (tbb-dashboard + bao-cao-trip-tbb) + `.env` local, chạy lại → OK. **TTL ~30 ngày, dự kiến hết lại ~10-14/10.** (Token JWT KHÔNG có field `exp` → phải test bằng call thật.)
+- **BACKFILL LỖ HỔNG 13/09**: sự cố token đêm 13/09 khiến chốt eod 23:30 + sync 23:35 đều fail → Supabase thiếu đúng **13/09** (trend/nhanvien/xephang/báo cáo sáng hụt 1 ngày). Đã chạy `sync-23h.yml -f date=2026-09-13` (idempotent upsert, KHÔNG gửi nhóm) → 13/09 vào Supabase: 64 BC · 494 chuyến · 31.961 đơn · %GTC 63,1% · chưa gán 18.490 · LTC 6.204 · giờ XP TB 8:13 · 66 NV muộn. Chạy lại live-30m thường → trend/nhanvien/xephang đã gồm 13/09. **eod.html** vẫn hiển thị 12/09 (không ép tạo lại vì force_eod sẽ kích cảnh báo NV tụt %GTC gửi nhóm) — sẽ tự cập nhật tối nay 14/09 khi chốt 23:30. **Bài học vá sau outage token:** backfill ngày thiếu bằng `sync-23h.yml -f date=<ngày>` (an toàn), TRÁNH `force_eod` giờ hành chính (gửi alert cũ vào nhóm).
