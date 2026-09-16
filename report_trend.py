@@ -678,9 +678,16 @@ def gen_html(data):
     return "\n".join(P)
 
 
+_NV_BG = ("<style>body{background:"
+          "radial-gradient(135% 80% at 0% 0%,rgba(245,158,11,.13),transparent 55%),"
+          "radial-gradient(135% 80% at 100% 12%,rgba(239,68,68,.10),transparent 55%),"
+          "#0a0d18 !important;background-attachment:fixed}"
+          ".top{background:linear-gradient(180deg,rgba(20,15,6,.92) 60%,rgba(20,15,6,0)) !important}</style>")
+
+
 def gen_nhanvien_html(data):
     now = datetime.now(VN)
-    P = [_HEAD.replace("<title>Xu hướng TBB</title>", "<title>Năng suất Nhân viên · TBB</title>"),
+    P = [_HEAD.replace("<title>Xu hướng TBB</title>", "<title>Năng suất Nhân viên · TBB</title>") + _NV_BG,
          "<div class='wrap'>",
          "<header class='top'><div class='brand'>⚡ NĂNG SUẤT NHÂN VIÊN</div>"
          "<div class='ts' style='white-space:nowrap'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m")]
