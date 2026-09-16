@@ -313,6 +313,8 @@ def gen_html(rows):
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(R["ltc"]))
     P.append("</section>")
 
+    P.append("<a class='eod tq' href='tongquan.html'><span>📋 Báo cáo tổng quan</span>"
+             "<span class='arw'>số chính cần theo dõi →</span></a>")
     P.append("<a class='eod' href='eod.html'><span>📊 Báo cáo %GTC cuối ngày</span>"
              "<span class='arw'>chi tiết nhân viên →</span></a>")
     P.append("<a class='eod' href='backlog.html'><span>📦 Tồn đọng Lấy · Giao · Trả</span>"
@@ -477,6 +479,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
  padding:14px 16px;margin-bottom:8px;font-weight:700;font-size:14px}
 .eod .arw{color:#aeb6e0;font-size:12px;font-weight:600}
 .eod:active{transform:scale(.99)}
+.eod.tq{background:linear-gradient(135deg,#1e3a8a,#2563eb);border-color:#3b82f6;font-size:15px}
+.eod.tq .arw{color:#c7dbff}
 
 .sec{font-size:12px;font-weight:700;letter-spacing:.05em;color:#b9c0da;text-transform:uppercase;margin:20px 4px 10px}
 
@@ -596,6 +600,14 @@ def main():
             f.write(report_chuyendi.gen_html(rows))
     except Exception as e:
         logger.warning("Tạo chuyendi.html lỗi (bỏ qua): %s", str(e)[:150])
+
+    # Trang TỔNG QUAN — gom số chính từ trực tiếp + 30 ngày (dùng lại rows, 0 call thêm)
+    try:
+        import report_tongquan
+        with open(os.path.join(outdir, "tongquan.html"), "w", encoding="utf-8") as f:
+            f.write(report_tongquan.build_html(rows))
+    except Exception as e:
+        logger.warning("Tạo tongquan.html lỗi (bỏ qua): %s", str(e)[:150])
 
     # JSON dữ liệu cho BOT đọc trực tiếp (khớp 100% trang) — cạnh dashboard
     payload = {
