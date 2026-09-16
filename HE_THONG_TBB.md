@@ -1,7 +1,7 @@
 # HỆ THỐNG BÁO CÁO VẬN HÀNH VÙNG TÂY BẮC BỘ (TBB) — GHN
 
 Tài liệu tổng hợp để **tiếp tục làm việc ở phiên sau / trên máy khác**. Repo: `vietvk-ux/tbb-dashboard` (public). Chủ: Vũ Khắc Việt (vietvk@ghn.vn) — GĐV Vùng TBB.
-Cập nhật gần nhất: 14/09/2026.
+Cập nhật gần nhất: 16/09/2026.
 
 > Nguyên tắc bảo mật: KHÔNG in/echo/commit giá trị `NHANH_TOKEN`, `SUPABASE_SERVICE_KEY`, `GTALK_OA_TOKEN`, PAT. Đặt qua `gh secret set` / GitHub Actions secrets. Dữ liệu số KHÔNG lưu trong repo — chỉ deploy lên GitHub Pages + Supabase.
 
@@ -179,6 +179,9 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 ### Nhật ký 29/08
 - **CHUYENDI (`chuyendi.html`) thêm 2 thẻ dải** sau "🏃 Đang chạy": **🕘 XP muộn ≥9h** (`late_count = Σ NV có cờ late`, kỷ luật ra hàng — NV xuất phát sau 9h) + **📦 Còn phải giao** (`on_road = Σ(ot_tot−ot_done)` của NV đang chạy = đơn đang trên đường, dự báo áp lực cuối ngày). Strip đủ 8 thẻ: Chuyến · Đơn/giờ TB · Giờ XP TB · %GTC vùng · Cần chú ý · Đang chạy · XP muộn ≥9h · Còn phải giao.
 - **NÚT LÀM MỚI (FAB) trang chính** (`report_live.gen_html`): nút tròn `⟳` cố định góc phải-dưới màn hình (`.fab position:fixed`, tôn trọng `env(safe-area-inset-bottom)` để tránh vạch home). Bấm → `location.replace(pathname+'?t='+Date.now())` (cache-buster, luôn lấy bản mới nhất trên GitHub Pages CDN), nút xoay khi tải (`.spin`). Trang vẫn giữ auto-refresh 5' (`<meta http-equiv=refresh 300>`).
+
+### Nhật ký 16/09
+- **TRANG TỔNG QUAN (`tongquan.html`)** — gom số chính cần theo dõi từ báo cáo trực tiếp + dữ liệu 30 ngày vào 1 màn hình. `report_tongquan.build_html(rows)` (rows = `fetch_live`, **0 call API thêm**), sinh trong `report_live.main` cạnh index. Gồm: hero %GTC vùng · **8 KPI** (Đã gán·Chưa gán·Đang chạy·Còn phải giao·GTC·💰COD GTB kẹt·LTC·%GTC TikTok) · **xu hướng %GTC 14 ngày** (đọc `khuvuc_data/`) · **5 điểm nóng tự động** (AM & bưu cục %GTC thấp nhất, bưu cục COD GTB cao nhất, NV xuất phát muộn ≥9h, xã khó giao nhất) · **8 link chi tiết** tới mọi trang. Link **📋 Báo cáo tổng quan** (nút xanh nổi bật `.eod.tq`) đặt ĐẦU danh sách trên index. Mobile: KPI grid 2 cột <430px, không tràn ngang. Verify Σ khớp, xu hướng hiện 6 ngày (10-15/09 — xác nhận auto-collect tối chạy tốt).
 
 ### Nhật ký 14/09
 - **CƠ CẤU AM — chuyển `(YBA) Văn Phú`**: từ **Nguyễn Công Nam → Bế Ngọc Chuyển** (sửa 1 file `am_map.py`, tự áp mọi trang xếp hạng theo AM). Sau đổi: Nam **12 BC** · Chuyển **11 BC** · tổng vẫn **54 BC**, không trùng key. Đã verify trên trang live (Văn Phú nằm dưới Bế Ngọc Chuyển). Quy trình chuẩn khi user báo đổi cơ cấu: sửa `am_map.py` → kiểm tên khớp hub + không trùng key → commit/push repo thật `vietvk-ux/tbb-dashboard` → deploy → verify Σ AM = tổng vùng.
