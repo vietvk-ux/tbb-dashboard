@@ -245,6 +245,9 @@ td.rd{color:var(--bad);font-weight:700}
 .rank{color:var(--mut);font-weight:700;width:22px}
 
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:24px 0 4px}
+:root{--bg:#171640;--card:#201f52;--card2:#28275f;--line:#34326c}
+body{background:radial-gradient(130% 100% at 50% -10%,rgba(129,140,248,.10),transparent 65%),#171640 !important;background-attachment:fixed}
+.top{background:linear-gradient(180deg,#171640 62%,rgba(23,22,64,0)) !important}
 </style></head><body>"""
 
 
