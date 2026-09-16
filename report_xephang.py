@@ -394,6 +394,6 @@ def gen_html(data, links=None):
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Điểm tổng hợp = %GTC·35 + Năng suất·20 + Tồn đỏ·20 + COD·15 + Kỷ luật·10 "
              "(NV: bỏ Tồn đỏ, chuẩn hoá lại 4). Màu theo NHÓM 3 (tỉ lệ) trong từng cấp.<br>"
-             "Năng suất = GTC/ngày làm · Kỷ luật = %% ngày xuất phát &lt;9h · nguồn Supabase · theo THÁNG dương lịch (tự reset đầu tháng)</div>")
+             "Năng suất = GTC/ngày làm · Kỷ luật = %% ngày xuất phát KHÔNG muộn (≤9h30; ngày cũ trước 16/09 tính ≤9h) · nguồn Supabase · theo THÁNG dương lịch (tự reset đầu tháng)</div>")
     P.append("</div></body></html>")
     return "\n".join(P)

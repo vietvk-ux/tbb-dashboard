@@ -14,6 +14,8 @@ from datetime import date, datetime, timedelta
 EOD_TRIP_CUTOFF_HOUR = int(os.environ.get("EOD_TRIP_CUTOFF_HOUR", "10") or "10")
 # Xuất phát MUỘN nếu chuyến đầu tiên trong ngày bắt đầu từ giờ này (VN) trở đi.
 EOD_LATE_START_HOUR = int(os.environ.get("EOD_LATE_START_HOUR", "9") or "9")
+# Muộn = xuất phát SAU 9h30 (phút trong ngày > 570). Đổi qua env EOD_LATE_START_MIN.
+EOD_LATE_START_MIN = int(os.environ.get("EOD_LATE_START_MIN", "570") or "570")
 # NGÀY VẬN HÀNH 10h→10h: gộp chuyến của ngày D đóng sau nửa đêm (endDateIndex=D+1, <10h)
 # để không rơi số. Chỉ dùng khi CHỐT ngày D vào sáng D+1 (đủ dữ liệu). Mặc định TẮT.
 EOD_OPERATING_DAY = os.environ.get("EOD_OPERATING_DAY", "").strip().lower() in ("1", "true", "yes")
@@ -303,7 +305,7 @@ def aggregate(payload):
             "end": en.strftime("%H:%M") if en else None,
             "start_h": st.hour + st.minute / 60 if st else None,
             "span_min": span,
-            "late": (st.hour >= EOD_LATE_START_HOUR) if st else False,
+            "late": ((st.hour * 60 + st.minute) > EOD_LATE_START_MIN) if st else False,
         }
     driver_list = sorted([{**v, "trips": drv_trips.get(f"{v['driver_id']}|{v['bc']}", 0), "gtc": gtc(v),
                            "ltc": ltc_drv.get(f"{v['driver_id']}|{v['bc']}", 0), **_drv_time(v)}
