@@ -122,8 +122,8 @@ def build_html(rows):
     P.append("<div class='sec'>⚠️ Điểm nóng cần chú ý · bấm mở chi tiết</div>")
     P.append("<section class='hot'>")
     if am_worst:
-        # chi tiết: bưu cục của AM đó (xếp %GTC thấp→cao)
-        det = "".join(_dl_bc(r) for r in sorted(am_rows.get(am_worst[0], []),
+        # chi tiết: bưu cục của AM đó (bấm mở tiếp ra nhân viên), xếp %GTC thấp→cao
+        det = "".join(_bc_block(r) for r in sorted(am_rows.get(am_worst[0], []),
                       key=lambda x: _pct(x["gtc"], x["total"]) if x["total"] else 999))
         P.append(_hot("🧑‍💼", "AM %GTC thấp nhất", am_worst[0], "%d%%" % am_worst[1], _cls(am_worst[1]), det))
     if bc_worst:
@@ -281,12 +281,33 @@ def _nv_card(d):
                "".join("<span class='chip'>%s</span>" % c for c in chips)))
 
 
+def _bcm(r):
+    return {"total": r.get("total", 0), "backlog": r.get("backlog", 0),
+            "ontrip": r.get("ontrip", 0), "gtc": r.get("gtc", 0),
+            "cod": r.get("cod_gtb", 0), "ltc": r.get("ltc", 0),
+            "onroad": sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", []))}
+
+
+def _bc_block(r):
+    """1 bưu cục dạng <details> bấm mở ra thẻ nhân viên — dùng ở drill & điểm nóng AM."""
+    m = _bcm(r); pc = _pct(m["gtc"], m["total"]); cls = _cls(pc)
+    P = ["<details class='bc sub %s'><summary>" % cls]
+    P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+             "<span class='pill %s'>%s</span></div>"
+             % (cls, _esc(r["name"]), cls, ("%d%%" % pc) if pc is not None else "—"))
+    P.append(_metaline("", m))
+    P.append("</summary><div class='dtl'>")
+    drv = [d for d in r.get("drivers", []) if d.get("total") or d.get("ltc") or d.get("chuyen")]
+    if drv:
+        for d in sorted(drv, key=lambda x: _pct(x.get("gtc", 0), x.get("total", 0)) if x.get("total") else 999):
+            P.append(_nv_card(d))
+    else:
+        P.append("<div class='none'>Chưa có dữ liệu hôm nay.</div>")
+    P.append("</div></details>")
+    return "".join(P)
+
+
 def _consolidated(rows):
-    def bcm(r):
-        return {"total": r.get("total", 0), "backlog": r.get("backlog", 0),
-                "ontrip": r.get("ontrip", 0), "gtc": r.get("gtc", 0),
-                "cod": r.get("cod_gtb", 0), "ltc": r.get("ltc", 0),
-                "onroad": sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", []))}
     am_rows = {}
     for r in rows:
         a = AM_OF.get(r["name"])
@@ -301,7 +322,7 @@ def _consolidated(rows):
         rs = am_rows[a]
         agg = {k: 0 for k in ("total", "backlog", "ontrip", "gtc", "cod", "ltc", "onroad")}
         for r in rs:
-            for k, v in bcm(r).items():
+            for k, v in _bcm(r).items():
                 agg[k] += v
         pc = _pct(agg["gtc"], agg["total"]); cls = _cls(pc)
         P.append("<details class='bc %s'><summary>" % cls)
@@ -311,20 +332,7 @@ def _consolidated(rows):
         P.append(_metaline("🏤%d BC" % len(rs), agg))
         P.append("</summary><div class='dtl'>")
         for r in sorted(rs, key=lambda x: _pct(x.get("gtc", 0), x.get("total", 0)) if x.get("total") else 999):
-            m = bcm(r); pcb = _pct(m["gtc"], m["total"]); clsb = _cls(pcb)
-            P.append("<details class='bc sub %s'><summary>" % clsb)
-            P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
-                     "<span class='pill %s'>%s</span></div>"
-                     % (clsb, _esc(r["name"]), clsb, ("%d%%" % pcb) if pcb is not None else "—"))
-            P.append(_metaline("", m))
-            P.append("</summary><div class='dtl'>")
-            drv = [d for d in r.get("drivers", []) if d.get("total") or d.get("ltc") or d.get("chuyen")]
-            if drv:
-                for d in sorted(drv, key=lambda x: _pct(x.get("gtc", 0), x.get("total", 0)) if x.get("total") else 999):
-                    P.append(_nv_card(d))
-            else:
-                P.append("<div class='none'>Chưa có dữ liệu hôm nay.</div>")
-            P.append("</div></details>")
+            P.append(_bc_block(r))
         P.append("</div></details>")
     return "".join(P)
 
