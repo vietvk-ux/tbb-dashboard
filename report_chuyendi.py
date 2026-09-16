@@ -15,7 +15,7 @@ from am_map import AM_OF
 # Ngưỡng cảnh báo (đơn/giờ tính trên cả span mở→đóng chuyến nên trung vị vùng ~4;
 # đặt ngưỡng theo phân phối thật để không gắn cờ cả vùng).
 DPH_MIN = 2.5      # đơn/giờ dưới mức này = chậm (đáy phân phối)
-LATE_H = 9         # xuất phát từ 9h = muộn
+LATE_H = 9.5       # muộn = xuất phát SAU 9h30
 GTC_MIN = 60       # %GTC dưới mức này = kém (cảnh báo)
 MIN_ORDERS = 10    # tối thiểu đơn để vào bảng hiệu suất (tránh nhiễu mẫu nhỏ)
 
@@ -57,7 +57,7 @@ def _metrics(d, bc, prov):
     gtc_pct = round(gtc * 100 / total) if total else None
     chuyen = d.get("chuyen", 0)
     dpc = round(total / chuyen) if chuyen else 0
-    late = start_h is not None and start_h >= LATE_H
+    late = start_h is not None and start_h > LATE_H
     return {
         "name": d.get("name"), "bc": bc, "prov": prov, "chuyen": chuyen,
         "total": total, "gtc": gtc, "dpc": dpc, "dph": dph,
@@ -160,7 +160,7 @@ def gen_html(rows):
              % (_gtc_cls(gtc_vung), ("%d%%" % gtc_vung) if gtc_vung is not None else "—"))
     P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🐢 Cần chú ý</div></div>" % len(can_chu_y))
     P.append("<div class='st'><div class='sv'>%d</div><div class='sl'>🏃 Đang chạy</div></div>" % len(dang_chay))
-    P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🕘 XP muộn ≥9h</div></div>" % late_count)
+    P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🕘 XP muộn >9h30</div></div>" % late_count)
     P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>📦 Còn phải giao</div></div>" % _n(on_road))
     P.append("</section>")
 
@@ -171,8 +171,8 @@ def gen_html(rows):
     P.append("<div class='sec' style='color:var(--bad)'>🔴 NV cần chú ý — hiệu suất chuyến đi thấp</div>")
     P.append("<section class='card'>")
     P.append("<div class='note'>NV <b>đã đóng chuyến</b>, xếp theo <b>đơn/giờ thấp nhất</b> (&lt; %s). "
-             "Badge ⚠ nếu kèm <b>xuất phát muộn ≥%dh</b> / <b>%%GTC &lt;%d%%</b>.</div>"
-             % (str(DPH_MIN).replace(".", ","), LATE_H, GTC_MIN))
+             "Badge ⚠ nếu kèm <b>xuất phát sau 9h30</b> / <b>%%GTC &lt;%d%%</b>.</div>"
+             % (str(DPH_MIN).replace(".", ","), GTC_MIN))
     if can_chu_y:
         P.append(thead)
         for i, m in enumerate(can_chu_y[:25], 1):

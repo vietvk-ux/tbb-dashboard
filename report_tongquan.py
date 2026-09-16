@@ -11,7 +11,9 @@ from datetime import datetime, timezone, timedelta
 from am_map import AM_OF
 
 VN = timezone(timedelta(hours=7))
-LATE_H = int(os.environ.get("EOD_LATE_START_HOUR", "9") or "9")
+LATE_MIN = int(os.environ.get("EOD_LATE_START_MIN", "570") or "570")  # muộn = xuất phát SAU 9h30
+def _late(st):
+    return st is not None and (st.hour * 60 + st.minute) > LATE_MIN
 
 
 def _n(x): return "{:,}".format(int(x or 0)).replace(",", ".")
@@ -39,8 +41,7 @@ def build_html(rows):
     ontrip, fin, ltc = S("ontrip"), S("fin"), S("ltc")
     vngh, vngh_gtc, cod_gtb = S("vngh"), S("vngh_gtc"), S("cod_gtb")
     on_road = sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for r in rows for d in r.get("drivers", []))
-    late_nv = sum(1 for r in rows for d in r.get("drivers", [])
-                  if d.get("st") is not None and d["st"].hour >= LATE_H)
+    late_nv = sum(1 for r in rows for d in r.get("drivers", []) if _late(d.get("st")))
     reg_pct = _pct(gtc, total)
     vpct = _pct(vngh_gtc, vngh)
 
@@ -60,10 +61,10 @@ def build_html(rows):
     bc_worst = min([(r["name"], _pct(r["gtc"], r["total"])) for r in rows if r.get("total", 0) >= 50],
                    key=lambda x: x[1], default=None)
     bc_cod = max([(r["name"], r.get("cod_gtb", 0)) for r in rows], key=lambda x: x[1], default=None)
-    # NV xuất phát muộn (≥LATE_H) — danh sách cụ thể
+    # NV xuất phát muộn (SAU 9h30) — danh sách cụ thể
     late_list = sorted(
         [(d["name"], r["name"], d["st"]) for r in rows for d in r.get("drivers", [])
-         if d.get("st") is not None and d["st"].hour >= LATE_H],
+         if _late(d.get("st"))],
         key=lambda x: -(x[2].hour * 60 + x[2].minute))
 
     # ---- Xu hướng + điểm nóng khu vực (khuvuc_data) ----
@@ -141,7 +142,7 @@ def build_html(rows):
                       % (_esc(nm), _esc(bc), st.hour, st.minute) for nm, bc, st in late_list[:30])
     else:
         det = "<div class='none'>Không có NV nào xuất phát muộn.</div>"
-    P.append(_hot("🕘", "NV xuất phát muộn (≥%dh)" % LATE_H, "toàn vùng", str(late_nv) + " NV",
+    P.append(_hot("🕘", "NV xuất phát muộn (sau 9h30)", "toàn vùng", str(late_nv) + " NV",
                   "bad" if late_nv else "good", det))
     if zero_wards:
         tot_don = sum(w[2] for w in zero_wards)
