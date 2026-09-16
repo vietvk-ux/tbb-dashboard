@@ -131,19 +131,6 @@ def build_html(rows):
     P.append("<div class='sec'>📊 Tổng hợp chi tiết · AM → Bưu cục → Nhân viên · bấm mở</div>")
     P.append(_consolidated(rows))
 
-    # Trang chuyên sâu (dữ liệu lịch sử không gom được ở đây)
-    P.append("<div class='sec'>🔗 Trang chuyên sâu</div>")
-    for href, name, desc in [
-        ("eod.html", "📊 Cuối ngày", "chốt %GTC · Top 10 BC COD GTB"),
-        ("chuyendi.html", "🚚 Hiệu suất chuyến đi", "đơn/giờ · giờ ra hàng"),
-        ("nhanvien.html", "⚡ Năng suất NV", "xếp hạng GTC/ngày (30 ngày)"),
-        ("khuvuc.html", "🗺 Bản đồ khu vực", "GTC theo xã · bản đồ nhiệt"),
-        ("xephang.html", "🏆 Xếp hạng tổng hợp", "điểm AM · BC · NV (30 ngày)"),
-        ("backlog.html", "📦 Tồn đọng", "Lấy · Giao · Trả theo giờ"),
-    ]:
-        P.append("<a class='eod' href='%s'><span>%s</span><span class='arw'>%s →</span></a>"
-                 % (href, name, desc))
-
     P.append("<div class='foot'>Tổng hợp real-time từ báo cáo trực tiếp + dữ liệu 30 ngày · "
              "COD GTB = tiền thu hộ kẹt trên đơn giao hỏng (triệu) · nguồn nhanh.ghn.vn</div>")
     P.append("</div></body></html>")
