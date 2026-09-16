@@ -429,8 +429,8 @@ details.bc.sub{margin:6px 0;border-radius:10px;background:rgba(255,255,255,.02)}
   .bcn{font-size:13px}
   .eod{padding:11px 12px;font-size:14px}
 }
-body{background:radial-gradient(120% 62% at 50% -5%,rgba(236,72,153,.20),transparent 60%),radial-gradient(100% 55% at 92% 16%,rgba(244,63,94,.13),transparent 60%),#170a12 !important;background-attachment:fixed}
-.top{background:linear-gradient(180deg,#1b0c16 62%,rgba(27,12,22,0)) !important}
+body{background:radial-gradient(135% 95% at 50% -12%,rgba(244,114,182,.32),transparent 70%),#2e1122 !important;background-attachment:fixed}
+.top{background:linear-gradient(180deg,#2e1122 60%,rgba(46,17,34,0)) !important}
 </style></head><body>"""
 
 

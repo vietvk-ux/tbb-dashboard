@@ -442,6 +442,6 @@ details.bc.sub{margin:6px 0;border-radius:10px;background:rgba(255,255,255,.025)
   .hd .nvc{padding:7px 8px}
   .hd .chips{gap:4px}
 }
-body{background:radial-gradient(120% 62% at 50% -5%,rgba(59,130,246,.24),transparent 60%),radial-gradient(100% 55% at 92% 16%,rgba(99,102,241,.14),transparent 60%),#0a1020 !important;background-attachment:fixed}
-.top{background:linear-gradient(180deg,#0a1326 62%,rgba(10,19,38,0)) !important}
+body{background:radial-gradient(135% 95% at 50% -12%,rgba(59,130,246,.38),transparent 70%),#0c2247 !important;background-attachment:fixed}
+.top{background:linear-gradient(180deg,#0c2247 60%,rgba(12,34,71,0)) !important}
 </style></head><body>"""

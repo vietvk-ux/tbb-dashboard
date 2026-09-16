@@ -550,8 +550,8 @@ display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-col
 .fab .rfi{font-size:26px;line-height:1;font-weight:700}
 .fab.spin .rfi{animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-body{background:radial-gradient(120% 62% at 50% -5%,rgba(34,197,94,.20),transparent 60%),radial-gradient(100% 55% at 92% 16%,rgba(16,185,129,.12),transparent 60%),#0a1410 !important;background-attachment:fixed}
-.top{background:linear-gradient(180deg,#08130d 62%,rgba(8,19,13,0)) !important}
+body{background:radial-gradient(135% 95% at 50% -12%,rgba(52,211,153,.36),transparent 70%),#0c3021 !important;background-attachment:fixed}
+.top{background:linear-gradient(180deg,#0c3021 60%,rgba(12,48,33,0)) !important}
 </style></head><body>"""
 
 
