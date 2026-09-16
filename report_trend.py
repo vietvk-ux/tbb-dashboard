@@ -679,10 +679,11 @@ def gen_html(data):
 
 
 _NV_BG = ("<style>body{background:"
-          "radial-gradient(135% 80% at 0% 0%,rgba(245,158,11,.13),transparent 55%),"
-          "radial-gradient(135% 80% at 100% 12%,rgba(239,68,68,.10),transparent 55%),"
-          "#0a0d18 !important;background-attachment:fixed}"
-          ".top{background:linear-gradient(180deg,rgba(20,15,6,.92) 60%,rgba(20,15,6,0)) !important}</style>")
+          "radial-gradient(120% 65% at 50% -5%,rgba(245,158,11,.28),transparent 60%),"
+          "radial-gradient(100% 55% at 92% 18%,rgba(239,68,68,.20),transparent 60%),"
+          "#1a130a !important;background-attachment:fixed}"
+          ".top{background:linear-gradient(180deg,#221808 62%,rgba(34,24,8,0)) !important}"
+          ".regavg,.dnote{background:rgba(245,158,11,.08)}</style>")
 
 
 def gen_nhanvien_html(data):
@@ -715,10 +716,10 @@ def gen_nhanvien_html(data):
 
 
 _KHO_BG = ("<style>body{background:"
-           "radial-gradient(135% 80% at 0% 0%,rgba(139,26,47,.16),transparent 55%),"      # đỏ đô
-           "radial-gradient(135% 80% at 100% 12%,rgba(120,72,40,.13),transparent 55%),"   # nâu
-           "#0a0d18 !important;background-attachment:fixed}"
-           ".top{background:linear-gradient(180deg,rgba(24,10,10,.92) 60%,rgba(24,10,10,0)) !important}</style>")
+           "radial-gradient(120% 65% at 50% -5%,rgba(150,30,52,.34),transparent 62%),"    # đỏ đô
+           "radial-gradient(100% 55% at 92% 18%,rgba(130,80,45,.24),transparent 60%),"    # nâu
+           "#170b0d !important;background-attachment:fixed}"
+           ".top{background:linear-gradient(180deg,#1f0d10 62%,rgba(31,13,16,0)) !important}</style>")
 
 
 def gen_transit_html(transit):
