@@ -69,13 +69,11 @@ def build_html(rows):
     # ---- Xu hướng + điểm nóng khu vực (khuvuc_data) ----
     days = _load_days(14)
     day_series = [(d["ngay"][8:] + "/" + d["ngay"][5:7], _pct(d["gtc"], d["tot"])) for d in days]
-    hard_ward = None
+    # Toàn bộ xã/tuyến có GTC 0% toàn vùng (hôm qua, ≥5 đơn) — xếp số đơn giảm dần
+    zero_wards = []
     if days:
-        latest = days[-1]
-        cand = [w for w in latest.get("wards", []) if w[2] >= 20]
-        if cand:
-            w = min(cand, key=lambda w: _pct(w[3], w[2]))
-            hard_ward = (w[1], w[0], _pct(w[3], w[2]))   # ward, dist, pct
+        zero_wards = sorted([w for w in days[-1].get("wards", []) if w[2] >= 5 and w[3] == 0],
+                            key=lambda w: -w[2])   # w = [dist, ward, n, g]
 
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
@@ -145,10 +143,16 @@ def build_html(rows):
         det = "<div class='none'>Không có NV nào xuất phát muộn.</div>"
     P.append(_hot("🕘", "NV xuất phát muộn (≥%dh)" % LATE_H, "toàn vùng", str(late_nv) + " NV",
                   "bad" if late_nv else "good", det))
-    if hard_ward:
-        det = _ward_nv(days[-1], hard_ward[1], hard_ward[0]) if days else ""
-        P.append(_hot("🗺", "Xã khó giao nhất (hôm qua)", "%s · %s" % (hard_ward[0], hard_ward[1]),
-                      "%d%%" % hard_ward[2], _cls(hard_ward[2]), det))
+    if zero_wards:
+        tot_don = sum(w[2] for w in zero_wards)
+        det = ("<div class='dsub'>Toàn bộ xã/tuyến GTC 0%% toàn vùng hôm qua (≥5 đơn) · %d đơn giao hỏng hết</div>"
+               % tot_don)
+        det += "".join(
+            "<div class='dl'><span class='dln'>%s</span><span class='dlm'>%s · 📦%d</span>"
+            "<span class='pill sm bad'>0%%</span></div>" % (_esc(w[1]), _esc(w[0]), w[2])
+            for w in zero_wards[:60])
+        P.append(_hot("🗺", "Xã 0% GTC toàn vùng (hôm qua)", "toàn vùng · %d đơn hỏng" % tot_don,
+                      "%d xã" % len(zero_wards), "bad", det))
     P.append("</section>")
 
     # ===== BÁO CÁO TỔNG HỢP CHI TIẾT: AM → Bưu cục → Nhân viên =====
@@ -378,6 +382,7 @@ details.ht summary::-webkit-details-marker{display:none}
 .hcar{color:var(--mut);font-size:11px;flex:none;transition:transform .15s}
 details.ht[open] .hcar{transform:rotate(180deg)}
 .hd{padding:0 13px 10px}
+.hd .dsub{font-size:11px;color:var(--mut);padding:2px 0 4px;line-height:1.5}
 .dl{display:flex;align-items:center;gap:8px;padding:7px 2px;border-top:1px solid rgba(255,255,255,.05)}
 .dl:first-child{border-top:none}
 .dln{font-weight:600;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
