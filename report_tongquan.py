@@ -442,7 +442,4 @@ details.bc.sub{margin:6px 0;border-radius:10px;background:rgba(255,255,255,.025)
   .hd .nvc{padding:7px 8px}
   .hd .chips{gap:4px}
 }
-:root{--bg:#132449;--card:#18305c;--line:#2c4a80}
-body{background:radial-gradient(130% 100% at 50% -10%,rgba(59,130,246,.11),transparent 65%),#132449 !important;background-attachment:fixed}
-.top{background:linear-gradient(180deg,#132449 62%,rgba(19,36,73,0)) !important}
 </style></head><body>"""
