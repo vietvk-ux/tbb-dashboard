@@ -68,23 +68,23 @@ def _bc_drv_details(r):
     P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
              "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
     P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
-             "<span>📦 %s kiện</span><span class='gtb'>❌COD %str</span><span class='ltc'>LTC %s</span></div>"
-             % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]), _n(r.get("kien", 0)), _codm(r.get("cod_gtb", 0)), _n(r.get("ltc", 0))))
+             "<span class='gtb'>❌COD %str</span><span class='ltc'>LTC %s</span></div>"
+             % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]), _codm(r.get("cod_gtb", 0)), _n(r.get("ltc", 0))))
     P.append("</summary><div class='dtl'>")
     drv = r.get("drivers", [])
     if drv:
         P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th>"
-                 "<th>Kiện</th><th>LTC</th><th>COD GTB</th><th>%GTC</th></tr></thead><tbody>")
+                 "<th>LTC</th><th>COD GTB</th><th>%GTC</th></tr></thead><tbody>")
         for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
             pc2 = _pct(d["gtc"], d["total"])
             cgtb = d.get("cod_gtb", 0)
             gtb_cell = ("<b class='gtb'>%str</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
             ltc = d.get("ltc", 0)
             ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
-            P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+            P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
                      "<td><span class='pill sm %s'>%s%%</span></td></tr>"
                      % (_esc(d["name"]), _n(d.get("chuyen", 0)), _n(d["total"]), _n(d["gtc"]),
-                        _n(d.get("kien", 0)), ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—"))
+                        ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—"))
         P.append("</tbody></table>")
     else:
         P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
@@ -353,8 +353,8 @@ def gen_html(rows):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·📦 %s kiện·<span class='gtb'>❌COD %str</span>·<span class='ltc'>LTC %s</span></div>"
-                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _n(v.get("kien", 0)), _codm(v.get("cod_gtb", 0)), _n(v["ltc"])))
+        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='gtb'>❌COD %str</span>·<span class='ltc'>LTC %s</span></div>"
+                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _codm(v.get("cod_gtb", 0)), _n(v["ltc"])))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
@@ -374,9 +374,9 @@ def gen_html(rows):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·📦 %s kiện·<span class='gtb'>❌COD %str</span>·<span class='ltc'>LTC %s</span></div>"
+        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='gtb'>❌COD %str</span>·<span class='ltc'>LTC %s</span></div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
-                    _n(v.get("kien", 0)), _codm(v.get("cod_gtb", 0)), _n(v["ltc"])))
+                    _codm(v.get("cod_gtb", 0)), _n(v["ltc"])))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(prov_rows.get(pv, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
@@ -399,24 +399,24 @@ def gen_html(rows):
                  % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
-                 "<span class='w'>⏳ %s</span><span>✅ %s</span><span>📦 %s kiện</span><span class='gtb'>❌COD %str</span>"
+                 "<span class='w'>⏳ %s</span><span>✅ %s</span><span class='gtb'>❌COD %str</span>"
                  "<span class='ltc'>LTC %s</span></div>"
                  % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
-                    _n(r.get("kien", 0)), _codm(r.get("cod_gtb", 0)), _n(r.get("ltc", 0))))
+                    _codm(r.get("cod_gtb", 0)), _n(r.get("ltc", 0))))
         P.append("</summary>")
         drv = r["drivers"]  # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao)
         P.append("<div class='dtl'>")
         if drv:
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>Kiện</th><th>LTC</th><th>COD GTB</th><th>%GTC</th></tr></thead><tbody>")
+            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Ch</th><th>Gán</th><th>GTC</th><th>LTC</th><th>COD GTB</th><th>%GTC</th></tr></thead><tbody>")
             for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
                 pc2 = _pct(d["gtc"], d["total"])
                 cgtb = d.get("cod_gtb", 0)  # COD kẹt trên đơn GTB (đã thao tác nhưng giao hỏng)
                 gtb_cell = ("<b class='gtb'>%str</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
                 ltc = d.get("ltc", 0)
                 ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
-                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                          % (_esc(d["name"]), _n(d.get("chuyen", 0)), _n(d["total"]), _n(d["gtc"]),
-                            _n(d.get("kien", 0)), ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—"))
+                            ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—"))
             P.append("</tbody></table>")
         else:
             P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")

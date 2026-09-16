@@ -256,7 +256,6 @@ def _metaline(prefix, m):
     parts.append("<span class='mi'>🏃%s</span>" % _n(m["ontrip"]))
     parts.append("<span class='mi'>🚛%s</span>" % _n(m["onroad"]))
     parts.append("<span class='mi g'>✅%s</span>" % _n(m["gtc"]))
-    parts.append("<span class='mi'>📦%s kiện</span>" % _n(m.get("kien", 0)))
     parts.append("<span class='mi cod'>💰%str</span>" % _codm(m["cod"]))
     parts.append("<span class='mi ltc'>🛒%s</span>" % _n(m["ltc"]))
     return "<div class='ml'>" + "".join(parts) + "</div>"
@@ -266,8 +265,7 @@ def _nv_card(d):
     total = d.get("total", 0); gtc = d.get("gtc", 0); pc = _pct(gtc, total); cls = _cls(pc)
     cod = d.get("cod_gtb", 0); ltc = d.get("ltc", 0); vngh = d.get("vngh", 0); vg = d.get("vngh_gtc", 0)
     chuyen = d.get("chuyen", 0); st = d.get("st"); ot = d.get("ot_tot", 0); od = d.get("ot_done", 0)
-    chips = ["📥%s" % _n(total), "<span class='g'>✅%s</span>" % _n(gtc),
-             "📦%s kiện" % _n(d.get("kien", 0))]
+    chips = ["📥%s" % _n(total), "<span class='g'>✅%s</span>" % _n(gtc)]
     if cod >= 1e5:
         chips.append("<span class='cod'>💰%str</span>" % _codm(cod))
     if ltc:
