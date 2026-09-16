@@ -286,10 +286,9 @@ def _ns_drill(rows):
     nv = {}
     for r in rows:
         bc = r.get("buu_cuc") or "?"
-        did = str(r.get("driver_id") or "") or ("%s|%s" % (r.get("ten_nv") or "", bc))
-        d = nv.setdefault(did, {"ten": r.get("ten_nv") or "—", "bc": bc, "g": 0, "days": 0})
+        did = str(r.get("driver_id") or "") or (r.get("ten_nv") or "")
+        d = nv.setdefault((did, bc), {"ten": r.get("ten_nv") or "—", "bc": bc, "g": 0, "days": 0})
         if r.get("ten_nv"): d["ten"] = r["ten_nv"]
-        if r.get("buu_cuc"): d["bc"] = r["buu_cuc"]
         d["g"] += r.get("gtc") or 0
         d["days"] += 1
     nvs = [{**d, "avg": d["g"] / d["days"]} for d in nv.values() if d["days"] > 0]
@@ -350,10 +349,9 @@ def _ns_yesterday_bc(rows):
     for r in rows:
         b = r.get("buu_cuc") or "?"
         bc_days.setdefault(b, set()).add(r["ngay"])
-        did = str(r.get("driver_id") or "") or ("%s|%s" % (r.get("ten_nv") or "", b))
-        d = nv.setdefault(did, {"ten": r.get("ten_nv") or "—", "bc": b, "g": 0, "days": 0, "hq": 0})
+        did = str(r.get("driver_id") or "") or (r.get("ten_nv") or "")
+        d = nv.setdefault((did, b), {"ten": r.get("ten_nv") or "—", "bc": b, "g": 0, "days": 0, "hq": 0})
         if r.get("ten_nv"): d["ten"] = r["ten_nv"]
-        if r.get("buu_cuc"): d["bc"] = r["buu_cuc"]
         g = r.get("gtc") or 0
         d["g"] += g; d["days"] += 1
         if r["ngay"] == latest:
