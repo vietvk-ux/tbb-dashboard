@@ -337,6 +337,56 @@ def _ns_drill(rows):
     return P[0] + "<section class='card drillcard'>" + "".join(P[1:]) + "</section>"
 
 
+def _ns_yesterday_bc(rows):
+    """GTC HÔM QUA theo bưu cục (xếp cao→thấp), bấm mở ra nhân viên; mỗi cấp so
+    với TB 30 ngày (▲ trên / ▼ dưới mức thường). Màu xanh=trên TB, đỏ=dưới TB."""
+    if not rows:
+        return ("<div class='sec' style='color:var(--good)'>🏤 GTC hôm qua theo bưu cục</div>"
+                "<section class='card'><div class='none'>Chưa đủ dữ liệu.</div></section>")
+    latest = max(r["ngay"] for r in rows)
+    dm = "%s/%s" % (latest[8:10], latest[5:7])
+    label = "🏤 GTC hôm qua (%s) theo bưu cục · cao → thấp · so TB 30 ngày" % dm
+    nv = {}; bc_days = {}
+    for r in rows:
+        b = r.get("buu_cuc") or "?"
+        bc_days.setdefault(b, set()).add(r["ngay"])
+        did = str(r.get("driver_id") or "") or ("%s|%s" % (r.get("ten_nv") or "", b))
+        d = nv.setdefault(did, {"ten": r.get("ten_nv") or "—", "bc": b, "g": 0, "days": 0, "hq": 0})
+        if r.get("ten_nv"): d["ten"] = r["ten_nv"]
+        if r.get("buu_cuc"): d["bc"] = r["buu_cuc"]
+        g = r.get("gtc") or 0
+        d["g"] += g; d["days"] += 1
+        if r["ngay"] == latest:
+            d["hq"] = g
+    bc = {}
+    for x in nv.values():
+        d = bc.setdefault(x["bc"], {"hq": 0, "g": 0, "nv": []})
+        d["hq"] += x["hq"]; d["g"] += x["g"]; d["nv"].append(x)
+
+    def ud(cur, avg): return "good" if cur >= avg else "bad"
+    def dtxt(cur, avg):
+        diff = round(cur - avg)
+        return ("<span class='up'>▲%d</span>" % diff) if diff >= 0 else ("<span class='down'>▼%d</span>" % abs(diff))
+    P = ["<div class='sec' style='color:var(--good)'>%s</div>" % label,
+         "<div class='dnote'>Số lớn = GTC HÔM QUA · TB = bình quân 30 ngày · ▲ trên / ▼ dưới mức thường · 🟢 trên TB · 🔴 dưới TB</div>"]
+    for b in sorted(bc, key=lambda k: -bc[k]["hq"]):
+        d = bc[b]; nd = len(bc_days.get(b, [])) or 1; avgd = d["g"] / nd
+        c = ud(d["hq"], avgd)
+        P.append("<details class='bcx %s'><summary><span class='dot %s'></span>"
+                 "<span class='dn'>%s</span><span class='dmeta'>TB %d · %s</span>"
+                 "<span class='pill sm %s'>%s</span></summary><div class='dbody'>"
+                 % (c, c, _esc(b), round(avgd), dtxt(d["hq"], avgd), c, _n(d["hq"])))
+        for x in sorted(d["nv"], key=lambda i: -i["hq"]):
+            avg = x["g"] / x["days"] if x["days"] else 0
+            cc = ud(x["hq"], avg)
+            P.append("<div class='nvr'><span class='dn'>%s</span>"
+                     "<span class='dmeta'>TB %d · %s</span>"
+                     "<span class='pill sm %s'>%s</span></div>"
+                     % (_esc(x["ten"]), round(avg), dtxt(x["hq"], avg), cc, _n(x["hq"])))
+        P.append("</div></details>")
+    return P[0] + "<section class='card drillcard'>" + "".join(P[1:]) + "</section>"
+
+
 def _ns_today_card(rows, min_today=30, min_prior=3, topn=15):
     """So NĂNG SUẤT: đơn GTC NGÀY GẦN NHẤT của NV vs TB đơn GTC/ngày của CHÍNH NV
     (các ngày trước trong 30 ngày). Chỉ NV có GTC ngày gần nhất > min_today.
@@ -640,6 +690,8 @@ def gen_nhanvien_html(data):
     P.append(_cod_card(data.get("nv30") or []))
     # Năng suất TB 30 ngày theo AM → Bưu cục → Nhân viên (thấp→cao, màu đỏ/vàng/xanh)
     P.append(_ns_drill(data.get("nv_gtc") or []))
+    # GTC hôm qua theo bưu cục (cao→thấp) · bấm ra NV · so TB 30 ngày
+    P.append(_ns_yesterday_bc(data.get("nv_gtc") or []))
     P.append("<a class='eod' href='trend.html'><span>📈 Xu hướng theo ngày</span>"
              "<span class='arw'>biểu đồ %GTC →</span></a>")
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
@@ -843,6 +895,7 @@ details.bcx.good{border-left-color:var(--good)}details.bcx.warn{border-left-colo
 .dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
 .dn{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .dmeta{color:var(--mut);font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dmeta .up{color:var(--good);font-weight:800}.dmeta .down{color:var(--bad);font-weight:800}
 .dbody{padding:2px 10px 9px}
 .nvr{display:flex;align-items:center;gap:9px;padding:7px 2px;border-top:1px solid rgba(255,255,255,.05)}
 .nvr:first-child{border-top:none}
