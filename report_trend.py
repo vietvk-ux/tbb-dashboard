@@ -365,7 +365,14 @@ def _ns_yesterday_bc(rows):
     def dtxt(cur, avg):
         diff = round(cur - avg)
         return ("<span class='up'>▲%d</span>" % diff) if diff >= 0 else ("<span class='down'>▼%d</span>" % abs(diff))
+    # Tổng GTC hôm qua toàn vùng = Σ tất cả bưu cục · so TB ngày (Σ GTC 30 ngày ÷ số ngày)
+    reg_hq = sum(d["hq"] for d in bc.values())
+    reg_days = len(set(r["ngay"] for r in rows)) or 1
+    reg_avgd = sum(r.get("gtc") or 0 for r in rows) / reg_days
+    rc = ud(reg_hq, reg_avgd)
     P = ["<div class='sec' style='color:var(--good)'>%s</div>" % label,
+         "<div class='regavg'><span>🌐 Tổng GTC hôm qua toàn vùng · TB %d/ngày · %s</span>"
+         "<span class='pill %s'>%s</span></div>" % (round(reg_avgd), dtxt(reg_hq, reg_avgd), rc, _n(reg_hq)),
          "<div class='dnote'>Số lớn = GTC HÔM QUA · TB = bình quân 30 ngày · ▲ trên / ▼ dưới mức thường · 🟢 trên TB · 🔴 dưới TB</div>"]
     for b in sorted(bc, key=lambda k: -bc[k]["hq"]):
         d = bc[b]; nd = len(bc_days.get(b, [])) or 1; avgd = d["g"] / nd
@@ -894,7 +901,7 @@ details.bcx.good{border-left-color:var(--good)}details.bcx.warn{border-left-colo
 .dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
 .dn{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .dmeta{color:var(--mut);font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.dmeta .up{color:var(--good);font-weight:800}.dmeta .down{color:var(--bad);font-weight:800}
+.dmeta .up,.regavg .up{color:var(--good);font-weight:800}.dmeta .down,.regavg .down{color:var(--bad);font-weight:800}
 .dbody{padding:2px 10px 9px}
 .nvr{display:flex;align-items:center;gap:9px;padding:7px 2px;border-top:1px solid rgba(255,255,255,.05)}
 .nvr:first-child{border-top:none}
