@@ -684,14 +684,15 @@ def gen_nhanvien_html(data):
                  "Thêm secret rồi đợi có dữ liệu.</div>")
         P.append("</div></body></html>")
         return "\n".join(P)
-    # Năng suất GTC = đơn GTC / số ngày làm việc (mục chính)
+    # ĐẦU TRANG: 2 báo cáo drill năng suất theo AM/bưu cục/nhân viên
+    # 1) Năng suất TB 30 ngày theo AM → Bưu cục → Nhân viên (thấp→cao, màu đỏ/vàng/xanh)
+    P.append(_ns_drill(data.get("nv_gtc") or []))
+    # 2) GTC hôm qua theo bưu cục (cao→thấp) · bấm ra NV · so TB 30 ngày
+    P.append(_ns_yesterday_bc(data.get("nv_gtc") or []))
+    # Năng suất GTC = đơn GTC / số ngày làm việc (danh sách xếp hạng)
     P.append(_ns_card(data.get("nangsuat") or []))
     # Top 10 COD GTB / đơn GTB cao nhất (30 ngày) — tiền thu hộ kẹt/đơn hỏng
     P.append(_cod_card(data.get("nv30") or []))
-    # Năng suất TB 30 ngày theo AM → Bưu cục → Nhân viên (thấp→cao, màu đỏ/vàng/xanh)
-    P.append(_ns_drill(data.get("nv_gtc") or []))
-    # GTC hôm qua theo bưu cục (cao→thấp) · bấm ra NV · so TB 30 ngày
-    P.append(_ns_yesterday_bc(data.get("nv_gtc") or []))
     P.append("<a class='eod' href='trend.html'><span>📈 Xu hướng theo ngày</span>"
              "<span class='arw'>biểu đồ %GTC →</span></a>")
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
