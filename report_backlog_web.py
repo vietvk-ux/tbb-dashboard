@@ -230,6 +230,8 @@ border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:12px;
 .eod .arw{color:var(--mut);font-size:12.5px;font-weight:500}
 .foot{color:var(--mut);font-size:11px;text-align:center;margin:22px 0 8px;line-height:1.6}
 .muted{color:var(--mut)}
+body{background:radial-gradient(120% 62% at 50% -5%,rgba(249,115,22,.24),transparent 60%),radial-gradient(100% 55% at 92% 16%,rgba(234,88,12,.15),transparent 60%),#170f08 !important;background-attachment:fixed}
+.top{background:linear-gradient(180deg,#1b1208 62%,rgba(27,18,8,0)) !important}
 </style>"""
 
 

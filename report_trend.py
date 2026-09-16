@@ -542,9 +542,16 @@ def _bucket_chips(buckets):
 
 # ---------- Trang ----------
 
+_TREND_BG = ("<style>body{background:"
+             "radial-gradient(120% 62% at 50% -5%,rgba(6,182,212,.24),transparent 60%),"
+             "radial-gradient(100% 55% at 92% 16%,rgba(56,189,248,.14),transparent 60%),"
+             "#08141c !important;background-attachment:fixed}"
+             ".top{background:linear-gradient(180deg,#08161f 62%,rgba(8,22,31,0)) !important}</style>")
+
+
 def gen_html(data):
     now = datetime.now(VN)
-    P = [_HEAD, "<div class='wrap'>",
+    P = [_HEAD + _TREND_BG, "<div class='wrap'>",
          "<header class='top'><div class='brand'>📈 XU HƯỚNG TBB</div>"
          "<div class='ts'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m")]
 
