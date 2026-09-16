@@ -31,8 +31,8 @@ td.nv .sc{color:var(--mut);font-size:10.5px;font-weight:400}
 table.drv td.win{font-size:11px;color:var(--mut);white-space:nowrap}
 .bc summary .amn{font-weight:800;font-size:14.5px}
 .bc summary .ammet{color:var(--mut);font-size:11.5px;font-weight:500}
-body{background:radial-gradient(135% 95% at 50% -12%,rgba(45,212,191,.34),transparent 70%),#0a2f2b !important;background-attachment:fixed}
-.top{background:linear-gradient(180deg,#0a2f2b 60%,rgba(10,47,43,0)) !important}
+body{background:radial-gradient(130% 100% at 50% -10%,rgba(45,212,191,.10),transparent 65%),#0c2521 !important;background-attachment:fixed}
+.top{background:linear-gradient(180deg,#0c2521 62%,rgba(12,37,33,0)) !important}
 </style>"""
 
 
