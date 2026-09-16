@@ -127,19 +127,20 @@ def build_html(rows):
         P.append(_hot("🗺", "Xã khó giao nhất (hôm qua)", "%s · %s" % (hard_ward[0], hard_ward[1]), "%d%%" % hard_ward[2], _cls(hard_ward[2])))
     P.append("</section>")
 
-    # Truy cập nhanh
-    P.append("<div class='sec'>🔗 Xem chi tiết</div>")
-    links = [
-        ("index.html", "🟢 Trực tiếp", "%GTC · gán · COD theo NV/BC/AM"),
+    # ===== BÁO CÁO TỔNG HỢP CHI TIẾT: AM → Bưu cục → Nhân viên =====
+    P.append("<div class='sec'>📊 Tổng hợp chi tiết · AM → Bưu cục → Nhân viên · bấm mở</div>")
+    P.append(_consolidated(rows))
+
+    # Trang chuyên sâu (dữ liệu lịch sử không gom được ở đây)
+    P.append("<div class='sec'>🔗 Trang chuyên sâu</div>")
+    for href, name, desc in [
         ("eod.html", "📊 Cuối ngày", "chốt %GTC · Top 10 BC COD GTB"),
-        ("backlog.html", "📦 Tồn đọng", "Lấy · Giao · Trả theo giờ"),
         ("chuyendi.html", "🚚 Hiệu suất chuyến đi", "đơn/giờ · giờ ra hàng"),
-        ("nhanvien.html", "⚡ Năng suất NV", "xếp hạng GTC/ngày"),
+        ("nhanvien.html", "⚡ Năng suất NV", "xếp hạng GTC/ngày (30 ngày)"),
         ("khuvuc.html", "🗺 Bản đồ khu vực", "GTC theo xã · bản đồ nhiệt"),
-        ("xephang.html", "🏆 Xếp hạng tổng hợp", "điểm AM · BC · NV"),
-        ("khochuyentiep.html", "📦 Kho chuyển tiếp", "tồn luân chuyển"),
-    ]
-    for href, name, desc in links:
+        ("xephang.html", "🏆 Xếp hạng tổng hợp", "điểm AM · BC · NV (30 ngày)"),
+        ("backlog.html", "📦 Tồn đọng", "Lấy · Giao · Trả theo giờ"),
+    ]:
         P.append("<a class='eod' href='%s'><span>%s</span><span class='arw'>%s →</span></a>"
                  % (href, name, desc))
 
@@ -190,6 +191,89 @@ def _spark(series):
         P.append("<text x='%.1f' y='%.1f' class='bv'>%d</text>" % (cx, y - 4, v))
         P.append("<text x='%.1f' y='%d' class='bx'>%s</text>" % (cx, H - 10, _esc(lab)))
     P.append("</svg>")
+    return "".join(P)
+
+
+def _metaline(prefix, m):
+    parts = [prefix] if prefix else []
+    parts.append("📥%s" % _n(m["total"]))
+    parts.append("<span class='w'>⏳%s</span>" % _n(m["backlog"]))
+    parts.append("🏃%s" % _n(m["ontrip"]))
+    parts.append("📦%s" % _n(m["onroad"]))
+    parts.append("<span class='g'>✅%s</span>" % _n(m["gtc"]))
+    parts.append("<span class='cod'>💰%str</span>" % _codm(m["cod"]))
+    parts.append("<span class='ltc'>🛒%s</span>" % _n(m["ltc"]))
+    return "<div class='ml'>" + " · ".join(parts) + "</div>"
+
+
+def _nv_card(d):
+    total = d.get("total", 0); gtc = d.get("gtc", 0); pc = _pct(gtc, total); cls = _cls(pc)
+    cod = d.get("cod_gtb", 0); ltc = d.get("ltc", 0); vngh = d.get("vngh", 0); vg = d.get("vngh_gtc", 0)
+    chuyen = d.get("chuyen", 0); st = d.get("st"); ot = d.get("ot_tot", 0); od = d.get("ot_done", 0)
+    chips = ["📥%s" % _n(total), "<span class='g'>✅%s</span>" % _n(gtc)]
+    if cod >= 1e5:
+        chips.append("<span class='cod'>💰%str</span>" % _codm(cod))
+    if ltc:
+        chips.append("<span class='ltc'>🛒%s</span>" % _n(ltc))
+    if vngh:
+        chips.append("🛍️%s/%s" % (_n(vg), _n(vngh)))
+    if chuyen:
+        chips.append("🚚%sch" % _n(chuyen))
+    if st is not None:
+        chips.append("⏰%02d:%02d" % (st.hour, st.minute))
+    if ot:
+        chips.append("🏃%s/%s" % (_n(od), _n(ot)))
+    return ("<div class='nvc %s'><div class='nvh'><span class='nvn'>%s</span>"
+            "<span class='pill sm %s'>%s</span></div><div class='chips'>%s</div></div>"
+            % (cls, _esc(d.get("name", "—")), cls, ("%d%%" % pc) if pc is not None else "—",
+               "".join("<span class='chip'>%s</span>" % c for c in chips)))
+
+
+def _consolidated(rows):
+    def bcm(r):
+        return {"total": r.get("total", 0), "backlog": r.get("backlog", 0),
+                "ontrip": r.get("ontrip", 0), "gtc": r.get("gtc", 0),
+                "cod": r.get("cod_gtb", 0), "ltc": r.get("ltc", 0),
+                "onroad": sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", []))}
+    am_rows = {}
+    for r in rows:
+        a = AM_OF.get(r["name"])
+        if a:
+            am_rows.setdefault(a, []).append(r)
+
+    def am_pct(a):
+        rs = am_rows[a]; t = sum(x.get("total", 0) for x in rs); g = sum(x.get("gtc", 0) for x in rs)
+        return _pct(g, t) if t else 999
+    P = []
+    for a in sorted(am_rows, key=am_pct):
+        rs = am_rows[a]
+        agg = {k: 0 for k in ("total", "backlog", "ontrip", "gtc", "cod", "ltc", "onroad")}
+        for r in rs:
+            for k, v in bcm(r).items():
+                agg[k] += v
+        pc = _pct(agg["gtc"], agg["total"]); cls = _cls(pc)
+        P.append("<details class='bc %s'><summary>" % cls)
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+                 "<span class='pill %s'>%s</span></div>"
+                 % (cls, _esc(a), cls, ("%d%%" % pc) if pc is not None else "—"))
+        P.append(_metaline("🏤%d BC" % len(rs), agg))
+        P.append("</summary><div class='dtl'>")
+        for r in sorted(rs, key=lambda x: _pct(x.get("gtc", 0), x.get("total", 0)) if x.get("total") else 999):
+            m = bcm(r); pcb = _pct(m["gtc"], m["total"]); clsb = _cls(pcb)
+            P.append("<details class='bc sub %s'><summary>" % clsb)
+            P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+                     "<span class='pill %s'>%s</span></div>"
+                     % (clsb, _esc(r["name"]), clsb, ("%d%%" % pcb) if pcb is not None else "—"))
+            P.append(_metaline("", m))
+            P.append("</summary><div class='dtl'>")
+            drv = [d for d in r.get("drivers", []) if d.get("total") or d.get("ltc") or d.get("chuyen")]
+            if drv:
+                for d in sorted(drv, key=lambda x: _pct(x.get("gtc", 0), x.get("total", 0)) if x.get("total") else 999):
+                    P.append(_nv_card(d))
+            else:
+                P.append("<div class='none'>Chưa có dữ liệu hôm nay.</div>")
+            P.append("</div></details>")
+        P.append("</div></details>")
     return "".join(P)
 
 
@@ -244,9 +328,35 @@ font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
  border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0;text-decoration:none;color:var(--txt);font-weight:600}
 .eod .arw{color:var(--mut);font-size:11.5px;font-weight:500;text-align:right}
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:16px 0 8px}
+/* ===== Drill AM → Bưu cục → Nhân viên ===== */
+details.bc{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:12px;margin:7px 0;overflow:hidden}
+details.bc.good{border-left-color:var(--good)}details.bc.warn{border-left-color:var(--warn)}details.bc.bad{border-left-color:var(--bad)}
+details.bc summary{padding:10px 12px;cursor:pointer;list-style:none}
+details.bc summary::-webkit-details-marker{display:none}
+.bch{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.bcn{font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:800;font-size:12px;flex:none;font-variant-numeric:tabular-nums}
+.pill.sm{font-size:11px;padding:1px 7px}
+.pill.good{background:rgba(34,197,94,.15);color:var(--good)}
+.pill.warn{background:rgba(245,158,11,.15);color:var(--warn)}
+.pill.bad{background:rgba(239,68,68,.15);color:var(--bad)}
+.ml{font-size:11.5px;color:var(--mut);margin-top:6px;line-height:1.7;font-variant-numeric:tabular-nums}
+.ml .w{color:var(--warn)}.ml .g{color:var(--good)}.ml .cod{color:var(--bad);font-weight:700}.ml .ltc{color:var(--good)}
+.dtl{padding:2px 8px 9px}
+details.bc.sub{margin:6px 0;border-radius:10px;background:rgba(255,255,255,.025)}
+.none{color:var(--mut);font-size:12px;padding:6px 4px}
+.nvc{background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0}
+.nvh{display:flex;align-items:center;gap:8px}
+.nvn{font-weight:600;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{font-size:11px;background:rgba(255,255,255,.05);border-radius:6px;padding:2px 7px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip .g{color:var(--good)}.chip .cod{color:var(--bad);font-weight:700}.chip .ltc{color:var(--good)}
 @media (max-width:430px){
   .grid{grid-template-columns:repeat(2,1fr)}
   .hpct{font-size:46px}.kv{font-size:17px}
   .eod{font-size:13.5px;padding:11px 12px}.eod .arw{font-size:11px}
+  .ml{font-size:11px}.chip{font-size:10.5px;padding:2px 6px}.bcn{font-size:13.5px}
 }
 </style></head><body>"""
