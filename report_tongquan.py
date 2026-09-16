@@ -248,16 +248,18 @@ def _spark(series):
 
 
 def _metaline(prefix, m):
-    parts = [prefix] if prefix else []
-    parts.append("📥%s" % _n(m["total"]))
-    parts.append("<span class='w'>⏳%s</span>" % _n(m["backlog"]))
-    parts.append("🏃%s" % _n(m["ontrip"]))
-    parts.append("🚛%s" % _n(m["onroad"]))
-    parts.append("<span class='g'>✅%s</span>" % _n(m["gtc"]))
-    parts.append("📦%s kiện" % _n(m.get("kien", 0)))
-    parts.append("<span class='cod'>💰%str</span>" % _codm(m["cod"]))
-    parts.append("<span class='ltc'>🛒%s</span>" % _n(m["ltc"]))
-    return "<div class='ml'>" + " · ".join(parts) + "</div>"
+    parts = []
+    if prefix:
+        parts.append("<span class='mi'>%s</span>" % prefix)
+    parts.append("<span class='mi'>📥%s</span>" % _n(m["total"]))
+    parts.append("<span class='mi w'>⏳%s</span>" % _n(m["backlog"]))
+    parts.append("<span class='mi'>🏃%s</span>" % _n(m["ontrip"]))
+    parts.append("<span class='mi'>🚛%s</span>" % _n(m["onroad"]))
+    parts.append("<span class='mi g'>✅%s</span>" % _n(m["gtc"]))
+    parts.append("<span class='mi'>📦%s kiện</span>" % _n(m.get("kien", 0)))
+    parts.append("<span class='mi cod'>💰%str</span>" % _codm(m["cod"]))
+    parts.append("<span class='mi ltc'>🛒%s</span>" % _n(m["ltc"]))
+    return "<div class='ml'>" + "".join(parts) + "</div>"
 
 
 def _nv_card(d):
@@ -417,7 +419,8 @@ details.bc summary::-webkit-details-marker{display:none}
 .pill.good{background:rgba(34,197,94,.15);color:var(--good)}
 .pill.warn{background:rgba(245,158,11,.15);color:var(--warn)}
 .pill.bad{background:rgba(239,68,68,.15);color:var(--bad)}
-.ml{font-size:11.5px;color:var(--mut);margin-top:6px;line-height:1.7;font-variant-numeric:tabular-nums}
+.ml{display:flex;flex-wrap:wrap;gap:3px 9px;font-size:11.5px;color:var(--mut);margin-top:6px;font-variant-numeric:tabular-nums}
+.ml .mi{white-space:nowrap}
 .ml .w{color:var(--warn)}.ml .g{color:var(--good)}.ml .cod{color:var(--bad);font-weight:700}.ml .ltc{color:var(--good)}
 .dtl{padding:2px 8px 9px}
 details.bc.sub{margin:6px 0;border-radius:10px;background:rgba(255,255,255,.025)}
@@ -432,6 +435,13 @@ details.bc.sub{margin:6px 0;border-radius:10px;background:rgba(255,255,255,.025)
   .grid{grid-template-columns:repeat(2,1fr)}
   .hpct{font-size:46px}.kv{font-size:17px}
   .eod{font-size:13.5px;padding:11px 12px}.eod .arw{font-size:11px}
-  .ml{font-size:11px}.chip{font-size:10.5px;padding:2px 6px}.bcn{font-size:13.5px}
+  .ml{font-size:11px;gap:2px 7px}.chip{font-size:10.5px;padding:2px 6px}.bcn{font-size:13.5px}
+  /* Điểm nóng mở ra: thu lề để card lồng rộng, gọn hơn trên iPhone */
+  .hd{padding:0 6px 8px}
+  .hd .bc.sub{margin:5px 0}
+  .hd .dtl{padding:2px 6px 8px}
+  .hd details.bc summary{padding:9px 9px}
+  .hd .nvc{padding:7px 8px}
+  .hd .chips{gap:4px}
 }
 </style></head><body>"""
