@@ -714,9 +714,16 @@ def gen_nhanvien_html(data):
     return "\n".join(P)
 
 
+_KHO_BG = ("<style>body{background:"
+           "radial-gradient(135% 80% at 0% 0%,rgba(139,26,47,.16),transparent 55%),"      # đỏ đô
+           "radial-gradient(135% 80% at 100% 12%,rgba(120,72,40,.13),transparent 55%),"   # nâu
+           "#0a0d18 !important;background-attachment:fixed}"
+           ".top{background:linear-gradient(180deg,rgba(24,10,10,.92) 60%,rgba(24,10,10,0)) !important}</style>")
+
+
 def gen_transit_html(transit):
     now = datetime.now(VN)
-    P = [_HEAD.replace("<title>Xu hướng TBB</title>", "<title>Kho Chuyển Tiếp · TBB</title>"),
+    P = [_HEAD.replace("<title>Xu hướng TBB</title>", "<title>Kho Chuyển Tiếp · TBB</title>") + _KHO_BG,
          "<div class='wrap'>",
          "<header class='top'><div class='brand'>📦 KHO CHUYỂN TIẾP</div>"
          "<div class='ts' style='white-space:nowrap'>cập nhật %s</div></header>" % now.strftime("%H:%M %d/%m")]
