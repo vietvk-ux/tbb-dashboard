@@ -102,7 +102,7 @@ def build_html(rows):
         ("📥", _n(total), "Đã gán", ""),
         ("⏳", _n(backlog), "Chưa gán", "warn"),
         ("🏃", _n(ontrip), "Đang chạy", ""),
-        ("📦", _n(on_road), "Còn phải giao", "warn"),
+        ("🚛", _n(on_road), "Còn phải giao", "warn"),
         ("✅", _n(gtc), "GTC nay", "good"),
         ("💰", _codm(cod_gtb) + "tr", "COD GTB kẹt", "bad"),
         ("🛒", _n(ltc), "LTC", "good"),
@@ -252,8 +252,9 @@ def _metaline(prefix, m):
     parts.append("📥%s" % _n(m["total"]))
     parts.append("<span class='w'>⏳%s</span>" % _n(m["backlog"]))
     parts.append("🏃%s" % _n(m["ontrip"]))
-    parts.append("📦%s" % _n(m["onroad"]))
+    parts.append("🚛%s" % _n(m["onroad"]))
     parts.append("<span class='g'>✅%s</span>" % _n(m["gtc"]))
+    parts.append("📦%s kiện" % _n(m.get("kien", 0)))
     parts.append("<span class='cod'>💰%str</span>" % _codm(m["cod"]))
     parts.append("<span class='ltc'>🛒%s</span>" % _n(m["ltc"]))
     return "<div class='ml'>" + " · ".join(parts) + "</div>"
@@ -263,7 +264,8 @@ def _nv_card(d):
     total = d.get("total", 0); gtc = d.get("gtc", 0); pc = _pct(gtc, total); cls = _cls(pc)
     cod = d.get("cod_gtb", 0); ltc = d.get("ltc", 0); vngh = d.get("vngh", 0); vg = d.get("vngh_gtc", 0)
     chuyen = d.get("chuyen", 0); st = d.get("st"); ot = d.get("ot_tot", 0); od = d.get("ot_done", 0)
-    chips = ["📥%s" % _n(total), "<span class='g'>✅%s</span>" % _n(gtc)]
+    chips = ["📥%s" % _n(total), "<span class='g'>✅%s</span>" % _n(gtc),
+             "📦%s kiện" % _n(d.get("kien", 0))]
     if cod >= 1e5:
         chips.append("<span class='cod'>💰%str</span>" % _codm(cod))
     if ltc:
@@ -285,7 +287,7 @@ def _nv_card(d):
 def _bcm(r):
     return {"total": r.get("total", 0), "backlog": r.get("backlog", 0),
             "ontrip": r.get("ontrip", 0), "gtc": r.get("gtc", 0),
-            "cod": r.get("cod_gtb", 0), "ltc": r.get("ltc", 0),
+            "cod": r.get("cod_gtb", 0), "ltc": r.get("ltc", 0), "kien": r.get("kien", 0),
             "onroad": sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", []))}
 
 
@@ -321,7 +323,7 @@ def _consolidated(rows):
     P = []
     for a in sorted(am_rows, key=am_pct):
         rs = am_rows[a]
-        agg = {k: 0 for k in ("total", "backlog", "ontrip", "gtc", "cod", "ltc", "onroad")}
+        agg = {k: 0 for k in ("total", "backlog", "ontrip", "gtc", "cod", "ltc", "kien", "onroad")}
         for r in rs:
             for k, v in _bcm(r).items():
                 agg[k] += v
