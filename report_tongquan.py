@@ -45,19 +45,26 @@ def build_html(rows):
     vpct = _pct(vngh_gtc, vngh)
 
     # ---- AM / bưu cục ----
+    rows_by_name = {r["name"]: r for r in rows}
+    am_rows = {}
     am = {}
     for r in rows:
         a = AM_OF.get(r["name"])
         if not a:
             continue
+        am_rows.setdefault(a, []).append(r)
         d = am.setdefault(a, {"gtc": 0, "total": 0, "cod": 0})
         d["gtc"] += r.get("gtc", 0); d["total"] += r.get("total", 0); d["cod"] += r.get("cod_gtb", 0)
     am_worst = min([(a, _pct(v["gtc"], v["total"])) for a, v in am.items() if v["total"] >= 50],
                    key=lambda x: x[1], default=None)
-    am_cod = max([(a, v["cod"]) for a, v in am.items()], key=lambda x: x[1], default=None)
     bc_worst = min([(r["name"], _pct(r["gtc"], r["total"])) for r in rows if r.get("total", 0) >= 50],
                    key=lambda x: x[1], default=None)
     bc_cod = max([(r["name"], r.get("cod_gtb", 0)) for r in rows], key=lambda x: x[1], default=None)
+    # NV xuất phát muộn (≥LATE_H) — danh sách cụ thể
+    late_list = sorted(
+        [(d["name"], r["name"], d["st"]) for r in rows for d in r.get("drivers", [])
+         if d.get("st") is not None and d["st"].hour >= LATE_H],
+        key=lambda x: -(x[2].hour * 60 + x[2].minute))
 
     # ---- Xu hướng + điểm nóng khu vực (khuvuc_data) ----
     days = _load_days(14)
@@ -113,18 +120,35 @@ def build_html(rows):
         P.append("<div class='sec'>📈 %GTC theo ngày (14 ngày gần nhất)</div>")
         P.append("<div class='card'>%s</div>" % _spark(day_series))
 
-    # Điểm nóng
-    P.append("<div class='sec'>⚠️ Điểm nóng cần chú ý</div>")
+    # Điểm nóng — mỗi thẻ bấm mở ra chi tiết NV/bưu cục/tuyến cụ thể
+    P.append("<div class='sec'>⚠️ Điểm nóng cần chú ý · bấm mở chi tiết</div>")
     P.append("<section class='hot'>")
     if am_worst:
-        P.append(_hot("🧑‍💼", "AM %GTC thấp nhất", am_worst[0], "%d%%" % am_worst[1], _cls(am_worst[1])))
+        # chi tiết: bưu cục của AM đó (xếp %GTC thấp→cao)
+        det = "".join(_dl_bc(r) for r in sorted(am_rows.get(am_worst[0], []),
+                      key=lambda x: _pct(x["gtc"], x["total"]) if x["total"] else 999))
+        P.append(_hot("🧑‍💼", "AM %GTC thấp nhất", am_worst[0], "%d%%" % am_worst[1], _cls(am_worst[1]), det))
     if bc_worst:
-        P.append(_hot("🏤", "Bưu cục %GTC thấp nhất", _short(bc_worst[0]), "%d%%" % bc_worst[1], _cls(bc_worst[1])))
+        r = rows_by_name.get(bc_worst[0])
+        det = _nv_list(r, key=lambda x: _pct(x.get("gtc", 0), x.get("total", 0)) if x.get("total") else 999) if r else ""
+        P.append(_hot("🏤", "Bưu cục %GTC thấp nhất", _short(bc_worst[0]), "%d%%" % bc_worst[1], _cls(bc_worst[1]), det))
     if bc_cod:
-        P.append(_hot("💰", "Bưu cục COD GTB cao nhất", _short(bc_cod[0]), _codm(bc_cod[1]) + "tr", "bad"))
-    P.append(_hot("🕘", "NV xuất phát muộn (≥%dh)" % LATE_H, "toàn vùng", str(late_nv) + " NV", "bad" if late_nv else "good"))
+        r = rows_by_name.get(bc_cod[0])
+        det = _nv_list(r, key=lambda x: -x.get("cod_gtb", 0), only_cod=True) if r else ""
+        P.append(_hot("💰", "Bưu cục COD GTB cao nhất", _short(bc_cod[0]), _codm(bc_cod[1]) + "tr", "bad", det))
+    # NV xuất phát muộn: danh sách cụ thể
+    if late_list:
+        det = "".join("<div class='dl'><span class='dln'>%s</span><span class='dlm'>%s</span>"
+                      "<span class='pill sm bad'>%02d:%02d</span></div>"
+                      % (_esc(nm), _esc(bc), st.hour, st.minute) for nm, bc, st in late_list[:30])
+    else:
+        det = "<div class='none'>Không có NV nào xuất phát muộn.</div>"
+    P.append(_hot("🕘", "NV xuất phát muộn (≥%dh)" % LATE_H, "toàn vùng", str(late_nv) + " NV",
+                  "bad" if late_nv else "good", det))
     if hard_ward:
-        P.append(_hot("🗺", "Xã khó giao nhất (hôm qua)", "%s · %s" % (hard_ward[0], hard_ward[1]), "%d%%" % hard_ward[2], _cls(hard_ward[2])))
+        det = _ward_nv(days[-1], hard_ward[1], hard_ward[0]) if days else ""
+        P.append(_hot("🗺", "Xã khó giao nhất (hôm qua)", "%s · %s" % (hard_ward[0], hard_ward[1]),
+                      "%d%%" % hard_ward[2], _cls(hard_ward[2]), det))
     P.append("</section>")
 
     # ===== BÁO CÁO TỔNG HỢP CHI TIẾT: AM → Bưu cục → Nhân viên =====
@@ -147,10 +171,47 @@ def _bar(p):
     return "<div class='bar'><div class='fill %s' style='width:%d%%'></div></div>" % (cls, min(p, 100))
 
 
-def _hot(ic, lab, name, val, cls):
-    return ("<div class='ht %s'><div class='hi'>%s</div><div class='hm'>"
-            "<div class='hl'>%s</div><div class='hn'>%s</div></div>"
-            "<div class='hv %s'>%s</div></div>" % (cls, ic, _esc(lab), _esc(name), cls, _esc(val)))
+def _hot(ic, lab, name, val, cls, detail=None):
+    head = ("<div class='hi'>%s</div><div class='hm'><div class='hl'>%s</div>"
+            "<div class='hn'>%s</div></div><div class='hv %s'>%s</div>"
+            % (ic, _esc(lab), _esc(name), cls, _esc(val)))
+    if not detail:
+        return "<div class='ht %s'>%s</div>" % (cls, head)
+    return ("<details class='ht %s'><summary>%s<span class='hcar'>▾</span></summary>"
+            "<div class='hd'>%s</div></details>" % (cls, head, detail))
+
+
+def _dl_bc(r):
+    """1 dòng bưu cục gọn (dùng trong chi tiết điểm nóng AM)."""
+    pc = _pct(r.get("gtc", 0), r.get("total", 0))
+    return ("<div class='dl'><span class='dln'>%s</span>"
+            "<span class='dlm'>📥%s ✅%s 💰%str</span><span class='pill sm %s'>%s</span></div>"
+            % (_esc(r["name"]), _n(r.get("total", 0)), _n(r.get("gtc", 0)),
+               _codm(r.get("cod_gtb", 0)), _cls(pc), ("%d%%" % pc) if pc is not None else "—"))
+
+
+def _nv_list(r, key, only_cod=False):
+    """Danh sách NV card của 1 bưu cục (chi tiết điểm nóng bưu cục)."""
+    drv = [d for d in r.get("drivers", []) if d.get("total") or d.get("ltc") or d.get("chuyen")]
+    if only_cod:
+        drv = [d for d in drv if d.get("cod_gtb", 0) >= 1e5]
+    if not drv:
+        return "<div class='none'>Không có dữ liệu.</div>"
+    return "".join(_nv_card(d) for d in sorted(drv, key=key))
+
+
+def _ward_nv(day, dist, ward):
+    """NV đã giao ở xã khó nhất (từ khuvuc_data nv[bc,nv,dist,ward,n,g]) — tuyến cụ thể."""
+    rowsw = [x for x in day.get("nv", []) if x[2] == dist and x[3] == ward]
+    if not rowsw:
+        return "<div class='none'>Không có dữ liệu nhân viên cho xã này.</div>"
+    out = []
+    for bc, nv, d, w, n, g in sorted(rowsw, key=lambda x: _pct(x[5], x[4]) if x[4] else 999):
+        pc = _pct(g, n)
+        out.append("<div class='dl'><span class='dln'>%s</span>"
+                   "<span class='dlm'>%s · 📦%d ✅%d</span><span class='pill sm %s'>%s</span></div>"
+                   % (_esc(nv), _esc(bc.split(") ")[-1]), n, g, _cls(pc), ("%d%%" % pc) if pc is not None else "—"))
+    return "".join(out)
 
 
 def _spark(series):
@@ -311,6 +372,17 @@ font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 .hn{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hv{font-weight:800;font-size:17px;font-variant-numeric:tabular-nums;flex:none}
 .hv.good{color:var(--good)}.hv.warn{color:var(--warn)}.hv.bad{color:var(--bad)}
+details.ht{display:block;padding:0}
+details.ht summary{display:flex;align-items:center;gap:11px;padding:11px 13px;cursor:pointer;list-style:none}
+details.ht summary::-webkit-details-marker{display:none}
+.hcar{color:var(--mut);font-size:11px;flex:none;transition:transform .15s}
+details.ht[open] .hcar{transform:rotate(180deg)}
+.hd{padding:0 13px 10px}
+.dl{display:flex;align-items:center;gap:8px;padding:7px 2px;border-top:1px solid rgba(255,255,255,.05)}
+.dl:first-child{border-top:none}
+.dln{font-weight:600;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlm{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46%}
+.hd .nvc:first-child{margin-top:2px}
 .eod{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);
  border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0;text-decoration:none;color:var(--txt);font-weight:600}
 .eod .arw{color:var(--mut);font-size:11.5px;font-weight:500;text-align:right}
