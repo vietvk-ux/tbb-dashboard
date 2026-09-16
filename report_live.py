@@ -550,6 +550,7 @@ display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-col
 .fab .rfi{font-size:26px;line-height:1;font-weight:700}
 .fab.spin .rfi{animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+:root{--bg:#0e2318;--bg2:#123024;--card:#163227;--card2:#1d3e31;--line:#284f3d}
 body{background:radial-gradient(130% 100% at 50% -10%,rgba(34,197,94,.10),transparent 65%),#0e2318 !important;background-attachment:fixed}
 .top{background:linear-gradient(180deg,#0e2318 62%,rgba(14,35,24,0)) !important}
 </style></head><body>"""
