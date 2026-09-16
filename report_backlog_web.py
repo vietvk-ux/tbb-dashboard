@@ -230,7 +230,6 @@ border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:12px;
 .eod .arw{color:var(--mut);font-size:12.5px;font-weight:500}
 .foot{color:var(--mut);font-size:11px;text-align:center;margin:22px 0 8px;line-height:1.6}
 .muted{color:var(--mut)}
-:root{--bg:#241804;--card:#33240d;--line:#4c3818}
 body{background:radial-gradient(130% 100% at 50% -10%,rgba(251,146,60,.10),transparent 65%),#241804 !important;background-attachment:fixed}
 .top{background:linear-gradient(180deg,#241804 62%,rgba(36,24,4,0)) !important}
 </style>"""

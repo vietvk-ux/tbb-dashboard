@@ -542,8 +542,7 @@ def _bucket_chips(buckets):
 
 # ---------- Trang ----------
 
-_TREND_BG = ("<style>:root{--card:#113140;--card2:#163d4e;--line:#1f4d60}"
-             "body{background:"
+_TREND_BG = ("<style>body{background:"
              "radial-gradient(130% 100% at 50% -10%,rgba(34,211,238,.10),transparent 65%),"
              "#0c2430 !important;background-attachment:fixed}"
              ".top{background:linear-gradient(180deg,#0c2430 62%,rgba(12,36,48,0)) !important}</style>")
@@ -685,12 +684,10 @@ def gen_html(data):
     return "\n".join(P)
 
 
-_NV_BG = ("<style>:root{--bg:#241a06;--card:#322408;--card2:#3c2c0e;--line:#4a3612}"
-          "body{background:"
+_NV_BG = ("<style>body{background:"
           "radial-gradient(130% 100% at 50% -10%,rgba(251,191,36,.10),transparent 65%),"
           "#241a06 !important;background-attachment:fixed}"
-          ".top{background:linear-gradient(180deg,#241a06 62%,rgba(36,26,6,0)) !important}"
-          ".regavg,.dnote{background:rgba(245,158,11,.09)}</style>")
+          ".top{background:linear-gradient(180deg,#241a06 62%,rgba(36,26,6,0)) !important}</style>")
 
 
 def gen_nhanvien_html(data):
@@ -722,8 +719,7 @@ def gen_nhanvien_html(data):
     return "\n".join(P)
 
 
-_KHO_BG = ("<style>:root{--card:#3c1a1f;--card2:#472128;--line:#562a30}"
-           "body{background:"
+_KHO_BG = ("<style>body{background:"
            "radial-gradient(130% 100% at 50% -10%,rgba(225,60,90,.10),transparent 65%),"  # đỏ đô
            "#2e1114 !important;background-attachment:fixed}"                               # nền đỏ đô tối dịu
            ".top{background:linear-gradient(180deg,#2e1114 62%,rgba(46,17,20,0)) !important}</style>")
