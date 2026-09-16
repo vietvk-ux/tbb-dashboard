@@ -308,7 +308,10 @@ def _ns_drill(rows):
         am = AM_OF.get(x["bc"]) or "(chưa gán AM)"
         ambc.setdefault(am, {}).setdefault(x["bc"], []).append(x)
 
+    reg_avg = wavg(nvs)   # năng suất bình quân toàn vùng (Σ GTC ÷ Σ ngày làm)
     P = ["<div class='sec' style='color:var(--good)'>%s</div>" % label,
+         "<div class='regavg'><span>🌐 Năng suất bình quân toàn vùng</span>"
+         "<span class='pill %s'>%d đơn/ngày</span></div>" % (cls(reg_avg), round(reg_avg)),
          "<div class='dnote'>TB/ngày = đơn GTC ÷ số ngày làm (30 ngày) · 🔴 thấp → 🟡 → 🟢 cao · xếp thấp trước</div>"]
     for am in sorted(ambc, key=lambda a: wavg([x for bl in ambc[a].values() for x in bl])):
         am_items = [x for bl in ambc[am].values() for x in bl]
@@ -829,6 +832,7 @@ td.cod{font-weight:800;color:var(--bad)}
 /* Drill năng suất AM→BC→NV */
 .drillcard{padding:8px}
 .dnote{font-size:11.5px;color:var(--mut);margin:2px 2px 8px;line-height:1.5}
+.regavg{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;margin:2px 0 6px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-weight:800;font-size:14px}
 details.amx{border:1px solid var(--line);border-left:3px solid var(--line);border-radius:12px;margin:7px 0;overflow:hidden;background:var(--card)}
 details.amx.good{border-left-color:var(--good)}details.amx.warn{border-left-color:var(--warn)}details.amx.bad{border-left-color:var(--bad)}
 details.bcx{border:1px solid var(--line);border-left:2px solid var(--line);border-radius:10px;margin:6px 0;overflow:hidden;background:rgba(255,255,255,.02)}
