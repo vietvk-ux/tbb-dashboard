@@ -235,7 +235,7 @@ body{background:radial-gradient(130% 100% at 50% -10%,rgba(251,146,60,.10),trans
 </style>"""
 
 
-def render_summary(entries, key, types, hero_lbl, tr=False):
+def render_summary(entries, key, types, hero_lbl, tr=False, prev_val=None, prev_date=None):
     """Khối tổng quan cho 1 báo cáo: hero + strip 4 nhóm + theo loại + theo tỉnh + top >120h."""
     P = []
     # region aggregates
@@ -254,6 +254,7 @@ def render_summary(entries, key, types, hero_lbl, tr=False):
     P.append("<div class='hlbl'>%s</div>" % _esc(hero_lbl))
     P.append("<div class='hbig'>%s</div>" % _n(grand))
     P.append("<div class='hsub'>đơn tồn · 🔴 &gt;120h: <b style='color:var(--bad)'>%s</b></div>" % _n(over120))
+    P.append(_delta_ton(grand, prev_val, prev_date))
     P.append("</section>")
 
     P.append("<section class='strip'>")
@@ -276,20 +277,24 @@ def render_summary(entries, key, types, hero_lbl, tr=False):
         tot = sec_total(e[key], types)
         a = am.get(amn)
         if a is None:
-            a = {"total": 0, "bc": 0, "ty": {ot: 0 for ot, _, _ in types}}
+            a = {"total": 0, "bc": 0, "red120": 0, "ty": {ot: 0 for ot, _, _ in types}}
             am[amn] = a
+        red120 = sec_groups(e[key], types)[">120h"]
         a["total"] += tot
         a["bc"] += 1
+        a["red120"] += red120
         tys = {ot: e[key].get(ot, {}).get("total", 0) for ot, _, _ in types}
         for ot in a["ty"]:
             a["ty"][ot] += tys[ot]
-        am_bcs.setdefault(amn, []).append((e["name"], tys, tot))
+        am_bcs.setdefault(amn, []).append((e["name"], tys, tot, red120))
     am_rows = sorted(am.items(), key=lambda kv: -kv[1]["total"])
     if am_rows:
         P.append("<div class='subh'>🧑‍💼 Theo AM · cao → thấp · bấm xem bưu cục</div>")
         for amn, a in am_rows:
             meta = " · ".join("%s %s" % (short, _n(a["ty"][ot]))
                               for ot, _, short in types if a["ty"][ot])
+            if a["red120"] > 0:
+                meta += " · 🔴&gt;120h %s" % _n(a["red120"])
             P.append("<details class='bc' data-u='%s'><summary>" % ("1" if a["total"] > 0 else "0"))
             P.append("<div><div class='bcn'>%s</div><div class='bcm'>🏤 %d BC · %s</div></div>"
                      % (_esc(amn), a["bc"], meta or "không có đơn tồn"))
@@ -299,14 +304,15 @@ def render_summary(entries, key, types, hero_lbl, tr=False):
             P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th>")
             for ot, _, short in types:
                 P.append("<th>%s</th>" % _esc(short))
-            P.append("<th>Tổng</th></tr>")
-            for name, tys, tot in sorted(am_bcs[amn], key=lambda x: -x[2]):
+            P.append("<th>🔴&gt;120h</th><th>Tổng</th></tr>")
+            for name, tys, tot, red120 in sorted(am_bcs[amn], key=lambda x: (-x[3], -x[2])):
                 P.append("<tr><td>%s</td>" % _esc(name))
                 for ot, _, _ in types:
                     v = tys[ot]
                     P.append("<td>%s</td>" % (_n(v) if v else "<span class='muted'>–</span>"))
+                rc = ("<span class='pill bad'>%s</span>" % _n(red120)) if red120 > 0 else "<span class='muted'>–</span>"
                 tc = ("<span class='pill acc'>%s</span>" % _n(tot)) if tot > 0 else "<span class='muted'>0</span>"
-                P.append("<td>%s</td></tr>" % tc)
+                P.append("<td>%s</td><td>%s</td></tr>" % (rc, tc))
             P.append("</table></div></div></details>")
     return P
 
@@ -337,7 +343,7 @@ def render_detail_table(parsed, types):
     return "".join(P)
 
 
-def render_red_section(entries):
+def render_red_section(entries, prev_red=None, prev_date=None):
     """Khối 🚨 Đơn đỏ toàn vùng: hero tổng + 4 KPI + top BC."""
     tot = {ot: 0 for ot, _, _ in RED_LABELS}
     grand = 0
@@ -350,6 +356,7 @@ def render_red_section(entries):
     P.append("<div class='hlbl'>🚨 Tổng đơn backlog quá hạn toàn vùng</div>")
     P.append("<div class='hbig' style='color:var(--bad)'>%s</div>" % _n(grand))
     P.append("<div class='hsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;48h · LC trả&gt;48h</div>")
+    P.append(_delta_ton(grand, prev_red, prev_date))
     P.append("</section>")
     P.append("<section class='strip'>")
     for ot, lbl, _ in RED_LABELS:
@@ -408,6 +415,55 @@ def render_red_section(entries):
     return P
 
 
+_LGT_OT = {ot for ot, _, _ in LGT_TYPES}
+_TR_OT = {ot for ot, _, _ in TR_TYPES}
+
+
+def _prev_ton():
+    """Tổng tồn CHỐT gần nhất (bao_cao_ton_dong) để so 'hôm qua': {date,lgt,tr,red} hoặc None."""
+    url = os.environ.get("SUPABASE_URL", "").strip()
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not url or not key:
+        return None
+    try:
+        import snapshot as SNAP
+        today = datetime.now(VN).date().isoformat()
+        # chốt gần nhất TRƯỚC hôm nay (tránh so với chính hôm nay nếu đã chốt)
+        rows = SNAP._sb_get(url, key,
+                            "bao_cao_ton_dong?ngay=lt.%s&select=ngay&order=ngay.desc&limit=1" % today)
+        if not rows:
+            return None
+        day = rows[0]["ngay"]
+        data = SNAP._sb_all(url, key,
+                            "bao_cao_ton_dong?ngay=eq.%s&select=order_type,total,g_red" % day)
+        lgt = sum(r["total"] for r in data if r["order_type"] in _LGT_OT)
+        tr = sum(r["total"] for r in data if r["order_type"] in _TR_OT)
+        red = sum((r.get("g_red") or 0) for r in data)
+        return {"date": day, "lgt": lgt, "tr": tr, "red": red}
+    except Exception as e:
+        logger.warning("Không đọc được tồn chốt hôm qua (bỏ qua): %s", str(e)[:120])
+        return None
+
+
+def _delta_ton(cur, ref, day):
+    """Dòng so với chốt hôm qua. Backlog: TĂNG = xấu (đỏ ▲), GIẢM = tốt (xanh ▼)."""
+    if ref is None:
+        return ""
+    d = cur - ref
+    try:
+        dm = datetime.strptime(day, "%Y-%m-%d").strftime("%d/%m")
+    except Exception:
+        dm = day
+    if d == 0:
+        return ("<div class='hsub' style='margin-top:4px'>➖ bằng chốt %s (%s)</div>"
+                % (dm, _n(ref)))
+    col = "var(--bad)" if d > 0 else "var(--good)"
+    ar = "▲" if d > 0 else "▼"
+    return ("<div class='hsub' style='margin-top:4px'>so chốt %s (%s): "
+            "<b style='color:%s'>%s%s</b></div>" % (dm, _n(ref), col, ar, _n(abs(d))))
+
+
 def build_html(entries, hub_count):
     now = datetime.now(VN)
     active = [e for e in entries if sec_total(e["lgt"], LGT_TYPES) > 0 or sec_total(e["tr"], TR_TYPES) > 0]
@@ -429,20 +485,25 @@ def build_html(entries, hub_count):
              "<a href='#lgt'>📦 Lấy·Giao·Trả</a>"
              "<a href='#luanchuyen'>🔁 Luân chuyển</a></div>")
 
+    prev = _prev_ton()
+    pdate = prev["date"] if prev else None
+
     # ===== 🚨 ĐƠN ĐỎ QUÁ HẠN (ưu tiên) =====
     P.append("<div class='sec first' id='do'>🚨 Đơn backlog — quá hạn cần xử lý</div>")
     P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;48h · LC trả&gt;48h</div>")
-    P += render_red_section(entries)
+    P += render_red_section(entries, prev_red=(prev["red"] if prev else None), prev_date=pdate)
 
     # ===== BÁO CÁO 1: LẤY-GIAO-TRẢ =====
     P.append("<div class='sec' id='lgt'>📦 Tồn Lấy · Giao · Trả</div>")
     P.append("<div class='secsub'>Đơn còn tồn tại bưu cục, chưa xử lý (mọi trạng thái)</div>")
-    P += render_summary(entries, "lgt", LGT_TYPES, "📦 Tổng tồn Lấy · Giao · Trả toàn vùng")
+    P += render_summary(entries, "lgt", LGT_TYPES, "📦 Tổng tồn Lấy · Giao · Trả toàn vùng",
+                        prev_val=(prev["lgt"] if prev else None), prev_date=pdate)
 
     # ===== BÁO CÁO 2: LUÂN CHUYỂN =====
     P.append("<div class='sec' id='luanchuyen'>🔁 Tồn đọng luân chuyển</div>")
     P.append("<div class='secsub'>Đơn luân chuyển giao / trả tồn tại kho (mọi trạng thái đóng kiện)</div>")
-    P += render_summary(entries, "tr", TR_TYPES, "🔁 Tổng tồn luân chuyển toàn vùng", tr=True)
+    P += render_summary(entries, "tr", TR_TYPES, "🔁 Tổng tồn luân chuyển toàn vùng", tr=True,
+                        prev_val=(prev["tr"] if prev else None), prev_date=pdate)
 
     # ===== DANH SÁCH BƯU CỤC (sắp theo TỔNG ĐƠN ĐỎ) =====
     P.append("<div class='sec' id='bc'>🏤 Tất cả bưu cục (%d)</div>" % len(active))
