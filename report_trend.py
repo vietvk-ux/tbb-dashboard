@@ -474,8 +474,9 @@ def _cod_card(nv30):
     else:
         agg = {}
         for r in nv30:
-            did = str(r.get("driver_id") or "") or ("%s|%s" % (r.get("ten_nv") or "", r.get("buu_cuc") or ""))
-            a = agg.setdefault(did, {"ten": r.get("ten_nv"), "bc": r.get("buu_cuc"), "cod": 0.0, "gtb": 0})
+            did = str(r.get("driver_id") or "") or (r.get("ten_nv") or "")
+            key = (did, r.get("buu_cuc") or "")   # gộp theo (NV, bưu cục) — NV làm 2 BC không dồn sai
+            a = agg.setdefault(key, {"ten": r.get("ten_nv"), "bc": r.get("buu_cuc"), "cod": 0.0, "gtb": 0})
             a["cod"] += r.get("cod_gtb") or 0
             a["gtb"] += r.get("gtb") or 0
             if r.get("ten_nv"):
