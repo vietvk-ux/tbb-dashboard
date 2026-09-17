@@ -267,7 +267,47 @@ def render_summary(entries, key, types, hero_lbl, tr=False):
         P.append("<div class='ty'><div class='v'>%s</div><div class='l'>%s</div></div>"
                  % (_n(rtypes[ot]), _esc(lbl)))
     P.append("</section>")
-    # (Đã bỏ "Top bưu cục >120h" và "Theo AM" theo yêu cầu — chỉ giữ số tổng quan.)
+    # ===== Theo AM · bấm mở xem chi tiết bưu cục =====
+    am, am_bcs = {}, {}
+    for e in entries:
+        amn = AM_OF.get(e["name"])
+        if not amn:
+            continue
+        tot = sec_total(e[key], types)
+        a = am.get(amn)
+        if a is None:
+            a = {"total": 0, "bc": 0, "ty": {ot: 0 for ot, _, _ in types}}
+            am[amn] = a
+        a["total"] += tot
+        a["bc"] += 1
+        tys = {ot: e[key].get(ot, {}).get("total", 0) for ot, _, _ in types}
+        for ot in a["ty"]:
+            a["ty"][ot] += tys[ot]
+        am_bcs.setdefault(amn, []).append((e["name"], tys, tot))
+    am_rows = sorted(am.items(), key=lambda kv: -kv[1]["total"])
+    if am_rows:
+        P.append("<div class='subh'>🧑‍💼 Theo AM · cao → thấp · bấm xem bưu cục</div>")
+        for amn, a in am_rows:
+            meta = " · ".join("%s %s" % (short, _n(a["ty"][ot]))
+                              for ot, _, short in types if a["ty"][ot])
+            P.append("<details class='bc' data-u='%s'><summary>" % ("1" if a["total"] > 0 else "0"))
+            P.append("<div><div class='bcn'>%s</div><div class='bcm'>🏤 %d BC · %s</div></div>"
+                     % (_esc(amn), a["bc"], meta or "không có đơn tồn"))
+            pill = ("<span class='pill acc'>%s</span>" % _n(a["total"])) if a["total"] > 0 \
+                else "<span class='pill mut'>0</span>"
+            P.append("<div class='bcr'>%s</div></summary>" % pill)
+            P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th>")
+            for ot, _, short in types:
+                P.append("<th>%s</th>" % _esc(short))
+            P.append("<th>Tổng</th></tr>")
+            for name, tys, tot in sorted(am_bcs[amn], key=lambda x: -x[2]):
+                P.append("<tr><td>%s</td>" % _esc(name))
+                for ot, _, _ in types:
+                    v = tys[ot]
+                    P.append("<td>%s</td>" % (_n(v) if v else "<span class='muted'>–</span>"))
+                tc = ("<span class='pill acc'>%s</span>" % _n(tot)) if tot > 0 else "<span class='muted'>0</span>"
+                P.append("<td>%s</td></tr>" % tc)
+            P.append("</table></div></div></details>")
     return P
 
 
