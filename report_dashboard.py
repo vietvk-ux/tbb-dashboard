@@ -317,7 +317,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
         P.append("<div class='dsub'>Xếp theo <b>COD GTB / đơn GTB</b> — tiền thu hộ kẹt trên mỗi đơn hỏng. Tổng COD GTB vùng <b>%.0f triệu</b>.<br>🔥 Cao nhất: <b>%s</b> — cần đốc thúc/thu hồi ngay.</div>"
                  % (tot_cod / 1e6, _esc(top3)))
         P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th><th>GTB</th><th>COD/GTB (tr)</th><th>%GTC</th></tr></thead><tbody>")
-        for i, dr in enumerate(danger[:15], 1):
+        for i, dr in enumerate(danger[:10], 1):
             gtb = dr["total"] - dr["success"]
             codper = (dr.get("gtb_cod", 0) / gtb / 1e6) if gtb > 0 else 0  # triệu / đơn GTB
             P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td><td class='rd'>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
