@@ -158,6 +158,7 @@ async def _trip_items(session, token, hub_id, trip_code, sem):
             lat, lng = info.get("lat"), info.get("lng")
             rec["lat"] = lat if isinstance(lat, (int, float)) else None
             rec["lng"] = lng if isinstance(lng, (int, float)) else None
+            rec["fail"] = (x.get("failNote") or "").strip()   # lý do giao hỏng (eod)
         recs.append(rec)
     return recs
 
@@ -198,6 +199,20 @@ async def fetch_report(token, target_date):
         return {"date": target_date, "trips": results, "hub_count": len(hubs)}
 
 
+def _fail_group(note):
+    """Phân nhóm lý do giao hỏng (failNote) → khach/lienlac/nvdc/khac. None nếu trống."""
+    n = (note or "").lower()
+    if not n:
+        return None
+    if any(k in n for k in ("đổi ý", "không mua", "không đặt", "từ chối", "hẹn")):
+        return "khach"      # do khách / shop
+    if any(k in n for k in ("liên lạc", "chặn số", "nghe máy", "không nghe")):
+        return "lienlac"    # không liên lạc được
+    if any(k in n for k in ("địa chỉ", "sđt", "sai thông tin", "sự cố", "nhân viên")):
+        return "nvdc"       # NV / địa chỉ
+    return "khac"
+
+
 def aggregate(payload):
     ok = [t for t in payload["trips"] if "error" not in t]
     err_count = len(payload["trips"]) - len(ok)
@@ -223,7 +238,8 @@ def aggregate(payload):
             if cur is None or score > cur["score"]:
                 best[key] = {"score": score, "bc": t["bc"], "prov": pc,
                              "driver_id": t.get("driver_id", ""), "driver_name": t.get("driver_name", "—"),
-                             "succ": it["succ"], "cod": it["cod"], "vngh": code.startswith("VNGH")}
+                             "succ": it["succ"], "cod": it["cod"], "vngh": code.startswith("VNGH"),
+                             "fail": it.get("fail", "")}
 
     # 1b) GỘP đơn LẤY (PICK) → LTC (lấy thành công) theo (bưu cục, mã đơn)
     bestp = {}
@@ -324,10 +340,23 @@ def aggregate(payload):
     vngh_total = sum(1 for rec in best.values() if rec["vngh"])
     vngh_success = sum(1 for rec in best.values() if rec["vngh"] and rec["succ"])
     vngh_gtc = round(vngh_success/vngh_total*100, 1) if vngh_total else None
+    # LÝ DO GIAO HỎNG (failNote) — phân nhóm đơn giao HỎNG có ghi lý do
+    fail_g = {"khach": 0, "lienlac": 0, "nvdc": 0, "khac": 0}
+    fail_notes = Counter()
+    fail_tot = 0
+    for rec in best.values():
+        if rec["succ"]:
+            continue
+        g = _fail_group(rec.get("fail", ""))
+        if g is None:
+            continue
+        fail_g[g] += 1; fail_tot += 1
+        fail_notes[rec["fail"][:46]] += 1
     return {"date": payload["date"], "hub_count": payload["hub_count"], "errors": err_count,
             "grand": {"trips": grand_trips, "total": grand_total, "success": grand_success, "gtc": grand_gtc,
                       "ltc": grand_ltc,
                       "vngh_total": vngh_total, "vngh_success": vngh_success, "vngh_gtc": vngh_gtc},
+            "fail": {"groups": fail_g, "top": fail_notes.most_common(8), "tong": fail_tot},
             "provinces": prov_list, "bcs": bc_list, "drivers": driver_list}
 
 

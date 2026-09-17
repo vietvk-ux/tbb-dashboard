@@ -177,6 +177,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .sv{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
 .sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
 .sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
+@media(max-width:430px){.strip{gap:4px}.st{padding:9px 2px}.sv{font-size:14px}.sl{font-size:9px;white-space:normal;line-height:1.15}}
 
 .banner{display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:14px;padding:13px 15px;margin-bottom:8px;
  background:linear-gradient(135deg,rgba(247,185,85,.12),rgba(247,185,85,.05));border:1px solid rgba(247,185,85,.3)}
@@ -244,14 +245,30 @@ td.nv .sc{color:var(--mut);font-size:11px;font-weight:500;margin-top:1px;overflo
 td.rd{color:var(--bad);font-weight:700}
 .rank{color:var(--mut);font-weight:700;width:22px}
 
+.cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:2px 0 4px}
+.cc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 6px;text-align:center}
+.cl{color:var(--mut);font-size:10.5px;margin-bottom:4px}
+.cv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.cv.bad{color:var(--bad)}
+.up{color:var(--good);font-weight:800}.down{color:var(--bad);font-weight:800}
+.failrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.fg{border-radius:12px;padding:11px 6px;text-align:center;border:1px solid var(--line)}
+.fg.good{background:rgba(47,208,122,.12);border-color:rgba(47,208,122,.3)}
+.fg.warn{background:rgba(247,185,85,.12);border-color:rgba(247,185,85,.3)}
+.fg.bad{background:rgba(242,88,95,.12);border-color:rgba(242,88,95,.3)}
+.fv{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.fg.good .fv{color:var(--good)}.fg.warn .fv{color:var(--warn)}.fg.bad .fv{color:var(--bad)}
+.fl{font-size:10.5px;color:var(--mut);margin-top:3px;line-height:1.35}
+.mh{font-weight:700;font-size:12.5px;margin:8px 2px 5px}.mh.up{color:var(--good)}
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:24px 0 4px}
 body{background:radial-gradient(130% 100% at 50% -10%,rgba(129,140,248,.10),transparent 65%),#171640 !important;background-attachment:fixed}
 .top{background:linear-gradient(180deg,#171640 62%,rgba(23,22,64,0)) !important}
 </style></head><body>"""
 
 
-def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
+def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=None):
     backlog = backlog or {}
+    hist = hist or []
     g = agg["grand"]
     d = agg["date"]
     total_gtb = g["total"] - g["success"]
@@ -302,6 +319,83 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None):
     # ===== Banner chưa gán giao =====
     P.append("<div class='banner'><div class='bl'>⏳ Chưa gán giao<br><span style='opacity:.75;font-weight:500'>chờ xếp chuyến · %s</span></div>"
              "<div class='bv'>%s đơn</div></div>" % (_esc(backlog_time), _n(total_backlog)))
+
+    # ===== ② SO SÁNH HÔM NAY vs HÔM QUA / TB 7 NGÀY =====
+    if hist:
+        y = hist[0]
+        gy = y.get("pct_gtc")
+        wk = [h.get("pct_gtc") for h in hist[:7] if h.get("pct_gtc") is not None]
+        avg7 = round(sum(wk) / len(wk), 1) if wk else None
+
+        def _delta(cur, ref):
+            if cur is None or ref is None:
+                return "—"
+            dv = round(cur - ref, 1)
+            return "<span class='%s'>%s%s</span>" % ("up" if dv >= 0 else "down",
+                                                      "▲" if dv >= 0 else "▼", str(abs(dv)).replace(".", ","))
+        P.append("<div class='sec'>📊 So sánh hôm nay</div><section class='cmp'>")
+        P.append("<div class='cc'><div class='cl'>%%GTC hôm nay</div><div class='cv'>%s%%</div></div>"
+                 % (g["gtc"] if g["gtc"] is not None else "—"))
+        P.append("<div class='cc'><div class='cl'>vs hôm qua (%s%%)</div><div class='cv'>%s</div></div>"
+                 % (gy if gy is not None else "—", _delta(g["gtc"], gy)))
+        P.append("<div class='cc'><div class='cl'>vs TB 7 ngày (%s%%)</div><div class='cv'>%s</div></div>"
+                 % (avg7 if avg7 is not None else "—", _delta(g["gtc"], avg7)))
+        P.append("</section>")
+
+    # ===== ① LÝ DO GIAO HỎNG HÔM NAY (failNote, phân 3 nhóm) =====
+    fail = agg.get("fail") or {"groups": {}, "top": [], "tong": 0}
+    ftot = fail.get("tong", 0)
+    if ftot > 0:
+        fg = fail["groups"]
+        kh, ll, nv = fg.get("khach", 0), fg.get("lienlac", 0), fg.get("nvdc", 0)
+        def _fp(x): return round(x * 100 / ftot) if ftot else 0
+        P.append("<div class='sec' style='color:var(--warn)'>🔴 Lý do giao hỏng hôm nay · %s đơn (đã ghi lý do)</div>" % _n(ftot))
+        P.append("<section class='card'>")
+        P.append("<div class='failrow'>"
+                 "<div class='fg good'><div class='fv'>%d%%</div><div class='fl'>🧍 Do khách/shop<br>%s đơn</div></div>"
+                 "<div class='fg warn'><div class='fv'>%d%%</div><div class='fl'>📞 Không liên lạc<br>%s đơn</div></div>"
+                 "<div class='fg bad'><div class='fv'>%d%%</div><div class='fl'>🚚 Do NV/địa chỉ<br>%s đơn</div></div></div>"
+                 % (_fp(kh), _n(kh), _fp(ll), _n(ll), _fp(nv), _n(nv)))
+        P.append("<table class='drv'><thead><tr><th class='lft'>Lý do cụ thể</th><th>Đơn</th><th>%</th></tr></thead><tbody>")
+        for note, cnt in fail.get("top", []):
+            P.append("<tr><td class='nv' style='max-width:none;white-space:normal;font-weight:500'>%s</td>"
+                     "<td>%s</td><td>%d%%</td></tr>" % (_esc(note), _n(cnt), _fp(cnt)))
+        P.append("</tbody></table>")
+        P.append("<div class='note' style='margin:6px 2px 0'>🟢 Do khách/shop = KHÔNG phải lỗi NV · 🔴 Do NV/địa chỉ = cần chấn chỉnh</div>")
+        P.append("</section>")
+
+    # ===== ③ TỒN CHUYỂN SANG MAI =====
+    carry = total_backlog + total_gtb
+    P.append("<div class='sec'>📦 Tồn chuyển sang ngày mai</div><section class='cmp'>")
+    P.append("<div class='cc'><div class='cl'>⏳ Chưa gán</div><div class='cv'>%s</div></div>" % _n(total_backlog))
+    P.append("<div class='cc'><div class='cl'>❌ GTB (giao lại)</div><div class='cv'>%s</div></div>" % _n(total_gtb))
+    P.append("<div class='cc'><div class='cl'>Σ tồn sang mai</div><div class='cv bad'>%s</div></div>" % _n(carry))
+    P.append("</section>")
+
+    # ===== ④ TỐT NHẤT HÔM NAY (top 5 NV + top 5 bưu cục %GTC cao nhất) =====
+    good_nv = sorted([dr for dr in agg["drivers"] if dr["total"] >= 30 and dr["gtc"] is not None],
+                     key=lambda x: -x["gtc"])[:5]
+    good_bc = sorted([b for b in agg["bcs"] if b["total"] >= 100 and b["gtc"] is not None],
+                     key=lambda x: -x["gtc"])[:5]
+    if good_nv or good_bc:
+        P.append("<div class='sec' style='color:var(--good)'>🏆 Tốt nhất hôm nay</div><section class='card'>")
+        if good_nv:
+            P.append("<div class='mh up'>🥇 Top 5 nhân viên · %GTC cao nhất (≥30 đơn)</div>")
+            P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th><th>Gán</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
+            for i, dr in enumerate(good_nv, 1):
+                P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td><td>%s</td>"
+                         "<td><span class='pill sm good'>%s%%</span></td></tr>"
+                         % (i, _esc(dr["driver_name"]), _esc(dr["bc"]), _n(dr["total"]), _n(dr["success"]), dr["gtc"]))
+            P.append("</tbody></table>")
+        if good_bc:
+            P.append("<div class='mh up'>🥇 Top 5 bưu cục · %GTC cao nhất</div>")
+            P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Bưu cục</th><th>Đơn</th><th>%GTC</th></tr></thead><tbody>")
+            for i, b in enumerate(good_bc, 1):
+                P.append("<tr><td class='rank'>%d</td><td class='nv'>%s</td><td>%s</td>"
+                         "<td><span class='pill sm good'>%s%%</span></td></tr>"
+                         % (i, _esc(b["bc"]), _n(b["total"]), b["gtc"]))
+            P.append("</tbody></table>")
+        P.append("</section>")
 
     # ===== ⚠️ Top nhân viên COD GTB / ĐƠN GTB cao nhất (KHÔNG lọc %GTC; chỉ cần có đơn GTB) =====
     danger = [dr for dr in agg["drivers"] if (dr["total"] - dr["success"]) > 0]
@@ -500,6 +594,26 @@ def _write_eod_fallback(err):
     return True
 
 
+def _fetch_hist(d):
+    """%GTC + đơn + COD các ngày TRƯỚC ngày d (Supabase bao_cao_vung, ~8 ngày). Lỗi → []."""
+    import requests
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return []
+    since = (d - timedelta(days=8)).isoformat()
+    try:
+        r = requests.get(url + "/rest/v1/bao_cao_vung",
+                         params=[("select", "ngay,pct_gtc,don_giao,gtc,cod_gtb"),
+                                 ("ngay", "gte." + since), ("ngay", "lt." + d.isoformat()),
+                                 ("order", "ngay.desc")],
+                         headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
+        return r.json() if r.ok else []
+    except Exception:
+        return []
+
+
 def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
@@ -539,12 +653,14 @@ def main():
         ontrip = asyncio.run(fetch_ontrip(token))
     except Exception as e:
         logger.warning("Không lấy được chuyến đang chạy (bỏ qua): %s", str(e)[:120])
+    # Lịch sử các ngày TRƯỚC (so sánh hôm nay vs hôm qua / TB tuần) — từ Supabase
+    hist = _fetch_hist(d)
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
-        f.write(gen_html(agg, backlog, backlog_time, ontrip))
+        f.write(gen_html(agg, backlog, backlog_time, ontrip, hist))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],
