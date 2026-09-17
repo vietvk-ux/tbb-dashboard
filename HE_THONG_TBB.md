@@ -1,7 +1,7 @@
 # HỆ THỐNG BÁO CÁO VẬN HÀNH VÙNG TÂY BẮC BỘ (TBB) — GHN
 
 Tài liệu tổng hợp để **tiếp tục làm việc ở phiên sau / trên máy khác**. Repo: `vietvk-ux/tbb-dashboard` (public). Chủ: Vũ Khắc Việt (vietvk@ghn.vn) — GĐV Vùng TBB.
-Cập nhật gần nhất: 16/09/2026.
+Cập nhật gần nhất: 17/09/2026.
 
 > Nguyên tắc bảo mật: KHÔNG in/echo/commit giá trị `NHANH_TOKEN`, `SUPABASE_SERVICE_KEY`, `GTALK_OA_TOKEN`, PAT. Đặt qua `gh secret set` / GitHub Actions secrets. Dữ liệu số KHÔNG lưu trong repo — chỉ deploy lên GitHub Pages + Supabase.
 
@@ -17,7 +17,7 @@ Cập nhật gần nhất: 16/09/2026.
 Gốc: `https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/`
 **Trang chính + 7 trang phụ:**
 - `index.html` / `live.html` — TRANG CHÍNH, GẦN REALTIME (mỗi ~15'). Có 3 chỉ số TikTok (VNGH) toàn vùng ở dải chỉ số.
-- `eod.html` — CUỐI NGÀY (chốt ~23:30). Gồm mục "⏰ Kỷ luật ra hàng".
+- `eod.html` — CUỐI NGÀY (chốt ~23:30). Gồm: ① Lý do giao hỏng (gom failNote 3 nhóm do-khách·shop / không-liên-lạc / do-NV·địa-chỉ + top 8 lý do cụ thể); ② So sánh %GTC hôm nay vs hôm qua & vs TB 7 ngày (từ Supabase, `_fetch_hist`); ③ Tồn chuyển sang mai (chưa gán + GTB + tổng); ④ Tốt nhất hôm nay (Top 5 NV ≥30 đơn + Top 5 bưu cục ≥100 đơn theo %GTC); "⏰ Kỷ luật ra hàng"; Top 10 NV nguy hiểm COD GTB; Top 10 bưu cục COD GTB.
 - `backlog.html` — TỒN ĐỌNG (Lấy·Giao·Trả + Luân chuyển + đơn đỏ quá hạn).
 - `trend.html` — XU HƯỚNG (đọc từ Supabase).
 - `nhanvien.html` — NĂNG SUẤT NV (GTC/ngày làm · COD GTB/đơn · Năng suất Nay−TB).
