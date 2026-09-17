@@ -444,7 +444,7 @@ def build_html(entries, hub_count):
              "(2) Tồn đọng luân chuyển giao/trả<br>"
              "Số cập nhật lúc chạy · trang tự làm mới mỗi 5 phút · dữ liệu làm mới ~30 phút/lần</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim();"
-             "document.querySelectorAll('details.bc').forEach(function(e){"
+             "document.querySelectorAll('details.bc[data-k]').forEach(function(e){"
              "e.style.display=(!q||e.dataset.k.indexOf(q)>=0)?'':'none';});}</script>")
     P.append("</div></body></html>")
     return "\n".join(P)

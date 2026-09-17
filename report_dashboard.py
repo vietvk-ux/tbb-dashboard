@@ -566,7 +566,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
     P.append("<div class='foot'>%GTC = giao thành công / tổng đơn giao · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
              "GTB = giao thất bại · COD GTB = tiền thu hộ kẹt ở đơn GTB · nguồn nhanh.ghn.vn</div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
-             "document.querySelectorAll('.bc').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
+             "document.querySelectorAll('.bc[data-k]').forEach(function(e){var s=(!q||e.dataset.k.indexOf(q)>=0);"
              "e.style.display=s?'':'none';if(s)n++;});"
              "document.getElementById('empty').style.display=n?'none':'block';}</script>")
     P.append("</div></body></html>")
