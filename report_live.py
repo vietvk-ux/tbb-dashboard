@@ -440,9 +440,14 @@ def gen_html(rows):
             P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
         P.append("</div></details>")
 
-    P.append("<div class='foot'>🏃 đang chạy · 🏁 kết thúc hôm nay · 📥 đã gán · ⏳ chưa gán · ✅ GTC · ❌COD = tiền COD kẹt trên đơn GTB (triệu)<br>"
-             "%GTC = GTC / tổng đơn gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
-             "số LIVE gồm cả chuyến đã kết thúc trong ngày · nguồn nhanh.ghn.vn</div>")
+    P.append("<div class='foot'><b>📖 Giải thích chỉ số</b><br>"
+             "📥 <b>Đã gán</b> = đơn đã xếp vào chuyến hôm nay · ⏳ <b>Chưa gán</b> = đơn tồn ở kho chưa xếp chuyến<br>"
+             "🏃 <b>Đang chạy</b> = số NV còn chuyến chưa kết thúc · 🚛 <b>Còn phải giao</b> = đơn của chuyến đang chạy CHƯA giao xong (đang trên đường)<br>"
+             "📊 <b>Tiến độ chạy</b> = đã giao / tổng đơn của chuyến đang chạy (%) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
+             "🕘 <b>XP muộn &gt;9h30</b> = số NV xuất phát sau 9h30 (kỷ luật ra hàng) · 🛍️ <b>TikTok</b> = đơn mã VNGH<br>"
+             "💰 <b>COD GTB kẹt</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công<br>"
+             "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
+             "<span style='opacity:.7'>Số LIVE gồm cả chuyến đã kết thúc trong ngày · %GTC còn thấp giữa ngày là bình thường (chuyến chưa đóng) · nguồn nhanh.ghn.vn</span></div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
              "document.querySelectorAll('.bc[data-k]').forEach(function(e){var k=e.dataset.k||'';"
              "var s=(!q||k.indexOf(q)>=0);e.style.display=s?'':'none';if(s)n++;});"
