@@ -276,6 +276,18 @@ def gen_html(rows):
                 a[k] += r.get(k, 0)
     reg_pct = _pct(R["gtc"], R["total"])
 
+    # Chỉ số hiệu suất chuyến ĐANG CHẠY (từ drivers · 0 tốn call thêm)
+    ot_tot = ot_done = late_cnt = 0
+    for r in rows:
+        for d in r.get("drivers", []):
+            ot_tot += d.get("ot_tot", 0)
+            ot_done += d.get("ot_done", 0)
+            st = d.get("st")
+            if st is not None and (st.hour * 60 + st.minute) > 570:  # xuất phát sau 9h30
+                late_cnt += 1
+    on_road = max(ot_tot - ot_done, 0)          # đơn đang trên đường (chuyến đang chạy)
+    run_pct = round(ot_done / ot_tot * 100) if ot_tot else None
+
     can_giao = R["total"] + R["backlog"]
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
@@ -308,14 +320,20 @@ def gen_html(rows):
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📥 Đã gán</div></div>" % _n(R["total"]))
     P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>⏳ Chưa gán</div></div>" % _n(R["backlog"]))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🏃 Đang chạy</div></div>" % _n(R["ontrip"]))
+    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🚛 Còn phải giao</div></div>" % _n(on_road))
+    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📊 Tiến độ chạy</div></div>"
+             % (("%d%%" % run_pct) if run_pct is not None else "—"))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ GTC nay</div></div>" % _n(R["gtc"]))
+    P.append("<div class='st'><div class='sv %s'>%s</div><div class='sl'>🕘 XP muộn &gt;9h30</div></div>"
+             % ("warn" if late_cnt else "", _n(late_cnt)))
     # 3 chỉ số đơn TikTok (VNGH) toàn vùng
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🛍️ TikTok gán</div></div>" % _n(R["vngh"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛍️ TikTok GTC</div></div>" % _n(R["vngh_gtc"]))
     vpct = _pct(R["vngh_gtc"], R["vngh"])
     P.append("<div class='st'><div class='sv %s'>%s%%</div><div class='sl'>🛍️ %%GTC TikTok</div></div>"
              % (_cls(vpct), vpct if vpct is not None else "—"))
-    # LTC ở cuối cùng (thay chỗ GTB thao tác cũ)
+    # COD GTB kẹt (tiền thu hộ kẹt trên đơn giao hỏng) + LTC ở cuối
+    P.append("<div class='st'><div class='sv bad'>%str</div><div class='sl'>💰 COD GTB kẹt</div></div>" % _codm(R["cod_gtb"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(R["ltc"]))
     P.append("</section>")
 
