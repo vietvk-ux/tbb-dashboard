@@ -366,10 +366,10 @@ def render_soon_section(entries):
     P.append("</section>")
     if rows:
         rows.sort(key=lambda x: -x[1]["total"])
-        P.append("<div class='subh'>🟠 Bưu cục sắp vỡ nhiều nhất — cần đẩy ngay</div>")
+        P.append("<div class='subh'>🟠 Top 12 bưu cục sắp vỡ nhiều nhất — cần đẩy ngay</div>")
         P.append("<div class='scroll'><table><tr><th>Bưu cục</th><th>Giao 96–120</th>"
                  "<th>Trả 96–120</th><th>Tổng sắp vỡ</th></tr>")
-        for name, s in rows:
+        for name, s in rows[:12]:
             gd_c = _n(s["DELIVER"]) if s["DELIVER"] else "<span class='muted'>–</span>"
             gr_c = _n(s["RETURN"]) if s["RETURN"] else "<span class='muted'>–</span>"
             P.append("<tr><td>%s</td><td>%s</td><td>%s</td>"
