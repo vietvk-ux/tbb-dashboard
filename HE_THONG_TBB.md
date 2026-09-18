@@ -1,9 +1,26 @@
 # HỆ THỐNG BÁO CÁO VẬN HÀNH VÙNG TÂY BẮC BỘ (TBB) — GHN
 
 Tài liệu tổng hợp để **tiếp tục làm việc ở phiên sau / trên máy khác**. Repo: `vietvk-ux/tbb-dashboard` (public). Chủ: Vũ Khắc Việt (vietvk@ghn.vn) — GĐV Vùng TBB.
-Cập nhật gần nhất: 17/09/2026.
+Cập nhật gần nhất: 18/09/2026.
 
 > Nguyên tắc bảo mật: KHÔNG in/echo/commit giá trị `NHANH_TOKEN`, `SUPABASE_SERVICE_KEY`, `GTALK_OA_TOKEN`, PAT. Đặt qua `gh secret set` / GitHub Actions secrets. Dữ liệu số KHÔNG lưu trong repo — chỉ deploy lên GitHub Pages + Supabase.
+
+---
+
+## 0. SETUP MÁY MỚI (đọc đầu tiên khi đổi máy)
+
+**Quan trọng:** toàn bộ tự động hoá chạy trên **GitHub Actions (đám mây)**, KHÔNG phụ thuộc máy cá nhân. Đổi máy KHÔNG làm hỏng hệ thống — web + bản tin GTalk + Supabase vẫn chạy. Máy cá nhân chỉ cần để **sửa code · test tay · push**.
+
+Các bước dựng lại trên máy mới:
+1. **Clone repo:** `gh repo clone vietvk-ux/tbb-dashboard` (cần `gh auth login` trước — đăng nhập GitHub tài khoản `vietvk-ux`, quyền repo + workflow để push/deploy).
+2. **Python 3.11 + thư viện:** `pip install -r requirements.txt` (chỉ 2 gói: `aiohttp`, `requests`).
+3. **Tạo `.env` local** (để chạy tay — KHÔNG commit) với 5 biến, lấy giá trị như sau:
+   - `NHANH_TOKEN` — đăng nhập nhanh.ghn.vn → F12 Console → `copy(localStorage.SESSION)` (xem §2).
+   - `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` — Supabase Dashboard → Project Settings → API (service_role key).
+   - `GTALK_OA_TOKEN` + `GTALK_CHANNEL_ID` — từ cấu hình bot GTalk cũ (hỏi user nếu chưa có).
+   - *Cách nạp khi chạy tay:* export ra shell, hoặc đọc từ `.env` bằng `grep|cut` (đừng in giá trị). Các repo bot khác (`tbb-gtalk-bot/.env`, `tbb-bot-python/.env`) trên máy CŨ chứa sẵn các key này — máy mới phải tạo lại.
+4. **Secrets trên GitHub Actions ĐÃ có sẵn** trong repo (không đọc lại được) — chỉ cần cập nhật khi token hết hạn: `gh secret set NHANH_TOKEN` (§2, §6). Automation KHÔNG dùng `.env` local.
+5. **Chạy tay 1 trang để test:** vd `NHANH_TOKEN=... python report_live.py` (sinh `docs/<slug>/index.html`). Hoặc kích workflow: `gh workflow run live-30m.yml`.
 
 ---
 
@@ -15,8 +32,10 @@ Cập nhật gần nhất: 17/09/2026.
 
 ### URL trang web (slug bí mật)
 Gốc: `https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/`
-**Trang chính + 7 trang phụ:**
-- `index.html` / `live.html` — TRANG CHÍNH, GẦN REALTIME (mỗi ~15'). Có 3 chỉ số TikTok (VNGH) toàn vùng ở dải chỉ số.
+**Trang chính + các trang phụ:**
+- `index.html` / `live.html` — TRANG CHÍNH, GẦN REALTIME (mỗi ~15'). Dải 12 tile (gồm 🚛 Còn phải giao · 📊 Tiến độ chạy · 🕘 XP muộn >9h30 · 💰 COD GTB kẹt · 3 chỉ số TikTok…) + chú giải chân trang.
+- `tongquan.html` — TỔNG QUAN 1 màn hình (hero %GTC · 8 KPI · xu hướng 14 ngày · 5 điểm nóng · drill AM→BC→NV). Link "📋 Báo cáo tổng quan" đầu index.
+- `khuvuc.html` — BẢN ĐỒ KHU VỰC (Trang 9, xem §2): GTC theo xã + toạ độ, bản đồ nhiệt, biểu đồ tuần/tháng.
 - `eod.html` — CUỐI NGÀY (chốt ~23:30). Gồm: ① Lý do giao hỏng (gom failNote 3 nhóm do-khách·shop / không-liên-lạc / do-NV·địa-chỉ + top 8 lý do cụ thể); ② So sánh %GTC hôm nay vs hôm qua & vs TB 7 ngày (từ Supabase, `_fetch_hist`); ③ Tồn chuyển sang mai (chưa gán + GTB + tổng); ④ Tốt nhất hôm nay (Top 5 NV ≥30 đơn + Top 5 bưu cục ≥100 đơn theo %GTC); "⏰ Kỷ luật ra hàng"; Top 10 NV nguy hiểm COD GTB; Top 10 bưu cục COD GTB.
 - `backlog.html` — TỒN ĐỌNG (Lấy·Giao·Trả + Luân chuyển + đơn đỏ quá hạn).
 - `trend.html` — XU HƯỚNG (đọc từ Supabase).
@@ -83,7 +102,7 @@ Gốc: `https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/`
 ## 3. XẾP HẠNG THEO AM
 
 - **`am_map.py`** — `AM_OF = {tên_bưu_cục: tên_AM}` là NGUỒN DUY NHẤT (54 BC → 7 AM). Sửa 1 file này là áp cho TẤT CẢ báo cáo.
-- 7 AM: Nguyễn Công Nam(13), Bùi Văn Đông(5), Hoàng Gia Đạt(7), Đinh Văn Thu(4), Nguyễn Đức Thịnh(9), Điêu Chính Luân(6), Bế Ngọc Chuyển(10). 8 điểm "ĐG" nhỏ chưa gán (thường 0 sản lượng).
+- 7 AM (54 BC, sau khi chuyển Văn Phú 14/09): Nguyễn Công Nam(12), Bùi Văn Đông(5), Hoàng Gia Đạt(7), Đinh Văn Thu(4), Nguyễn Đức Thịnh(9), Điêu Chính Luân(6), Bế Ngọc Chuyển(11). 10 điểm "ĐG" nhỏ chưa gán (thường 0 sản lượng).
 - Khi user báo đổi cơ cấu AM → sửa `AM_OF` → kiểm tên khớp hub → commit/push → force deploy → verify `Σ AM = tổng vùng`.
 - Mục "🧑‍💼 Theo AM" (bấm mở ra bưu cục, drill tiếp nhân viên) ở: trực tiếp, cuối ngày, tồn đọng (cả 3 phần).
 - **Ngưỡng đơn đỏ tồn:** Giao>120h, Trả>120h, **LC giao>48h** (đổi từ 36h ngày 22/08), LC trả>48h.
