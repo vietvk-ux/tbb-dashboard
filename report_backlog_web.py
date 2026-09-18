@@ -359,16 +359,16 @@ def render_soon_section(entries):
     gd = sum(x[1]["DELIVER"] for x in rows)
     gr = sum(x[1]["RETURN"] for x in rows)
     P = ["<section class='hero' style='border-color:rgba(247,185,85,.5);background:rgba(247,185,85,.08)'>"]
-    P.append("<div class='hlbl'>⏰ Sắp vỡ SLA 120h · Giao/Trả 96–120h toàn vùng</div>")
+    P.append("<div class='hlbl'>⏰ Sắp quá hạn SLA 120h · Giao/Trả 96–120h toàn vùng</div>")
     P.append("<div class='hbig' style='color:var(--warn)'>%s</div>" % _n(grand))
-    P.append("<div class='hsub'>Giao %s · Trả %s · <b>xử lý TRƯỚC khi vỡ &gt;120h</b></div>"
+    P.append("<div class='hsub'>Giao %s · Trả %s · <b>xử lý TRƯỚC khi quá hạn &gt;120h</b></div>"
              % (_n(gd), _n(gr)))
     P.append("</section>")
     if rows:
         rows.sort(key=lambda x: -x[1]["total"])
-        P.append("<div class='subh'>🟠 Top 12 bưu cục sắp vỡ nhiều nhất — cần đẩy ngay</div>")
+        P.append("<div class='subh'>🟠 Top 12 bưu cục sắp quá hạn nhiều nhất — cần đẩy ngay</div>")
         P.append("<div class='scroll'><table><tr><th>Bưu cục</th><th>Giao 96–120</th>"
-                 "<th>Trả 96–120</th><th>Tổng sắp vỡ</th></tr>")
+                 "<th>Trả 96–120</th><th>Tổng sắp QH</th></tr>")
         for name, s in rows[:12]:
             gd_c = _n(s["DELIVER"]) if s["DELIVER"] else "<span class='muted'>–</span>"
             gr_c = _n(s["RETURN"]) if s["RETURN"] else "<span class='muted'>–</span>"
@@ -520,7 +520,7 @@ def build_html(entries, hub_count):
 
     # tab nhảy nhanh
     P.append("<div class='tabs'><a class='on' href='#do'>🚨 Đơn backlog</a>"
-             "<a href='#soon'>⏰ Sắp vỡ</a>"
+             "<a href='#soon'>⏰ Sắp quá hạn</a>"
              "<a href='#lgt'>📦 Lấy·Giao·Trả</a>"
              "<a href='#luanchuyen'>🔁 Luân chuyển</a></div>")
 
@@ -532,8 +532,8 @@ def build_html(entries, hub_count):
     P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;48h · LC trả&gt;48h</div>")
     P += render_red_section(entries, prev_red=(prev["red"] if prev else None), prev_date=pdate)
 
-    # ===== ⏰ SẮP VỠ SLA (96–120h) — cảnh báo sớm =====
-    P.append("<div class='sec' id='soon'>⏰ Sắp vỡ SLA · Giao/Trả 96–120h</div>")
+    # ===== ⏰ SẮP QUÁ HẠN SLA (96–120h) — cảnh báo sớm =====
+    P.append("<div class='sec' id='soon'>⏰ Sắp quá hạn SLA · Giao/Trả 96–120h</div>")
     P.append("<div class='secsub'>Đơn cận mốc 120h — đẩy đi TRƯỚC khi thành đơn đỏ quá hạn</div>")
     P += render_soon_section(entries)
 
