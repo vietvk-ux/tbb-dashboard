@@ -76,8 +76,9 @@ def build_html(rows):
     nv_cod_list = sorted([(d, bc) for d, bc in all_drv if d.get("cod_gtb", 0) >= 1e5],
                          key=lambda x: -x[0].get("cod_gtb", 0))
     nv_cod = nv_cod_list[0] if nv_cod_list else None
-    bc_onroad = max([(r, sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", [])))
-                     for r in rows], key=lambda x: x[1], default=None)
+    bc_onroad_list = sorted([(r, sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", [])))
+                             for r in rows], key=lambda x: -x[1])
+    bc_onroad = bc_onroad_list[0] if bc_onroad_list and bc_onroad_list[0][1] > 0 else None
     bc_backlog_list = sorted([(r["name"], r.get("backlog", 0)) for r in rows if r.get("backlog", 0) > 0],
                              key=lambda x: -x[1])
     bc_backlog = bc_backlog_list[0] if bc_backlog_list else None
@@ -168,11 +169,14 @@ def build_html(rows):
         P.append(_hot("💸", "NV COD GTB kẹt cao nhất",
                       "%s · %s" % (d0.get("name", "—"), _bc_tail(bc0)),
                       _codm(d0.get("cod_gtb", 0)) + "tr", "bad", det))
-    # 🚛 Bưu cục còn phải giao nhiều nhất (đơn đang trên đường của chuyến đang chạy)
-    if bc_onroad and bc_onroad[1] > 0:
-        r0 = bc_onroad[0]
-        det = _nv_list(r0, key=lambda x: -(x.get("ot_tot", 0) - x.get("ot_done", 0)))
-        P.append(_hot("🚛", "Bưu cục còn phải giao nhiều nhất", _short(r0["name"]),
+    # 🚛 Bưu cục còn phải giao nhiều nhất (đơn đang trên đường của chuyến đang chạy) — top 10
+    if bc_onroad:
+        det = "<div class='dsub'>Top 10 bưu cục còn nhiều đơn trên đường nhất (chuyến đang chạy)</div>"
+        det += "".join(
+            "<div class='dl'><span class='dln'>%s</span><span class='dlm'>🏃 %s chuyến đang chạy</span>"
+            "<span class='pill sm warn'>%s</span></div>" % (_esc(r["name"]), _n(r.get("ontrip", 0)), _n(v))
+            for r, v in bc_onroad_list[:10] if v > 0)
+        P.append(_hot("🚛", "Bưu cục còn phải giao nhiều nhất", _short(bc_onroad[0]["name"]),
                       _n(bc_onroad[1]) + " đơn", "warn", det))
     # ⏳ Bưu cục chưa gán (backlog) cao nhất — top 10
     if bc_backlog:
