@@ -343,6 +343,44 @@ def render_detail_table(parsed, types):
     return "".join(P)
 
 
+def _soon_of(e):
+    """Đơn Giao/Trả SẮP vỡ SLA 120h = bucket 96–120h (chưa vỡ nhưng cận kề)."""
+    lgt = e["lgt"]
+    g = lgt.get("DELIVER", {}).get("buckets", {}).get("96_120", 0)
+    r = lgt.get("RETURN", {}).get("buckets", {}).get("96_120", 0)
+    return {"DELIVER": g, "RETURN": r, "total": g + r}
+
+
+def render_soon_section(entries):
+    """⏰ Đơn Giao/Trả sắp vỡ SLA 120h (96–120h) — cảnh báo sớm theo bưu cục."""
+    rows = [(e["name"], _soon_of(e)) for e in entries]
+    rows = [x for x in rows if x[1]["total"] > 0]
+    grand = sum(x[1]["total"] for x in rows)
+    gd = sum(x[1]["DELIVER"] for x in rows)
+    gr = sum(x[1]["RETURN"] for x in rows)
+    P = ["<section class='hero' style='border-color:rgba(247,185,85,.5);background:rgba(247,185,85,.08)'>"]
+    P.append("<div class='hlbl'>⏰ Sắp vỡ SLA 120h · Giao/Trả 96–120h toàn vùng</div>")
+    P.append("<div class='hbig' style='color:var(--warn)'>%s</div>" % _n(grand))
+    P.append("<div class='hsub'>Giao %s · Trả %s · <b>xử lý TRƯỚC khi vỡ &gt;120h</b></div>"
+             % (_n(gd), _n(gr)))
+    P.append("</section>")
+    if rows:
+        rows.sort(key=lambda x: -x[1]["total"])
+        P.append("<div class='subh'>🟠 Bưu cục sắp vỡ nhiều nhất — cần đẩy ngay</div>")
+        P.append("<div class='scroll'><table><tr><th>Bưu cục</th><th>Giao 96–120</th>"
+                 "<th>Trả 96–120</th><th>Tổng sắp vỡ</th></tr>")
+        for name, s in rows:
+            gd_c = _n(s["DELIVER"]) if s["DELIVER"] else "<span class='muted'>–</span>"
+            gr_c = _n(s["RETURN"]) if s["RETURN"] else "<span class='muted'>–</span>"
+            P.append("<tr><td>%s</td><td>%s</td><td>%s</td>"
+                     "<td><span class='pill warn'>%s</span></td></tr>"
+                     % (_esc(name), gd_c, gr_c, _n(s["total"])))
+        P.append("</table></div>")
+    else:
+        P.append("<div class='note' style='text-align:center'>Không có đơn nào ở mốc 96–120h.</div>")
+    return P
+
+
 def render_red_section(entries, prev_red=None, prev_date=None):
     """Khối 🚨 Đơn đỏ toàn vùng: hero tổng + 4 KPI + top BC."""
     tot = {ot: 0 for ot, _, _ in RED_LABELS}
@@ -482,6 +520,7 @@ def build_html(entries, hub_count):
 
     # tab nhảy nhanh
     P.append("<div class='tabs'><a class='on' href='#do'>🚨 Đơn backlog</a>"
+             "<a href='#soon'>⏰ Sắp vỡ</a>"
              "<a href='#lgt'>📦 Lấy·Giao·Trả</a>"
              "<a href='#luanchuyen'>🔁 Luân chuyển</a></div>")
 
@@ -492,6 +531,11 @@ def build_html(entries, hub_count):
     P.append("<div class='sec first' id='do'>🚨 Đơn backlog — quá hạn cần xử lý</div>")
     P.append("<div class='secsub'>Giao&gt;120h · Trả&gt;120h · LC giao&gt;48h · LC trả&gt;48h</div>")
     P += render_red_section(entries, prev_red=(prev["red"] if prev else None), prev_date=pdate)
+
+    # ===== ⏰ SẮP VỠ SLA (96–120h) — cảnh báo sớm =====
+    P.append("<div class='sec' id='soon'>⏰ Sắp vỡ SLA · Giao/Trả 96–120h</div>")
+    P.append("<div class='secsub'>Đơn cận mốc 120h — đẩy đi TRƯỚC khi thành đơn đỏ quá hạn</div>")
+    P += render_soon_section(entries)
 
     # ===== BÁO CÁO 1: LẤY-GIAO-TRẢ =====
     P.append("<div class='sec' id='lgt'>📦 Tồn Lấy · Giao · Trả</div>")
