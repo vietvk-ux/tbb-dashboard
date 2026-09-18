@@ -430,15 +430,28 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
         P.append("<div class='note' style='margin:0 0 8px'>%d người · %d chuyến đang chạy · <b>%s đơn</b> "
                  "chưa tính vào %%GTC — cần đốc thúc đóng chuyến. <i>(ảnh chụp %s)</i></div>"
                  % (len(ot), tot_ch, _n(tot_don), gen_at))
-        P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
-                 "<th>Chuyến</th><th>Đơn treo</th></tr></thead><tbody>")
-        for i, x in enumerate(ot[:20], 1):
-            P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td>"
-                     "<td>%s</td><td class='rd'>%s</td></tr>"
-                     % (i, _esc(x["driver_name"]), _esc(x["bc"]), _n(x["trips"]), _n(x["don"])))
-        if len(ot) > 20:
-            P.append("<tr><td></td><td class='nv' style='color:var(--mut)'>… và %d người khác</td>"
-                     "<td></td><td></td></tr>" % (len(ot) - 20))
+        # Nhóm theo AM → Bưu cục → Nhân viên cho gọn
+        am_g = {}
+        for x in ot:
+            amn = AM_OF.get(x["bc"]) or "(chưa phân AM)"
+            g = am_g.setdefault(amn, {"don": 0, "ch": 0, "nguoi": 0, "bcs": {}})
+            g["don"] += x["don"]; g["ch"] += x["trips"]; g["nguoi"] += 1
+            g["bcs"].setdefault(x["bc"], []).append(x)
+        P.append("<table class='drv'><thead><tr><th class='rank'>#</th>"
+                 "<th class='lft'>AM · Bưu cục · Nhân viên</th><th>Chuyến</th><th>Đơn treo</th></tr></thead><tbody>")
+        rank = 0
+        for amn, g in sorted(am_g.items(), key=lambda kv: -kv[1]["don"]):
+            # Dòng tiêu đề AM (gộp)
+            P.append("<tr><td></td><td class='nv' style='font-weight:700;color:var(--warn)'>%s"
+                     "<div class='sc'>%d người · %d bưu cục</div></td><td>%s</td><td class='rd'><b>%s</b></td></tr>"
+                     % (_esc(amn), g["nguoi"], len(g["bcs"]), _n(g["ch"]), _n(g["don"])))
+            for bc, drs in sorted(g["bcs"].items(), key=lambda kv: -sum(d["don"] for d in kv[1])):
+                for x in sorted(drs, key=lambda d: -d["don"]):
+                    rank += 1
+                    P.append("<tr><td class='rank'>%d</td>"
+                             "<td class='nv' style='padding-left:18px'>%s<div class='sc'>%s</div></td>"
+                             "<td>%s</td><td class='rd'>%s</td></tr>"
+                             % (rank, _esc(x["driver_name"]), _esc(bc), _n(x["trips"]), _n(x["don"])))
         P.append("</tbody></table></section>")
 
     # ===== 💰 Top 10 bưu cục COD GTB cao nhất (tiền thu hộ kẹt trên đơn giao hỏng) =====
