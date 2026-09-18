@@ -67,6 +67,21 @@ def build_html(rows):
          if _late(d.get("st"))],
         key=lambda x: -(x[2].hour * 60 + x[2].minute))
 
+    # ---- Điểm nóng bổ sung: NV kém nhất · NV giữ COD · BC còn phải giao · BC chưa gán ----
+    all_drv = [(d, r["name"]) for r in rows for d in r.get("drivers", [])]
+    # xếp %GTC thấp→cao; cùng %GTC thì NV NHIỀU ĐƠN lên trước (đáng lo hơn khi 0% giữa ngày)
+    _nv_qual = sorted([(d, bc) for d, bc in all_drv if d.get("total", 0) >= 30],
+                      key=lambda x: (_pct(x[0].get("gtc", 0), x[0].get("total", 0)), -x[0].get("total", 0)))
+    nv_worst = _nv_qual[0] if _nv_qual else None
+    nv_cod_list = sorted([(d, bc) for d, bc in all_drv if d.get("cod_gtb", 0) >= 1e5],
+                         key=lambda x: -x[0].get("cod_gtb", 0))
+    nv_cod = nv_cod_list[0] if nv_cod_list else None
+    bc_onroad = max([(r, sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", [])))
+                     for r in rows], key=lambda x: x[1], default=None)
+    bc_backlog_list = sorted([(r["name"], r.get("backlog", 0)) for r in rows if r.get("backlog", 0) > 0],
+                             key=lambda x: -x[1])
+    bc_backlog = bc_backlog_list[0] if bc_backlog_list else None
+
     # ---- Xu hướng + điểm nóng khu vực (khuvuc_data) ----
     days = _load_days(14)
     day_series = [(d["ngay"][8:] + "/" + d["ngay"][5:7], _pct(d["gtc"], d["tot"])) for d in days]
@@ -135,6 +150,39 @@ def build_html(rows):
         r = rows_by_name.get(bc_cod[0])
         det = _nv_list(r, key=lambda x: -x.get("cod_gtb", 0), only_cod=True) if r else ""
         P.append(_hot("💰", "Bưu cục COD GTB cao nhất", _short(bc_cod[0]), _codm(bc_cod[1]) + "tr", "bad", det))
+    # 👤 NV %GTC thấp nhất toàn vùng (≥30 đơn) — top 15 kém nhất
+    if nv_worst:
+        d0, bc0 = nv_worst
+        pc0 = _pct(d0.get("gtc", 0), d0.get("total", 0))
+        det = ("<div class='dsub'>Top 15 NV %GTC thấp nhất toàn vùng (≥30 đơn) · "
+               "giữa ngày 0% thường do chuyến CHƯA đóng — ưu tiên NV nhiều đơn mà giao được ít</div>")
+        det += "".join(_nv_hotrow(d, bc, "gtc") for d, bc in _nv_qual[:15])
+        P.append(_hot("👤", "NV %GTC thấp nhất (≥30 đơn)",
+                      "%s · %s" % (d0.get("name", "—"), _bc_tail(bc0)),
+                      "%d%%" % pc0, _cls(pc0), det))
+    # 💸 NV giữ COD GTB kẹt nhiều nhất — top 15
+    if nv_cod:
+        d0, bc0 = nv_cod
+        det = "<div class='dsub'>Top 15 NV giữ COD GTB kẹt nhiều nhất (tiền thu hộ trên đơn giao hỏng)</div>"
+        det += "".join(_nv_hotrow(d, bc, "cod") for d, bc in nv_cod_list[:15])
+        P.append(_hot("💸", "NV COD GTB kẹt cao nhất",
+                      "%s · %s" % (d0.get("name", "—"), _bc_tail(bc0)),
+                      _codm(d0.get("cod_gtb", 0)) + "tr", "bad", det))
+    # 🚛 Bưu cục còn phải giao nhiều nhất (đơn đang trên đường của chuyến đang chạy)
+    if bc_onroad and bc_onroad[1] > 0:
+        r0 = bc_onroad[0]
+        det = _nv_list(r0, key=lambda x: -(x.get("ot_tot", 0) - x.get("ot_done", 0)))
+        P.append(_hot("🚛", "Bưu cục còn phải giao nhiều nhất", _short(r0["name"]),
+                      _n(bc_onroad[1]) + " đơn", "warn", det))
+    # ⏳ Bưu cục chưa gán (backlog) cao nhất — top 10
+    if bc_backlog:
+        det = "<div class='dsub'>Top 10 bưu cục tồn nhiều đơn chưa xếp chuyến</div>"
+        det += "".join(
+            "<div class='dl'><span class='dln'>%s</span><span class='dlm'>chưa gán giao</span>"
+            "<span class='pill sm warn'>%s</span></div>" % (_esc(nm), _n(bl))
+            for nm, bl in bc_backlog_list[:10])
+        P.append(_hot("⏳", "Bưu cục chưa gán cao nhất", _short(bc_backlog[0]),
+                      _n(bc_backlog[1]) + " đơn", "warn", det))
     # NV xuất phát muộn: danh sách cụ thể
     if late_list:
         det = "".join("<div class='dl'><span class='dln'>%s</span><span class='dlm'>%s</span>"
@@ -168,6 +216,26 @@ def build_html(rows):
 
 def _short(bc):
     return bc  # giữ nguyên "(TỈNH) Tên" cho rõ
+
+
+def _bc_tail(bc):
+    """Tên bưu cục gọn (bỏ tiền tố '(TỈNH) '). Trả RAW (chưa esc)."""
+    return bc.split(") ")[-1] if ") " in bc else bc
+
+
+def _nv_hotrow(d, bc, mode):
+    """1 dòng NV toàn vùng cho chi tiết điểm nóng: tên · bưu cục + số liệu + pill phải."""
+    total = d.get("total", 0); gtc = d.get("gtc", 0)
+    name = _esc(d.get("name", "—")); bct = _esc(_bc_tail(bc))
+    if mode == "cod":
+        meta = "%s · 📥%s ❌%s" % (bct, _n(total), _n(total - gtc))
+        pill = "<span class='pill sm bad'>%str</span>" % _codm(d.get("cod_gtb", 0))
+    else:
+        pc = _pct(gtc, total)
+        meta = "%s · 📥%s ✅%s" % (bct, _n(total), _n(gtc))
+        pill = "<span class='pill sm %s'>%s</span>" % (_cls(pc), ("%d%%" % pc) if pc is not None else "—")
+    return ("<div class='dl'><span class='dln'>%s</span>"
+            "<span class='dlm'>%s</span>%s</div>" % (name, meta, pill))
 
 
 def _bar(p):
