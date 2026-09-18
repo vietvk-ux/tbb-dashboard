@@ -33,6 +33,54 @@ def _load_days(n=14):
         return []
 
 
+def _momentum(min_don=100):
+    """So %GTC 2 ngày CHỐT gần nhất (bao_cao_buu_cuc) → AM/bưu cục cải thiện & tệ đi nhất.
+    Trả {d_cur,d_prev,am[],bc_up[],bc_down[]} hoặc None. So 2 ngày hoàn chỉnh → sạch, không lẫn số live giữa ngày."""
+    url = os.environ.get("SUPABASE_URL", "").strip()
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not url or not key:
+        return None
+    try:
+        import snapshot as SNAP
+        days = SNAP._sb_get(url, key, "bao_cao_vung?select=ngay&order=ngay.desc&limit=2")
+        if len(days) < 2:
+            return None
+        d_cur, d_prev = days[0]["ngay"], days[1]["ngay"]
+
+        def fetch(d):
+            rr = SNAP._sb_all(url, key,
+                              "bao_cao_buu_cuc?ngay=eq.%s&select=buu_cuc,don_giao,gtc" % d)
+            return {r["buu_cuc"]: r for r in rr}
+        cur, prev = fetch(d_cur), fetch(d_prev)
+        bc = []
+        for name, c in cur.items():
+            p = prev.get(name)
+            if not p or (c.get("don_giao") or 0) < min_don or (p.get("don_giao") or 0) < min_don:
+                continue
+            pc, pp = _pct(c["gtc"], c["don_giao"]), _pct(p["gtc"], p["don_giao"])
+            if pc is None or pp is None:
+                continue
+            bc.append((name, pp, pc, pc - pp, c["don_giao"]))
+
+        def am_agg(dd):
+            a = {}
+            for name, r in dd.items():
+                am = AM_OF.get(name)
+                if not am:
+                    continue
+                x = a.setdefault(am, [0, 0]); x[0] += r.get("gtc") or 0; x[1] += r.get("don_giao") or 0
+            return {k: _pct(v[0], v[1]) for k, v in a.items() if v[1]}
+        amc, amp = am_agg(cur), am_agg(prev)
+        am = sorted([(k, amp[k], amc[k], amc[k] - amp[k]) for k in amc if k in amp],
+                    key=lambda x: x[3])   # tệ đi → cải thiện
+        return {"d_cur": d_cur, "d_prev": d_prev, "am": am,
+                "bc_down": sorted(bc, key=lambda x: x[3])[:8],
+                "bc_up": sorted(bc, key=lambda x: -x[3])[:8]}
+    except Exception:
+        return None
+
+
 def build_html(rows):
     now = datetime.now(VN)
     # ---- Gộp vùng ----
@@ -207,6 +255,36 @@ def build_html(rows):
         P.append(_hot("🗺", "Xã 0% GTC toàn vùng (hôm qua)", "toàn vùng · %d đơn hỏng" % tot_don,
                       "%d xã" % len(zero_wards), "bad", det))
     P.append("</section>")
+
+    # ===== 📊 BIẾN ĐỘNG %GTC vs HÔM QUA (2 ngày chốt) =====
+    mom = _momentum()
+    if mom and (mom["bc_down"] or mom["am"]):
+        dm = lambda s: s[8:10] + "/" + s[5:7]
+        P.append("<div class='sec'>📊 Biến động %%GTC · %s so %s (2 ngày chốt)</div>"
+                 % (dm(mom["d_cur"]), dm(mom["d_prev"])))
+        P.append("<section class='card'>")
+        if mom["am"]:
+            P.append("<div class='dsub'>Theo AM (▲ tăng tốt · ▼ giảm — điểm %)</div><div style='display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 4px'>")
+            for name, pp, pc, dv in mom["am"]:
+                col = "good" if dv >= 0 else "bad"; ar = "▲" if dv >= 0 else "▼"
+                P.append("<span style='padding:4px 9px;border-radius:12px;background:rgba(255,255,255,.05);font-size:12px'>"
+                         "%s <b style='color:var(--%s)'>%s%d</b></span>" % (_esc(name), col, ar, abs(dv)))
+            P.append("</div>")
+
+        def _mrow(t):
+            name, pp, pc, dv, don = t
+            col = "good" if dv >= 0 else "bad"; ar = "▲" if dv >= 0 else "▼"
+            return ("<div class='dl'><span class='dln'>%s</span>"
+                    "<span class='dlm'>%d%% → %d%% · 📥%s</span>"
+                    "<span class='pill sm %s'>%s%d</span></div>"
+                    % (_esc(name), pp, pc, _n(don), col, ar, abs(dv)))
+        if mom["bc_down"] and mom["bc_down"][0][3] < 0:
+            P.append("<div class='dsub' style='color:var(--bad)'>🔻 Bưu cục tụt %GTC nhiều nhất (≥100 đơn)</div>")
+            P += [_mrow(t) for t in mom["bc_down"] if t[3] < 0]
+        if mom["bc_up"] and mom["bc_up"][0][3] > 0:
+            P.append("<div class='dsub' style='color:var(--good)'>🔺 Bưu cục cải thiện nhất</div>")
+            P += [_mrow(t) for t in mom["bc_up"] if t[3] > 0]
+        P.append("</section>")
 
     # ===== BÁO CÁO TỔNG HỢP CHI TIẾT: AM → Bưu cục → Nhân viên =====
     P.append("<div class='sec'>📊 Tổng hợp chi tiết · AM → Bưu cục → Nhân viên · bấm mở</div>")
