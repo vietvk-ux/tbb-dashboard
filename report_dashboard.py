@@ -420,6 +420,47 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
         P.append("</tbody></table>")
     P.append("</section>")
 
+    # ===== 🚗 Nhân viên còn chuyến CHƯA kết thúc — gấp gọn AM → Bưu cục → NV =====
+    ot = [x for x in (ontrip or []) if x.get("don", 0) > 0]
+    if ot:
+        tot_don = sum(x["don"] for x in ot)
+        tot_ch = sum(x["trips"] for x in ot)
+        # gộp AM → bưu cục → NV
+        am_g = {}
+        for x in ot:
+            amn = AM_OF.get(x["bc"]) or "(chưa phân AM)"
+            g = am_g.setdefault(amn, {"don": 0, "ch": 0, "nguoi": 0, "bcs": {}})
+            g["don"] += x["don"]; g["ch"] += x["trips"]; g["nguoi"] += 1
+            g["bcs"].setdefault(x["bc"], []).append(x)
+        P.append("<div class='sec' style='color:var(--warn)'>🚗 Nhân viên còn chuyến CHƯA kết thúc</div>")
+        P.append("<div class='note' style='margin:0 2px 6px'>%d người · %d chuyến đang chạy · <b>%s đơn</b> "
+                 "chưa tính vào %%GTC — bấm AM → bưu cục để xem nhân viên. <i>(ảnh chụp %s)</i></div>"
+                 % (len(ot), tot_ch, _n(tot_don), gen_at))
+        for amn, g in sorted(am_g.items(), key=lambda kv: -kv[1]["don"]):
+            P.append("<details class='bc warn'><summary>"
+                     "<div class='bch'><span class='dot warn'></span><span class='bcn'>%s</span>"
+                     "<span class='pill bad'>%s</span></div>"
+                     "<div class='pmeta'>🧑 %d người · 🏤 %d bưu cục · 🚚 %s chuyến · <span style='color:var(--bad)'>📦 %s đơn treo</span></div>"
+                     "</summary><div class='dtl'>"
+                     % (_esc(amn), _n(g["don"]), g["nguoi"], len(g["bcs"]), _n(g["ch"]), _n(g["don"])))
+            for bc, drs in sorted(g["bcs"].items(), key=lambda kv: -sum(d["don"] for d in kv[1])):
+                bc_don = sum(d["don"] for d in drs)
+                bc_ch = sum(d["trips"] for d in drs)
+                P.append("<details class='bc sub warn'><summary>"
+                         "<div class='bch'><span class='dot warn'></span><span class='bcn'>%s</span>"
+                         "<span class='pill bad'>%s</span></div>"
+                         "<div class='bcm'><span>🧑 %d NV</span><span>🚚 %s chuyến</span>"
+                         "<span class='b'>📦 %s đơn treo</span></div>"
+                         "</summary><div class='dtl'>"
+                         % (_esc(bc), _n(bc_don), len(drs), _n(bc_ch), _n(bc_don)))
+                P.append("<table class='drv'><thead><tr><th class='lft'>Nhân viên</th>"
+                         "<th>Chuyến</th><th>Đơn treo</th></tr></thead><tbody>")
+                for x in sorted(drs, key=lambda d: -d["don"]):
+                    P.append("<tr><td class='nv'>%s</td><td>%s</td><td class='rd'><b>%s</b></td></tr>"
+                             % (_esc(x["driver_name"]), _n(x["trips"]), _n(x["don"])))
+                P.append("</tbody></table></div></details>")
+            P.append("</div></details>")
+
     # ===== 💰 Top 10 bưu cục COD GTB cao nhất (tiền thu hộ kẹt trên đơn giao hỏng) =====
     cod_bc = {}
     for dr in agg["drivers"]:
@@ -626,7 +667,12 @@ def main():
         backlog = {}
     total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
     logger.info("Tồn chưa gán giao toàn vùng (%s): %d đơn", backlog_time, total_backlog)
-    # (Đã bỏ mục "Nhân viên còn chuyến chưa kết thúc" khỏi eod — không fetch ontrip nữa.)
+    # Nhân viên còn chuyến CHƯA kết thúc (đơn chưa tính vào %GTC) — lỗi thì bỏ qua
+    ontrip = []
+    try:
+        ontrip = asyncio.run(fetch_ontrip(token))
+    except Exception as e:
+        logger.warning("Không lấy được chuyến đang chạy (bỏ qua): %s", str(e)[:120])
     # Lịch sử các ngày TRƯỚC (so sánh hôm nay vs hôm qua / TB tuần) — từ Supabase
     hist = _fetch_hist(d)
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
@@ -634,7 +680,7 @@ def main():
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
-        f.write(gen_html(agg, backlog, backlog_time, None, hist))
+        f.write(gen_html(agg, backlog, backlog_time, ontrip, hist))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],
