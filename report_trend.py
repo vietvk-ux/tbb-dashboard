@@ -159,7 +159,7 @@ def fetch_trend(days=90):
     tondong = sorted(tdd.values(), key=lambda x: x["ngay"])
     return {
         "vung": vung, "bc30": bc, "nv30": nv30, "nv_gtc": nv_gtc, "tondong": tondong,
-        "nangsuat": _get_safe(url, key, "v_nv_nangsuat?order=nang_suat.desc&limit=20"),
+        "nangsuat": _get_safe(url, key, "v_nv_nangsuat?so_ngay_lam=gte.10&order=nang_suat.desc&limit=20"),
     }
 
 
@@ -463,7 +463,7 @@ def _ns_card(rows):
                           _n(r.get("so_don_gtc")), _n(r.get("so_ngay_lam")), r.get("nang_suat")))
         inner = ("<table class='t'><thead><tr><th class='rk'>#</th><th>Nhân viên</th><th>GTC</th><th>Ngày</th>"
                  "<th>NS/ngày</th></tr></thead><tbody>" + "".join(trs) + "</tbody></table>")
-    return ("<div class='sec' style='color:var(--good)'>⚡ Năng suất GTC nhân viên · GTC/ngày làm (30 ngày)</div>"
+    return ("<div class='sec' style='color:var(--good)'>⚡ Năng suất GTC nhân viên · GTC/ngày làm (30 ngày · NV làm ≥10 ngày)</div>"
             "<section class='card'>%s</section>" % inner)
 
 
