@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 import aiohttp
 from report import (fetch_report, aggregate, dedup_orders, send_gtalk, TokenExpiredError,
-                    _get_hubs, _post, CONCURRENCY)
+                    _get_hubs, _post, CONCURRENCY, fetch_chua_gan)
 from am_map import AM_OF
 
 logger = logging.getLogger("dash")
@@ -39,7 +39,8 @@ def _esc(s):
 
 
 async def fetch_backlog(token):
-    """Số đơn tồn CHƯA GÁN vào chuyến theo bưu cục (live) qua /oss/v4/count-orders-to-assign.
+    """Số đơn tồn CHƯA GÁN CHUYẾN theo bưu cục (view 'Chưa có chuyến đi trong ngày',
+    get-general-info order_type=DAILY_TRIP_NONE — chuẩn theo trang Tồn LGT, VD Bum Tở Giao 653).
     Trả về {tên_bưu_cục: {'deliver':x,'pick':y,'return':z}}."""
     sem = asyncio.Semaphore(CONCURRENCY)
     timeout = aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=30)
@@ -48,16 +49,11 @@ async def fetch_backlog(token):
 
         async def one(h):
             hid = str(h["locationCode"])
-            try:
-                async with sem:
-                    d = await _post(session, "/oss/v4/count-orders-to-assign",
-                                    {"hub_id": hid}, hid, token)
-                data = d.get("data") or {}
-                return (h["locationName"], {"deliver": data.get("deliver") or 0,
-                                            "pick": data.get("pick") or 0,
-                                            "return": data.get("return") or 0})
-            except Exception:
-                return (h["locationName"], {"deliver": 0, "pick": 0, "return": 0})
+            async with sem:
+                g = await fetch_chua_gan(session, hid, token)
+            return (h["locationName"], {"deliver": g.get("deliver", 0),
+                                        "pick": g.get("pick", 0),
+                                        "return": g.get("return", 0)})
 
         rows = await asyncio.gather(*[one(h) for h in hubs])
     return dict(rows)

@@ -92,6 +92,23 @@ async def _get_hubs(session, token):
     return [h for h in (d.get("data") or []) if any(p in (h.get("locationName") or "") for p in TBB_PREFIXES)]
 
 
+async def fetch_chua_gan(session, hub_id, token):
+    """Đơn tồn CHƯA GÁN CHUYẾN trong ngày theo bưu cục (view 'Chưa có chuyến đi trong ngày').
+    = tổng theo loại của get-general-info order_type=DAILY_TRIP_NONE. Chuẩn theo trang Tồn LGT
+    (VD Bum Tở Giao 653). Trả {'deliver','pick','return','deliver_priority'} (0 nếu lỗi)."""
+    try:
+        d = await _post(session, "/core/oss/v1/report/get-general-info",
+                        {"hub_ids": [str(hub_id)], "view_mode": "WARD",
+                         "order_type": "DAILY_TRIP_NONE"}, hub_id, token)
+        data = d.get("data") or []
+        infos = (data[0].get("general_infos") if data else []) or []
+        g = {i.get("order_type"): (i.get("total_order") or 0) for i in infos}
+        return {"deliver": g.get("DELIVER", 0), "pick": g.get("PICK", 0),
+                "return": g.get("RETURN", 0), "deliver_priority": g.get("DELIVER_PRIORITY", 0)}
+    except Exception:
+        return {"deliver": 0, "pick": 0, "return": 0, "deliver_priority": 0}
+
+
 async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem, next_ymd=None):
     async with sem:
         d = await _post(session, "/lastmile/trip/get-trip-list-by-hub", {

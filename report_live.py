@@ -15,7 +15,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
-from report import _get_hubs, _post, _fetch_all_items, CONCURRENCY, TokenExpiredError, _vn_time, _ended_after_cutoff
+from report import _get_hubs, _post, _fetch_all_items, CONCURRENCY, TokenExpiredError, _vn_time, _ended_after_cutoff, fetch_chua_gan
 from am_map import AM_OF
 
 logger = logging.getLogger("live")
@@ -105,9 +105,8 @@ async def fetch_live(token):
             name = h["locationName"]
             try:
                 async with sem:
-                    bl = await _post(session, "/oss/v4/count-orders-to-assign",
-                                     {"hub_id": hid}, hid, token)
-                backlog = (bl.get("data") or {}).get("deliver", 0)
+                    bl = await fetch_chua_gan(session, hid, token)
+                backlog = bl.get("deliver", 0)   # Giao "chưa có chuyến đi trong ngày" (chuẩn Tồn LGT)
 
                 async def _list(status):
                     async with sem:
