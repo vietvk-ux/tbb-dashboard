@@ -56,6 +56,7 @@ Gốc: `https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/`
   - `/lastmile/trip/get-trip-list-by-hub` — chuyến theo hub, `status` = `ON_TRIP`/`FINISHED`. Trường dùng: `driverId/driverName`, `startTime/endTime` (UTC), `startDateIndex/endDateIndex` (YYYYMMDD giờ VN), `pickCount/deliverCount/returnCount`, `tripCode`.
   - `/lastmile/trip/get-trip-items` — item của 1 chuyến (PHÂN TRANG 1000/lần). Trường: `type` (DELIVER/PICK/RETURN), `orderCode`, `isSucceeded`, `isUpdated`, `collectAmount` (COD), `failCode/failNote`, `isScanned`, `collectCodFailedAmount`, `receiverContact` (lat/lng, districtName/wardName)…
   - Tồn đọng: `/core/oss/v1/report/...` (get-general-info, get-backlog-transport-info) + `count-orders-to-assign`.
+  - **"Chưa gán giao" (chuẩn):** `report.fetch_chua_gan` gọi get-general-info `order_type=DAILY_TRIP_NONE` (view "Chưa có chuyến đi trong ngày") → **DELIVER** = số Giao chưa gán chuyến (VD Bum Tở 653, Bình Lư 478). Đây là NGUỒN "chưa gán" cho live/tongquan/eod/Supabase `chua_gan` (đổi 21/09, thay `count-orders-to-assign.deliver` cũ vốn nhỏ hơn thực).
 
 ### Quy tắc tính (QUAN TRỌNG — dùng nhất quán mọi báo cáo)
 - **Gộp mã đơn:** 1 đơn gán nhiều chuyến chỉ tính 1 lần theo `(bưu cục, orderCode)`. Ưu tiên: đã giao(4) > đã xử lý(2) > còn lại.
