@@ -38,6 +38,37 @@ def _esc(s):
     return html.escape(str(s))
 
 
+def _cmpd(cur, ref, kind="n", higher_good=True):
+    """Δ hôm nay vs hôm qua. kind: n(số)/pct(điểm %)/money(triệu).
+    higher_good True→tăng xanh, False→tăng đỏ, None→trung tính (xám)."""
+    if cur is None or ref is None:
+        return "<span class='mut'>—</span>"
+    d = cur - ref
+    if abs(d) < (0.05 if kind != "n" else 1):
+        return "<span class='mut'>—</span>"
+    if kind == "money":
+        s = ("%.1f" % (abs(d) / 1e6)).replace(".", ",") + "tr"
+    elif kind == "pct":
+        s = ("%.1f" % abs(d)).replace(".", ",")
+    else:
+        s = _n(abs(d))
+    arr = "▲" if d > 0 else "▼"
+    if higher_good is None:
+        return "<span class='mut'>%s%s</span>" % (arr, s)
+    cls = "up" if (d > 0) == higher_good else "down"
+    return "<span class='%s'>%s%s</span>" % (cls, arr, s)
+
+
+def _fmt(v, kind="n"):
+    if v is None:
+        return "—"
+    if kind == "pct":
+        return ("%s%%" % v)
+    if kind == "money":
+        return ("%.1f" % (v / 1e6)).replace(".", ",") + "tr"
+    return _n(v)
+
+
 async def fetch_backlog(token):
     """Số đơn tồn CHƯA GÁN CHUYẾN theo bưu cục (view 'Chưa có chuyến đi trong ngày',
     get-general-info order_type=DAILY_TRIP_NONE — chuẩn theo trang Tồn LGT, VD Bum Tở Giao 653).
@@ -246,7 +277,7 @@ td.rd{color:var(--bad);font-weight:700}
 .cl{color:var(--mut);font-size:10.5px;margin-bottom:4px}
 .cv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
 .cv.bad{color:var(--bad)}
-.up{color:var(--good);font-weight:800}.down{color:var(--bad);font-weight:800}
+.up{color:var(--good);font-weight:800}.down{color:var(--bad);font-weight:800}.mut{color:var(--mut)}
 .failrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
 .fg{border-radius:12px;padding:11px 6px;text-align:center;border:1px solid var(--line)}
 .fg.good{background:rgba(47,208,122,.12);border-color:rgba(47,208,122,.3)}
@@ -262,9 +293,10 @@ body{background:radial-gradient(130% 100% at 50% -10%,rgba(129,140,248,.10),tran
 </style></head><body>"""
 
 
-def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=None):
+def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=None, prev_bc=None):
     backlog = backlog or {}
     hist = hist or []
+    prev_bc = prev_bc or []
     g = agg["grand"]
     d = agg["date"]
     total_gtb = g["total"] - g["success"]
@@ -316,27 +348,108 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
     P.append("<div class='banner'><div class='bl'>⏳ Chưa gán giao<br><span style='opacity:.75;font-weight:500'>chờ xếp chuyến · %s</span></div>"
              "<div class='bv'>%s đơn</div></div>" % (_esc(backlog_time), _n(total_backlog)))
 
-    # ===== ② SO SÁNH HÔM NAY vs HÔM QUA / TB 7 NGÀY =====
+    # ===== ② SO SÁNH HÔM NAY vs HÔM QUA (vùng đầy đủ + từng AM) =====
     if hist:
         y = hist[0]
+        ydm = "?"
+        try:
+            ydm = datetime.strptime(y["ngay"], "%Y-%m-%d").strftime("%d/%m")
+        except Exception:
+            pass
         gy = y.get("pct_gtc")
         wk = [h.get("pct_gtc") for h in hist[:7] if h.get("pct_gtc") is not None]
         avg7 = round(sum(wk) / len(wk), 1) if wk else None
 
-        def _delta(cur, ref):
+        def _pdelta(cur, ref):   # %GTC (điểm) — 3 thẻ headline
             if cur is None or ref is None:
                 return "—"
             dv = round(cur - ref, 1)
             return "<span class='%s'>%s%s</span>" % ("up" if dv >= 0 else "down",
-                                                      "▲" if dv >= 0 else "▼", str(abs(dv)).replace(".", ","))
-        P.append("<div class='sec'>📊 So sánh hôm nay</div><section class='cmp'>")
+                                                     "▲" if dv >= 0 else "▼", str(abs(dv)).replace(".", ","))
+        P.append("<div class='sec'>📊 So sánh hôm nay vs hôm qua (%s)</div><section class='cmp'>" % ydm)
         P.append("<div class='cc'><div class='cl'>%%GTC hôm nay</div><div class='cv'>%s%%</div></div>"
                  % (g["gtc"] if g["gtc"] is not None else "—"))
         P.append("<div class='cc'><div class='cl'>vs hôm qua (%s%%)</div><div class='cv'>%s</div></div>"
-                 % (gy if gy is not None else "—", _delta(g["gtc"], gy)))
+                 % (gy if gy is not None else "—", _pdelta(g["gtc"], gy)))
         P.append("<div class='cc'><div class='cl'>vs TB 7 ngày (%s%%)</div><div class='cv'>%s</div></div>"
-                 % (avg7 if avg7 is not None else "—", _delta(g["gtc"], avg7)))
+                 % (avg7 if avg7 is not None else "—", _pdelta(g["gtc"], avg7)))
         P.append("</section>")
+
+        # --- Bảng toàn bộ chỉ số VÙNG: hôm nay · hôm qua · Δ ---
+        vgtc = g["gtc"]
+        rmetrics = [
+            ("📦 Đơn giao", g["total"], y.get("don_giao"), "n", None),
+            ("✅ Giao TC", g["success"], y.get("gtc"), "n", True),
+            ("🎯 %GTC", vgtc, gy, "pct", True),
+            ("❌ GTB", total_gtb, y.get("gtb"), "n", False),
+            ("⏳ Chưa gán", total_backlog, y.get("chua_gan"), "n", False),
+            ("🛒 LTC", g.get("ltc", 0), y.get("ltc"), "n", True),
+            ("💰 COD GTB", total_cod, y.get("cod_gtb"), "money", False),
+            ("🛍️ TikTok gán", g.get("vngh_total", 0), y.get("vngh_don"), "n", None),
+            ("🛍️ %GTC TikTok", g.get("vngh_gtc"), y.get("vngh_gtc"), "pct", True),
+        ]
+        P.append("<section class='card'><table class='drv'><thead><tr><th class='lft'>Chỉ số vùng</th>"
+                 "<th>Hôm nay</th><th>Hôm qua</th><th>Δ</th></tr></thead><tbody>")
+        for lbl, cur, ref, kind, hg in rmetrics:
+            P.append("<tr><td class='nv'>%s</td><td>%s</td><td class='mut'>%s</td><td>%s</td></tr>"
+                     % (lbl, _fmt(cur, kind), _fmt(ref, kind), _cmpd(cur, ref, kind, hg)))
+        P.append("</tbody></table></section>")
+
+        # --- Từng AM: hôm nay vs hôm qua (bấm mở xem chi tiết chỉ số) ---
+        if prev_bc:
+            # hôm nay theo AM
+            cod_bc_now = {}
+            for dr in agg["drivers"]:
+                cod_bc_now[dr["bc"]] = cod_bc_now.get(dr["bc"], 0) + (dr.get("gtb_cod", 0) or 0)
+            amn_now = {}
+            for b in agg["bcs"]:
+                a = AM_OF.get(b["bc"])
+                if not a:
+                    continue
+                x = amn_now.setdefault(a, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0, "cod": 0.0})
+                x["don"] += b["total"]; x["gtc"] += b["success"]
+                x["gtb"] += b["total"] - b["success"]; x["ltc"] += b.get("ltc", 0)
+                x["cg"] += backlog.get(b["bc"], {}).get("deliver", 0)
+                x["cod"] += cod_bc_now.get(b["bc"], 0)
+            # hôm qua theo AM
+            amn_prev = {}
+            for b in prev_bc:
+                a = AM_OF.get(b.get("buu_cuc"))
+                if not a:
+                    continue
+                x = amn_prev.setdefault(a, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0})
+                x["don"] += b.get("don_giao") or 0; x["gtc"] += b.get("gtc") or 0
+                x["gtb"] += b.get("gtb") or 0; x["cg"] += b.get("chua_gan") or 0
+                x["ltc"] += b.get("ltc") or 0
+            P.append("<div class='sec'>🧑‍💼 So sánh từng AM vs hôm qua · bấm mở chi tiết</div>")
+
+            def _pc(gt, dn):
+                return round(gt / dn * 100, 1) if dn else None
+            for a in sorted(amn_now, key=lambda k: _pc(amn_now[k]["gtc"], amn_now[k]["don"]) or 999):
+                n = amn_now[a]; pv = amn_prev.get(a, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0})
+                pc_n = _pc(n["gtc"], n["don"]); pc_p = _pc(pv["gtc"], pv["don"])
+                cls = _cls(pc_n)
+                P.append("<details class='bc %s'><summary>"
+                         "<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+                         "<span class='pill %s'>%s%%</span></div>"
+                         "<div class='pmeta'>%%GTC %s · 📦 Đơn giao %s · ❌ GTB %s</div></summary>"
+                         % (cls, cls, _esc(a), cls, pc_n if pc_n is not None else "—",
+                            _cmpd(pc_n, pc_p, "pct", True), _cmpd(n["don"], pv["don"], "n", None),
+                            _cmpd(n["gtb"], pv["gtb"], "n", False)))
+                P.append("<div class='dtl'><table class='drv'><thead><tr><th class='lft'>Chỉ số</th>"
+                         "<th>Hôm nay</th><th>Hôm qua</th><th>Δ</th></tr></thead><tbody>")
+                amrows = [
+                    ("📦 Đơn giao", n["don"], pv["don"], "n", None),
+                    ("✅ Giao TC", n["gtc"], pv["gtc"], "n", True),
+                    ("🎯 %GTC", pc_n, pc_p, "pct", True),
+                    ("❌ GTB", n["gtb"], pv["gtb"], "n", False),
+                    ("⏳ Chưa gán", n["cg"], pv["cg"], "n", False),
+                    ("🛒 LTC", n["ltc"], pv["ltc"], "n", True),
+                ]
+                for lbl, cur, ref, kind, hg in amrows:
+                    P.append("<tr><td class='nv'>%s</td><td>%s</td><td class='mut'>%s</td><td>%s</td></tr>"
+                             % (lbl, _fmt(cur, kind), _fmt(ref, kind), _cmpd(cur, ref, kind, hg)))
+                P.append("</tbody></table></div></details>")
 
     # ===== ① LÝ DO GIAO HỎNG HÔM NAY (failNote, phân 3 nhóm) =====
     fail = agg.get("fail") or {"groups": {}, "top": [], "tong": 0}
@@ -621,9 +734,27 @@ def _fetch_hist(d):
     since = (d - timedelta(days=8)).isoformat()
     try:
         r = requests.get(url + "/rest/v1/bao_cao_vung",
-                         params=[("select", "ngay,pct_gtc,don_giao,gtc,cod_gtb"),
+                         params=[("select", "ngay,pct_gtc,don_giao,gtc,gtb,cod_gtb,chua_gan,ltc,vngh_don,vngh_gtc"),
                                  ("ngay", "gte." + since), ("ngay", "lt." + d.isoformat()),
                                  ("order", "ngay.desc")],
+                         headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
+        return r.json() if r.ok else []
+    except Exception:
+        return []
+
+
+def _fetch_prev_bc(day_iso):
+    """bao_cao_buu_cuc của 1 ngày (để so từng AM hôm nay vs hôm qua). Lỗi → []."""
+    import requests
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key and day_iso):
+        return []
+    try:
+        r = requests.get(url + "/rest/v1/bao_cao_buu_cuc",
+                         params=[("select", "buu_cuc,don_giao,gtc,gtb,chua_gan,ltc"),
+                                 ("ngay", "eq." + day_iso)],
                          headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
         return r.json() if r.ok else []
     except Exception:
@@ -671,12 +802,14 @@ def main():
         logger.warning("Không lấy được chuyến đang chạy (bỏ qua): %s", str(e)[:120])
     # Lịch sử các ngày TRƯỚC (so sánh hôm nay vs hôm qua / TB tuần) — từ Supabase
     hist = _fetch_hist(d)
+    # Bưu cục HÔM QUA (để so từng AM) — ngày chốt gần nhất trước d
+    prev_bc = _fetch_prev_bc(hist[0]["ngay"]) if hist else []
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
-        f.write(gen_html(agg, backlog, backlog_time, ontrip, hist))
+        f.write(gen_html(agg, backlog, backlog_time, ontrip, hist, prev_bc))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],
