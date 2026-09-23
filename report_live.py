@@ -335,7 +335,7 @@ def gen_html(rows):
     # ===== Dải chỉ số =====
     P.append("<section class='strip'>")
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📥 Đã gán</div></div>" % _n(R["total"]))
-    P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>⏳ Chưa gán</div></div>" % _n(R["backlog"]))
+    P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>⏳ Chưa gán</div></div>" % _n(R["backlog"]))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🏃 Đang chạy</div></div>" % _n(R["ontrip"]))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🚛 Còn phải giao</div></div>" % _n(on_road))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📊 Tiến độ chạy</div></div>"
@@ -350,7 +350,7 @@ def gen_html(rows):
     P.append("<div class='st'><div class='sv %s'>%s%%</div><div class='sl'>🛍️ %%GTC TikTok</div></div>"
              % (_cls(vpct), vpct if vpct is not None else "—"))
     # COD GTB kẹt (tiền thu hộ kẹt trên đơn giao hỏng) + LTC ở cuối
-    P.append("<div class='st'><div class='sv bad'>%str</div><div class='sl'>💰 COD GTB kẹt</div></div>" % _codm(R["cod_gtb"]))
+    P.append("<div class='st'><div class='sv warn'>%str</div><div class='sl'>💰 COD GTB kẹt</div></div>" % _codm(R["cod_gtb"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(R["ltc"]))
     P.append("</section>")
 
@@ -566,8 +566,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bch{display:flex;align-items:center;gap:9px}
 .bcn{font-weight:700;font-size:15px;flex:1;min-width:0}
 .bcm{display:flex;flex-wrap:wrap;gap:4px 9px;color:var(--mut);font-size:10.5px;letter-spacing:-.1px;font-variant-numeric:tabular-nums}
-.bcm .w{color:var(--warn)}
-.gtb{color:var(--bad);font-weight:700}
+.w{color:var(--bad);font-weight:700}
+.gtb{color:var(--warn);font-weight:700}
 .ltc{color:var(--good);font-weight:700}
 .dtl{padding:2px 12px 12px}
 .bc .dtl{padding:2px 4px 10px}
