@@ -487,28 +487,6 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                              % (lbl, _c3(cur, tbv, kind, hg), _fmt(hqv, kind), _fmt(tbv, kind)))
                 P.append("</tbody></table></div></details>")
 
-    # ===== ① LÝ DO GIAO HỎNG HÔM NAY (failNote, phân 3 nhóm) =====
-    fail = agg.get("fail") or {"groups": {}, "top": [], "tong": 0}
-    ftot = fail.get("tong", 0)
-    if ftot > 0:
-        fg = fail["groups"]
-        kh, ll, nv = fg.get("khach", 0), fg.get("lienlac", 0), fg.get("nvdc", 0)
-        def _fp(x): return round(x * 100 / ftot) if ftot else 0
-        P.append("<div class='sec' style='color:var(--warn)'>🔴 Lý do giao hỏng hôm nay · %s đơn (đã ghi lý do)</div>" % _n(ftot))
-        P.append("<section class='card'>")
-        P.append("<div class='failrow'>"
-                 "<div class='fg good'><div class='fv'>%d%%</div><div class='fl'>🧍 Do khách/shop<br>%s đơn</div></div>"
-                 "<div class='fg warn'><div class='fv'>%d%%</div><div class='fl'>📞 Không liên lạc<br>%s đơn</div></div>"
-                 "<div class='fg bad'><div class='fv'>%d%%</div><div class='fl'>🚚 Do NV/địa chỉ<br>%s đơn</div></div></div>"
-                 % (_fp(kh), _n(kh), _fp(ll), _n(ll), _fp(nv), _n(nv)))
-        P.append("<table class='drv'><thead><tr><th class='lft'>Lý do cụ thể</th><th>Đơn</th><th>%</th></tr></thead><tbody>")
-        for note, cnt in fail.get("top", []):
-            P.append("<tr><td class='nv' style='max-width:none;white-space:normal;font-weight:500'>%s</td>"
-                     "<td>%s</td><td>%d%%</td></tr>" % (_esc(note), _n(cnt), _fp(cnt)))
-        P.append("</tbody></table>")
-        P.append("<div class='note' style='margin:6px 2px 0'>🟢 Do khách/shop = KHÔNG phải lỗi NV · 🔴 Do NV/địa chỉ = cần chấn chỉnh</div>")
-        P.append("</section>")
-
     # ===== ③ TỒN CHUYỂN SANG MAI =====
     carry = total_backlog + total_gtb
     P.append("<div class='sec'>📦 Tồn chuyển sang ngày mai</div><section class='cmp'>")
@@ -516,31 +494,6 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
     P.append("<div class='cc'><div class='cl'>❌ GTB (giao lại)</div><div class='cv'>%s</div></div>" % _n(total_gtb))
     P.append("<div class='cc'><div class='cl'>Σ tồn sang mai</div><div class='cv bad'>%s</div></div>" % _n(carry))
     P.append("</section>")
-
-    # ===== ④ TỐT NHẤT HÔM NAY (top 5 NV + top 5 bưu cục %GTC cao nhất) =====
-    good_nv = sorted([dr for dr in agg["drivers"] if dr["total"] >= 30 and dr["gtc"] is not None],
-                     key=lambda x: -x["gtc"])[:5]
-    good_bc = sorted([b for b in agg["bcs"] if b["total"] >= 100 and b["gtc"] is not None],
-                     key=lambda x: -x["gtc"])[:5]
-    if good_nv or good_bc:
-        P.append("<div class='sec' style='color:var(--good)'>🏆 Tốt nhất hôm nay</div><section class='card'>")
-        if good_nv:
-            P.append("<div class='mh up'>🥇 Top 5 nhân viên · %GTC cao nhất (≥30 đơn)</div>")
-            P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th><th>Gán</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
-            for i, dr in enumerate(good_nv, 1):
-                P.append("<tr><td class='rank'>%d</td><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td><td>%s</td>"
-                         "<td><span class='pill sm good'>%s%%</span></td></tr>"
-                         % (i, _esc(dr["driver_name"]), _esc(dr["bc"]), _n(dr["total"]), _n(dr["success"]), dr["gtc"]))
-            P.append("</tbody></table>")
-        if good_bc:
-            P.append("<div class='mh up'>🥇 Top 5 bưu cục · %GTC cao nhất</div>")
-            P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Bưu cục</th><th>Đơn</th><th>%GTC</th></tr></thead><tbody>")
-            for i, b in enumerate(good_bc, 1):
-                P.append("<tr><td class='rank'>%d</td><td class='nv'>%s</td><td>%s</td>"
-                         "<td><span class='pill sm good'>%s%%</span></td></tr>"
-                         % (i, _esc(b["bc"]), _n(b["total"]), b["gtc"]))
-            P.append("</tbody></table>")
-        P.append("</section>")
 
     # ===== ⚠️ Top nhân viên COD GTB / ĐƠN GTB cao nhất (KHÔNG lọc %GTC; chỉ cần có đơn GTB) =====
     danger = [dr for dr in agg["drivers"] if (dr["total"] - dr["success"]) > 0]
@@ -605,30 +558,6 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                              % (_esc(x["driver_name"]), _n(x["trips"]), _n(x["don"])))
                 P.append("</tbody></table></div></details>")
             P.append("</div></details>")
-
-    # ===== 💰 Top 10 bưu cục COD GTB cao nhất (tiền thu hộ kẹt trên đơn giao hỏng) =====
-    cod_bc = {}
-    for dr in agg["drivers"]:
-        cod_bc[dr["bc"]] = cod_bc.get(dr["bc"], 0) + (dr.get("gtb_cod", 0) or 0)
-    gtb_bc = {b["bc"]: (b["total"] - b["success"]) for b in agg["bcs"]}
-    top_bc = [(bc, cod) for bc, cod in sorted(cod_bc.items(), key=lambda x: -x[1]) if cod > 0][:10]
-    P.append("<div class='sec' style='color:var(--bad)'>💰 Top 10 bưu cục COD GTB cao nhất</div>")
-    P.append("<section class='card'>")
-    if not top_bc:
-        P.append("<div class='ok' style='margin:0'>✅ Không có COD GTB nào. Vùng ổn định.</div>")
-    else:
-        tot_cod = sum(cod_bc.values())
-        P.append("<div class='note' style='margin:0 0 8px'>Tiền thu hộ (COD) kẹt trên các đơn giao thất bại (GTB), "
-                 "gộp theo bưu cục · xếp <b>cao → thấp</b>. Tổng COD GTB vùng <b>%.0f triệu</b>.</div>"
-                 % (tot_cod / 1e6))
-        P.append("<table class='drv'><thead><tr><th class='rank'>#</th>"
-                 "<th class='lft'>Bưu cục</th><th>GTB đơn</th><th>COD GTB (tr)</th></tr></thead><tbody>")
-        for i, (bc, cod) in enumerate(top_bc, 1):
-            P.append("<tr><td class='rank'>%d</td><td class='nv'>%s</td><td>%s</td>"
-                     "<td><b class='cod'>%s</b></td></tr>"
-                     % (i, _esc(bc), _n(gtb_bc.get(bc, 0)), ("%.1f" % (cod / 1e6)).replace(".", ",")))
-        P.append("</tbody></table>")
-    P.append("</section>")
 
     # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
     cod_by_bc = {}
