@@ -300,10 +300,11 @@ body{background:radial-gradient(130% 100% at 50% -10%,rgba(129,140,248,.10),tran
 </style></head><body>"""
 
 
-def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=None, bc_days=None):
+def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=None, bc_days=None, red_bc=None):
     backlog = backlog or {}
     hist = hist or []
     bc_days = bc_days or []
+    red_bc = red_bc or {}
     g = agg["grand"]
     d = agg["date"]
     total_gtb = g["total"] - g["success"]
@@ -494,6 +495,81 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
     P.append("<div class='cc'><div class='cl'>❌ GTB (giao lại)</div><div class='cv'>%s</div></div>" % _n(total_gtb))
     P.append("<div class='cc'><div class='cl'>Σ tồn sang mai</div><div class='cv bad'>%s</div></div>" % _n(carry))
     P.append("</section>")
+
+    # ===== 🚨 BƯU CỤC NGUY HIỂM CỦA VÙNG · Top 10 (cuối ngày + 1 tuần) =====
+    # %GTC TB 7 ngày theo bưu cục (từ bc_days)
+    bc7 = {}
+    for b in bc_days:
+        x = bc7.setdefault(b.get("buu_cuc"), [0, 0])
+        x[0] += b.get("don_giao") or 0; x[1] += b.get("gtc") or 0
+    drecs = []
+    for b in agg["bcs"]:
+        nm = b["bc"]; tot = b["total"]; suc = b["success"]
+        cg = backlog.get(nm, {}).get("deliver", 0)
+        rd = red_bc.get(nm, 0)
+        if tot == 0 and cg == 0 and rd == 0:
+            continue
+        pct_t = round(suc / tot * 100, 1) if tot else None
+        p7 = bc7.get(nm)
+        pct7 = round(p7[1] / p7[0] * 100, 1) if (p7 and p7[0]) else None
+        parts = [p for p in (pct_t, pct7) if p is not None]
+        pctb = sum(parts) / len(parts) if parts else 100  # kém dữ liệu → coi như tốt (không phạt)
+        drecs.append({"bc": nm, "cg": cg, "rd": rd, "pct_t": pct_t, "pct7": pct7,
+                      "pctb": pctb, "tot": tot})
+    if drecs and (red_bc or backlog):
+        m = len(drecs)
+
+        def _ranks(key, higher_bad):
+            order = sorted(range(m), key=lambda i: drecs[i][key], reverse=higher_bad)
+            pr = [0] * m
+            for r, i in enumerate(order):
+                pr[i] = r          # 0 = tệ nhất
+            return pr
+        rk_cg = _ranks("cg", True); rk_rd = _ranks("rd", True); rk_pc = _ranks("pctb", False)
+        for i, dd in enumerate(drecs):
+            dd["score"] = rk_cg[i] + rk_rd[i] + rk_pc[i]
+            dd["rcg"], dd["rrd"], dd["rpc"] = rk_cg[i], rk_rd[i], rk_pc[i]
+        drecs.sort(key=lambda x: x["score"])
+        top = drecs[:10]
+        q = m * 0.30   # ngưỡng "xấu" = nằm trong ~30% tệ nhất của tiêu chí
+
+        def _van_de(dd):
+            bad = []
+            if dd["rcg"] < q: bad.append("cg")
+            if dd["rrd"] < q: bad.append("rd")
+            if dd["rpc"] < q: bad.append("pc")
+            if len(bad) >= 3:
+                return ("bad", "Xấu toàn diện")
+            worst = min([("cg", dd["rcg"]), ("rd", dd["rrd"]), ("pc", dd["rpc"])], key=lambda t: t[1])[0]
+            return {"cg": ("warn", "Ùn tắc chưa gán"), "rd": ("bad", "Tồn đỏ quá hạn"),
+                    "pc": ("warn", "%GTC yếu")}[worst]
+        # phân tích ngắn
+        n_full = sum(1 for dd in top if _van_de(dd)[1] == "Xấu toàn diện")
+        n_untac = sum(1 for dd in top if "Ùn tắc" in _van_de(dd)[1])
+        n_gtc = sum(1 for dd in top if "%GTC" in _van_de(dd)[1])
+        worst1 = top[0]
+        P.append("<div class='sec' style='color:var(--bad)'>🚨 Bưu cục nguy hiểm của vùng · Top 10</div>")
+        P.append("<section class='card'>")
+        P.append("<div class='dsub'>Điểm tổng hợp 3 tiêu chí (trên %d bưu cục): <b>chưa gán giao cao · tồn đỏ &gt;120h cao · %%GTC thấp</b> "
+                 "(kết hợp cuối ngày + TB 7 ngày). 🔥 Nặng nhất: <b>%s</b> — %s.</div>"
+                 % (m, _esc(worst1["bc"]), _van_de(worst1)[1]))
+        P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Bưu cục</th>"
+                 "<th>%GTC nay/TB7</th><th>Chưa gán</th><th>Đỏ&gt;120h</th><th>Vấn đề</th></tr></thead><tbody>")
+        for i, dd in enumerate(top, 1):
+            vcls, vlbl = _van_de(dd)
+            pnow = ("%s%%" % dd["pct_t"]) if dd["pct_t"] is not None else "—"
+            p7 = ("%s%%" % dd["pct7"]) if dd["pct7"] is not None else "—"
+            P.append("<tr><td class='rank'>%d</td><td class='nv'>%s</td>"
+                     "<td>%s<span class='sc'>TB7 %s</span></td>"
+                     "<td class='rd'>%s</td><td class='rd'>%s</td>"
+                     "<td><span class='pill sm %s'>%s</span></td></tr>"
+                     % (i, _esc(dd["bc"]), pnow, p7, _n(dd["cg"]), _n(dd["rd"]), vcls, vlbl))
+        P.append("</tbody></table>")
+        P.append("<div class='note' style='margin:6px 2px 0'>Trong 10 bưu cục: 🔴 <b>%d</b> xấu toàn diện · "
+                 "⏳ %d ùn tắc chưa gán · 🎯 %d yếu %%GTC. "
+                 "Ùn tắc → đẩy xếp chuyến + xử lý đơn quá hạn; yếu %%GTC → rà lý do giao hỏng, kèm cặp NV.</div>"
+                 % (n_full, n_untac, n_gtc))
+        P.append("</section>")
 
     # ===== ⚠️ Top nhân viên COD GTB / ĐƠN GTB cao nhất (KHÔNG lọc %GTC; chỉ cần có đơn GTB) =====
     danger = [dr for dr in agg["drivers"] if (dr["total"] - dr["success"]) > 0]
@@ -780,12 +856,20 @@ def main():
     hist = _fetch_hist(d)
     # Bưu cục 7 ngày trước (để so từng AM: hôm qua + TB 7 ngày)
     bc_days = _fetch_bc_days(d, 7)
+    # Tồn ĐỎ quá hạn theo bưu cục (Giao>120 + Trả>120 + LC>48) — cho mục "Bưu cục nguy hiểm"
+    red_bc = {}
+    try:
+        import report_backlog_web as BL
+        bl_entries, _hc = asyncio.run(BL.fetch_all(token))
+        red_bc = {e["name"]: BL.red_of(e)["total"] for e in bl_entries}
+    except Exception as e:
+        logger.warning("Không lấy được tồn đỏ theo bưu cục (bỏ qua): %s", str(e)[:120])
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
-        f.write(gen_html(agg, backlog, backlog_time, ontrip, hist, bc_days))
+        f.write(gen_html(agg, backlog, backlog_time, ontrip, hist, bc_days, red_bc))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],
