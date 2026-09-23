@@ -414,7 +414,7 @@ def _metaline(prefix, m):
 def _nv_card(d):
     total = d.get("total", 0); gtc = d.get("gtc", 0); pc = _pct(gtc, total); cls = _cls(pc)
     cod = d.get("cod_gtb", 0); ltc = d.get("ltc", 0); vngh = d.get("vngh", 0); vg = d.get("vngh_gtc", 0)
-    chuyen = d.get("chuyen", 0); st = d.get("st"); ot = d.get("ot_tot", 0); od = d.get("ot_done", 0)
+    st = d.get("st"); ot = d.get("ot_tot", 0); od = d.get("ot_done", 0)
     chips = ["📥%s" % _n(total), "<span class='g'>✅%s</span>" % _n(gtc)]
     if cod >= 1e5:
         chips.append("<span class='cod'>💰%str</span>" % _codm(cod))
@@ -422,8 +422,6 @@ def _nv_card(d):
         chips.append("<span class='ltc'>🛒%s</span>" % _n(ltc))
     if vngh:
         chips.append("🛍️%s/%s" % (_n(vg), _n(vngh)))
-    if chuyen:
-        chips.append("🚚%sch" % _n(chuyen))
     if st is not None:
         chips.append("⏰%02d:%02d" % (st.hour, st.minute))
     if ot:
