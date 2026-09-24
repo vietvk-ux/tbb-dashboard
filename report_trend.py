@@ -134,8 +134,9 @@ def fetch_trend(days=90):
     # %GTC 30 ngày theo bưu cục (tốt/kém) — dùng cho bảng. limit cao tránh cắt dòng.
     since30 = (datetime.now(VN).date() - timedelta(days=30)).isoformat()
     bc = _get_all(url, key, "bao_cao_buu_cuc?ngay=gte.%s&select=buu_cuc,tinh,gtc,gtb,don_giao" % since30)
-    # Nhân viên 30 ngày (để xếp COD GTB / đơn GTB cao nhất)
-    nv30 = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=driver_id,ten_nv,buu_cuc,cod_gtb,gtb,don_giao" % since30)
+    # Nhân viên 10 ngày gần nhất (để xếp COD GTB / đơn GTB cao nhất)
+    since10 = (datetime.now(VN).date() - timedelta(days=10)).isoformat()
+    nv30 = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=driver_id,ten_nv,buu_cuc,cod_gtb,gtb,don_giao" % since10)
     # GTC theo NGÀY 30 ngày (so đơn GTC ngày gần nhất vs TB của chính NV)
     nv_gtc = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=ngay,driver_id,ten_nv,buu_cuc,gtc" % since30)
     # Tồn đọng theo NGÀY (gộp toàn vùng) — cho biểu đồ xu hướng.
@@ -468,9 +469,9 @@ def _ns_card(rows):
 
 
 def _cod_card(nv30):
-    """Top 10 nhân viên COD GTB / đơn GTB cao nhất (gộp 30 ngày). Tiền kẹt / đơn hỏng."""
+    """Top 10 nhân viên COD GTB / đơn GTB cao nhất (gộp 10 ngày gần nhất). Tiền kẹt / đơn hỏng."""
     if not nv30:
-        inner = "<div class='none'>Chưa đủ dữ liệu — cần bảng nhân viên tích lũy (số hiện khi có dữ liệu 30 ngày).</div>"
+        inner = "<div class='none'>Chưa đủ dữ liệu — cần bảng nhân viên tích lũy (số hiện khi có dữ liệu 10 ngày).</div>"
     else:
         agg = {}
         for r in nv30:
@@ -497,7 +498,7 @@ def _cod_card(nv30):
         inner = ("<table class='t'><thead><tr><th class='rk'>#</th><th>Nhân viên</th>"
                  "<th>GTB</th><th>COD GTB tr</th><th>tr/đơn</th></tr></thead><tbody>"
                  + "".join(trs) + "</tbody></table>")
-    return ("<div class='sec' style='color:var(--bad)'>💰 Top 10 nhân viên COD GTB / đơn cao nhất (30 ngày)</div>"
+    return ("<div class='sec' style='color:var(--bad)'>💰 Top 10 nhân viên COD GTB / đơn cao nhất (10 ngày)</div>"
             "<section class='card'>%s</section>" % inner)
 
 
