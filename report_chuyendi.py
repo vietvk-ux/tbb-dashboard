@@ -196,50 +196,6 @@ def gen_html(rows):
         P.append("<div class='none'>Chưa đủ dữ liệu chuyến kết thúc.</div>")
     P.append("</section>")
 
-    # 🧑‍💼 Theo AM
-    am = {}
-    for m in drv:
-        a = AM_OF.get(m["bc"])
-        if not a:
-            continue
-        x = am.setdefault(a, {"nv": 0, "gtc": 0, "h": 0.0, "late": 0, "drv": []})
-        if m["total"] > 0 or m["chuyen"] > 0:
-            x["nv"] += 1
-        if _is_done_eff(m):
-            x["gtc"] += m["gtc"]; x["h"] += m["span_h"]
-        if m["late"]:
-            x["late"] += 1
-        x["drv"].append(m)
-    if am:
-        P.append("<div class='sec'>🧑‍💼 Theo AM — bấm mở xem nhân viên</div>")
-        P.append("<section class='card' style='padding:2px 10px'>")
-        am_list = sorted(am.items(), key=lambda kv: (kv[1]["gtc"] / kv[1]["h"]) if kv[1]["h"] else 999)
-        for a, x in am_list:
-            dpha = round(x["gtc"] / x["h"], 1) if x["h"] else None
-            P.append("<details class='bc'><summary>"
-                     "<span class='amn'>%s</span><span class='ammet'>%d NV · %s đơn/giờ · %d muộn ▾</span>"
-                     "</summary><div class='dtl'>" % (
-                         _esc(a), x["nv"],
-                         str(dpha).replace(".", ",") if dpha is not None else "—", x["late"]))
-            ds = sorted(x["drv"], key=lambda m: (0, m["dph"]) if _is_done_eff(m) else (1, 999))
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>Đơn/giờ</th>"
-                     "<th>XP</th><th>%GTC</th></tr></thead><tbody>")
-            for m in ds:
-                p = m["gtc_pct"]
-                if _is_done_eff(m):
-                    dcell = "<span class='pill sm %s'>%s</span>" % (_dph_cls(m["dph"]), str(m["dph"]).replace(".", ","))
-                elif m["ot_tot"] > 0:
-                    dcell = "<span class='pill sm na'>🏃</span>"
-                else:
-                    dcell = "—"
-                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td>"
-                         "<td class='%s'>%s</td><td class='%s'>%s</td></tr>"
-                         % (_esc(m["name"]), _n(m["total"]), dcell,
-                            "bad" if m["late"] else "", m["start"] or "—",
-                            _gtc_cls(p), ("%d%%" % p) if p is not None else "—"))
-            P.append("</tbody></table></div></details>")
-        P.append("</section>")
-
     # 🏃 NV đang chạy — gộp AM → bưu cục → nhân viên (bấm mở drill như trang chính)
     def _pcls(pc):
         return "good" if pc >= 70 else ("warn" if pc >= 45 else "bad")
