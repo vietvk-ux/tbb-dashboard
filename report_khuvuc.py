@@ -19,6 +19,11 @@ import os, sys, json, glob, html, math, asyncio, logging
 import collections
 from datetime import datetime, timedelta, timezone, date
 
+try:
+    from am_map import AM_OF
+except Exception:
+    AM_OF = {}
+
 VN = timezone(timedelta(hours=7))
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "khuvuc_data")
 KEEP_DAYS = 30
@@ -266,8 +271,8 @@ def build_html(days):
                  % (_esc(bc.split(") ")[-1]), _esc(nv), _esc(md), out, tt))
     P.append("</tbody></table></div>")
 
-    # ----- DRILL NV × XÃ theo bưu cục -----
-    P.append("<div class='sec'>👤 GTC từng nhân viên theo xã/phường · bấm mở</div>")
+    # ----- DRILL AM → BƯU CỤC → NV × XÃ -----
+    P.append("<div class='sec'>👤 GTC theo AM → Bưu cục → Nhân viên (theo xã/phường) · bấm mở</div>")
     by_bc = collections.defaultdict(list)
     for bc, nv, dist, ward, n, g in latest["nv"]:
         by_bc[bc].append((nv, dist, ward, n, g))
@@ -275,32 +280,54 @@ def build_html(days):
     def _bc_pct(bc):
         rr = by_bc[bc]
         return _pct(sum(r[4] for r in rr), sum(r[3] for r in rr))
-    for bc in sorted(by_bc, key=_bc_pct):   # bưu cục %GTC THẤP → CAO
-        rows = by_bc[bc]
-        bt = sum(r[3] for r in rows); bg = sum(r[4] for r in rows)
-        bp = _pct(bg, bt)
-        nvset = sorted(set(r[0] for r in rows))
+    # gom bưu cục theo AM
+    am_bcs = collections.defaultdict(list)
+    for bc in by_bc:
+        am_bcs[AM_OF.get(bc) or "(chưa phân AM)"].append(bc)
+
+    def _am_ng(am):
+        t = sum(r[3] for bc in am_bcs[am] for r in by_bc[bc])
+        g = sum(r[4] for bc in am_bcs[am] for r in by_bc[bc])
+        return t, g
+
+    def _am_pct(am):
+        t, g = _am_ng(am)
+        return _pct(g, t) if t else 999
+    for am in sorted(am_bcs, key=_am_pct):   # AM %GTC THẤP → CAO (kém lên đầu)
+        at, ag = _am_ng(am); ap = _pct(ag, at)
+        nnv = len(set(r[0] for bc in am_bcs[am] for r in by_bc[bc]))
         P.append("<details class='bc %s'><summary><div class='bch'><span class='dot %s'></span>"
                  "<span class='bcn'>%s</span><span class='pill %s'>%d%%</span></div>"
-                 "<div class='pmeta'>👤 %d NV · 📦 %s · ✅ %s</div></summary><div class='dtl'>"
-                 % (_cls(bp), _cls(bp), _esc(bc), _cls(bp), bp, len(nvset), _n(bt), _n(bg)))
-        # từng NV (xếp %GTC thấp→cao)
-        def nv_pct(nv):
-            r = [x for x in rows if x[0] == nv]
-            return _pct(sum(x[4] for x in r), sum(x[3] for x in r))
-        for nv in sorted(nvset, key=nv_pct):
-            nr = [x for x in rows if x[0] == nv]
-            nt = sum(x[3] for x in nr); ng = sum(x[4] for x in nr); npc = _pct(ng, nt)
+                 "<div class='pmeta'>🏤 %d BC · 👤 %d NV · 📦 %s · ✅ %s</div></summary><div class='dtl'>"
+                 % (_cls(ap), _cls(ap), _esc(am), _cls(ap), ap if ap is not None else 0,
+                    len(am_bcs[am]), nnv, _n(at), _n(ag)))
+        for bc in sorted(am_bcs[am], key=_bc_pct):   # bưu cục %GTC THẤP → CAO
+            rows = by_bc[bc]
+            bt = sum(r[3] for r in rows); bg = sum(r[4] for r in rows)
+            bp = _pct(bg, bt)
+            nvset = sorted(set(r[0] for r in rows))
             P.append("<details class='bc sub %s'><summary><div class='bch'><span class='dot %s'></span>"
                      "<span class='bcn'>%s</span><span class='pill %s'>%d%%</span></div>"
-                     "<div class='pmeta'>📦 %d · ✅ %d</div></summary><div class='dtl'>"
-                     % (_cls(npc), _cls(npc), _esc(nv), _cls(npc), npc, nt, ng))
-            P.append("<table class='drv'><thead><tr><th class='l'>Huyện</th><th class='l'>Xã/Phường</th><th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
-            for nv2, dist, ward, n, g in sorted(nr, key=lambda x: -x[3]):
-                p = _pct(g, n)
-                P.append("<tr><td class='l'>%s</td><td class='l'>%s</td><td>%d</td><td>%d</td>"
-                         "<td><span class='pill sm %s'>%d%%</span></td></tr>" % (_esc(dist), _esc(ward), n, g, _cls(p), p))
-            P.append("</tbody></table></div></details>")
+                     "<div class='pmeta'>👤 %d NV · 📦 %s · ✅ %s</div></summary><div class='dtl'>"
+                     % (_cls(bp), _cls(bp), _esc(bc), _cls(bp), bp, len(nvset), _n(bt), _n(bg)))
+
+            def nv_pct(nv, rows=rows):
+                r = [x for x in rows if x[0] == nv]
+                return _pct(sum(x[4] for x in r), sum(x[3] for x in r))
+            for nv in sorted(nvset, key=nv_pct):
+                nr = [x for x in rows if x[0] == nv]
+                nt = sum(x[3] for x in nr); ng = sum(x[4] for x in nr); npc = _pct(ng, nt)
+                P.append("<details class='bc sub %s'><summary><div class='bch'><span class='dot %s'></span>"
+                         "<span class='bcn'>%s</span><span class='pill %s'>%d%%</span></div>"
+                         "<div class='pmeta'>📦 %d · ✅ %d</div></summary><div class='dtl'>"
+                         % (_cls(npc), _cls(npc), _esc(nv), _cls(npc), npc, nt, ng))
+                P.append("<table class='drv'><thead><tr><th class='l'>Huyện</th><th class='l'>Xã/Phường</th><th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
+                for nv2, dist, ward, n, g in sorted(nr, key=lambda x: -x[3]):
+                    p = _pct(g, n)
+                    P.append("<tr><td class='l'>%s</td><td class='l'>%s</td><td>%d</td><td>%d</td>"
+                             "<td><span class='pill sm %s'>%d%%</span></td></tr>" % (_esc(dist), _esc(ward), n, g, _cls(p), p))
+                P.append("</tbody></table></div></details>")
+            P.append("</div></details>")
         P.append("</div></details>")
 
     P.append("<a class='eod' href='nhanvien.html'><span>⚡ Năng suất nhân viên</span><span class='arw'>← trang trước</span></a>")
