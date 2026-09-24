@@ -91,7 +91,8 @@ async def fetch_backlog(token):
                 g = await fetch_chua_gan(session, hid, token)
             return (h["locationName"], {"deliver": g.get("deliver", 0),
                                         "pick": g.get("pick", 0),
-                                        "return": g.get("return", 0)})
+                                        "return": g.get("return", 0),
+                                        "wards": g.get("wards", [])})
 
         rows = await asyncio.gather(*[one(h) for h in hubs])
     return dict(rows)
@@ -495,6 +496,42 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
     P.append("<div class='cc'><div class='cl'>❌ GTB (giao lại)</div><div class='cv'>%s</div></div>" % _n(total_gtb))
     P.append("<div class='cc'><div class='cl'>Σ tồn sang mai</div><div class='cv bad'>%s</div></div>" % _n(carry))
     P.append("</section>")
+
+    # ===== 🗺 TỒN CHƯA GÁN THEO TUYẾN PHƯỜNG/XÃ (AM → bưu cục → xã) =====
+    am_bc = {}
+    for nm, v in (backlog or {}).items():
+        dv = v.get("deliver", 0)
+        if dv <= 0:
+            continue
+        am = AM_OF.get(nm) or "(chưa phân AM)"
+        am_bc.setdefault(am, []).append((nm, dv, v.get("wards", [])))
+    if am_bc:
+        P.append("<div class='sec'>🗺 Tồn chưa gán theo tuyến phường/xã · AM → bưu cục → xã "
+                 "(số Giao chưa xếp chuyến, chuyển sang mai)</div>")
+        for am, bcs in sorted(am_bc.items(), key=lambda kv: -sum(b[1] for b in kv[1])):
+            am_tot = sum(b[1] for b in bcs)
+            P.append("<details class='bc'><summary>")
+            P.append("<div class='bch'><span class='bcn'>🧑‍💼 %s</span>"
+                     "<span class='pill warn'>%s đơn</span></div>" % (_esc(am), _n(am_tot)))
+            P.append("<div class='bcm'><span>%d bưu cục còn tồn chưa gán</span></div>" % len(bcs))
+            P.append("</summary><div class='dtl'>")
+            for bc, dv, wards in sorted(bcs, key=lambda x: -x[1]):
+                P.append("<details class='bc sub warn'><summary>")
+                P.append("<div class='bch'><span class='bcn'>%s</span>"
+                         "<span class='pill warn'>%s</span></div>" % (_esc(bc), _n(dv)))
+                P.append("<div class='bcm'><span>🏘 %d xã/phường</span></div>" % len(wards))
+                P.append("</summary><div class='dtl'>")
+                if wards:
+                    P.append("<table class='drv'><thead><tr><th>Xã/phường</th>"
+                             "<th>Đơn chưa gán</th></tr></thead><tbody>")
+                    for wn, wc in wards:
+                        P.append("<tr><td class='nv'>%s</td><td><b>%s</b></td></tr>"
+                                 % (_esc(wn), _n(wc)))
+                    P.append("</tbody></table>")
+                else:
+                    P.append("<div class='note'>Không lấy được chi tiết xã (thử lại lần chốt sau).</div>")
+                P.append("</div></details>")
+            P.append("</div></details>")
 
     # ===== 🚨 BƯU CỤC NGUY HIỂM CỦA VÙNG · Top 10 (cuối ngày + 1 tuần) =====
     # %GTC TB 7 ngày theo bưu cục (từ bc_days)
