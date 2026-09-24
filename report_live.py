@@ -338,7 +338,8 @@ def gen_html(rows):
     # ===== Dải chỉ số =====
     P.append("<section class='strip'>")
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📥 Đã gán</div></div>" % _n(R["total"]))
-    P.append("<div class='st'><div class='sv bad'>%s</div><div class='sl'>⏳ Chưa gán</div></div>" % _n(R["backlog"]))
+    P.append("<div class='st cg' onclick=\"var d=document.getElementById('cgd');if(d){d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'});}\">"
+             "<div class='sv bad'>%s</div><div class='sl'>⏳ Chưa gán ▾</div></div>" % _n(R["backlog"]))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🏃 Đang chạy</div></div>" % _n(R["ontrip"]))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🚛 Còn phải giao</div></div>" % _n(on_road))
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📊 Tiến độ chạy</div></div>"
@@ -356,6 +357,45 @@ def gen_html(rows):
     P.append("<div class='st'><div class='sv warn'>%str</div><div class='sl'>💰 COD GTB kẹt</div></div>" % _codm(R["cod_gtb"]))
     P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(R["ltc"]))
     P.append("</section>")
+
+    # ===== Drill Chưa gán theo AM → Bưu cục → tuyến (xã) — mở từ tile ⏳ Chưa gán =====
+    cg_am = {}
+    for r in rows:
+        if r.get("backlog", 0) <= 0:
+            continue
+        amn = AM_OF.get(r["name"]) or "(chưa phân AM)"
+        cg_am.setdefault(amn, []).append(r)
+    if cg_am:
+        P.append("<details id='cgd' class='bc bad cgdrill'><summary>")
+        P.append("<div class='bch'><span class='dot bad'></span>"
+                 "<span class='bcn'>⏳ Tồn chưa gán · AM → Bưu cục → tuyến</span>"
+                 "<span class='pill bad'>%s</span></div>" % _n(R["backlog"]))
+        P.append("</summary><div class='dtl'>")
+        for amn, brows in sorted(cg_am.items(), key=lambda kv: -sum(x["backlog"] for x in kv[1])):
+            am_tot = sum(x["backlog"] for x in brows)
+            P.append("<details class='bc warn'><summary>")
+            P.append("<div class='bch'><span class='dot warn'></span><span class='bcn'>🧑‍💼 %s</span>"
+                     "<span class='pill warn'>%s</span></div>" % (_esc(amn), _n(am_tot)))
+            P.append("<div class='bcm'><span>%d bưu cục còn tồn chưa gán</span></div>" % len(brows))
+            P.append("</summary><div class='dtl'>")
+            for r in sorted(brows, key=lambda x: -x["backlog"]):
+                wards = r.get("backlog_wards", [])
+                P.append("<details class='bc sub warn'><summary>")
+                P.append("<div class='bch'><span class='dot warn'></span><span class='bcn'>%s</span>"
+                         "<span class='pill warn'>%s</span></div>" % (_esc(r["name"]), _n(r["backlog"])))
+                P.append("<div class='bcm'><span>🏘 %d tuyến xã/phường</span></div>" % len(wards))
+                P.append("</summary><div class='dtl'>")
+                if wards:
+                    P.append("<table class='drv'><thead><tr><th>Tuyến xã/phường</th>"
+                             "<th>Đơn chưa gán</th></tr></thead><tbody>")
+                    for wn, wc in wards:
+                        P.append("<tr><td>%s</td><td><b>%s</b></td></tr>" % (_esc(wn), _n(wc)))
+                    P.append("</tbody></table>")
+                else:
+                    P.append("<div class='note'>Không lấy được chi tiết tuyến (thử lại lần sau).</div>")
+                P.append("</div></details>")
+            P.append("</div></details>")
+        P.append("</div></details>")
 
     P.append("<a class='eod tq' href='tongquan.html'><span>📋 Báo cáo tổng quan</span>"
              "<span class='arw'>số chính cần theo dõi →</span></a>")
@@ -524,6 +564,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 
 .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px}
 .st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 6px;text-align:center}
+.st.cg{cursor:pointer}.st.cg:active{transform:scale(.98)}
+details.cgdrill{border-left-width:4px}details.cgdrill>summary{padding:12px}
 .sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
 .sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
 .sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
