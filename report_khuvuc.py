@@ -160,7 +160,7 @@ def _iso_week(ds):
     return "%d-T%02d" % (iso[0], iso[1])
 
 
-def _svg_bars(series, unit="%", target=None):
+def _svg_bars(series, unit="%", target=None, vfmt=None):
     """series: list [(label, value, cls)] → SVG cột dọc gọn, responsive."""
     if not series:
         return "<div class='none'>Chưa đủ dữ liệu.</div>"
@@ -188,8 +188,9 @@ def _svg_bars(series, unit="%", target=None):
         y = (H - pad_b) - h
         P.append("<rect x='%.1f' y='%.1f' width='%.1f' height='%.1f' rx='3' class='b %s'/>"
                  % (cx - barw / 2, y, barw, max(h, 1), cls))
-        P.append("<text x='%.1f' y='%.1f' class='bv'>%s%s</text>"
-                 % (cx, y - 4, val, unit if unit == "%" else ""))
+        vtxt = vfmt(val) if vfmt else ("%s%s" % (val, unit if unit == "%" else ""))
+        P.append("<text x='%.1f' y='%.1f' class='bv'>%s</text>"
+                 % (cx, y - 4, vtxt))
         P.append("<text x='%.1f' y='%d' class='bx'>%s</text>" % (cx, H - 12, _esc(lab)))
     P.append("</svg>")
     return "".join(P)
@@ -201,17 +202,15 @@ def build_html(days):
                 "Chưa có dữ liệu khu vực. Trang sẽ có số sau lần chốt cuối ngày đầu tiên.</div>")
     latest = days[-1]
 
-    # ----- TREND tuần / tháng -----
-    wk = collections.defaultdict(lambda: [0, 0]); mo = collections.defaultdict(lambda: [0, 0])
-    for d in days:
-        wk[_iso_week(d["ngay"])][0] += d["tot"]; wk[_iso_week(d["ngay"])][1] += d["gtc"]
-        ym = d["ngay"][:7]; mo[ym][0] += d["tot"]; mo[ym][1] += d["gtc"]
-    wk_series = [(k.split("T")[-1] and "T" + k.split("T")[-1], _pct(v[1], v[0]), _cls(_pct(v[1], v[0])))
-                 for k, v in sorted(wk.items())][-8:]
-    mo_series = [(k[5:] + "/" + k[:4], _pct(v[1], v[0]), _cls(_pct(v[1], v[0])))
-                 for k, v in sorted(mo.items())][-6:]
-    day_series = [(d["ngay"][8:] + "/" + d["ngay"][5:7], _pct(d["gtc"], d["tot"]), _cls(_pct(d["gtc"], d["tot"])))
-                  for d in days][-14:]
+    # ----- SỐ ĐƠN theo ngày (14 ngày) · màu cột theo %GTC ngày đó -----
+    dord_series = [(d["ngay"][8:] + "/" + d["ngay"][5:7], d["tot"], _cls(_pct(d["gtc"], d["tot"])))
+                   for d in days][-14:]
+    # ----- TOP HUYỆN/TP theo số đơn (ngày mới nhất) -----
+    dist = collections.defaultdict(lambda: [0, 0])
+    for dd, w, n, g in latest["wards"]:
+        dist[dd][0] += n; dist[dd][1] += g
+    top_dist = sorted(dist.items(), key=lambda x: -x[1][0])[:12]
+    dmax = top_dist[0][1][0] if top_dist else 1
 
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
@@ -244,13 +243,21 @@ def build_html(days):
     P.append("<div class='leg' id='legB' style='display:none'>🔴 %GTC thấp&nbsp;<span class='bar gtc'></span>"
              "&nbsp;🟢 cao&nbsp;·&nbsp;chấm to = nhiều đơn</div>")
 
-    # ----- BIỂU ĐỒ SO SÁNH -----
-    P.append("<div class='sec'>📅 %GTC theo tuần (8 tuần gần nhất)</div>")
-    P.append("<div class='card'>%s</div>" % _svg_bars(wk_series, "%", target=80))
-    P.append("<div class='sec'>🗓 %GTC theo tháng</div>")
-    P.append("<div class='card'>%s</div>" % _svg_bars(mo_series, "%", target=80))
-    P.append("<div class='sec'>📈 %GTC theo ngày (14 ngày)</div>")
-    P.append("<div class='card'>%s</div>" % _svg_bars(day_series, "%", target=80))
+    # ----- SỐ ĐƠN GIAO VỀ THEO NGÀY -----
+    P.append("<div class='sec'>📦 Số đơn giao về theo ngày (14 ngày) · màu cột theo %GTC</div>")
+    P.append("<div class='card'>%s</div>" % _svg_bars(dord_series, unit="đơn", vfmt=_n))
+
+    # ----- TOP HUYỆN/TP THEO SỐ ĐƠN -----
+    P.append("<div class='sec'>🏙 Top 12 Huyện/Thành phố có đơn nhiều nhất · ngày %s</div>" % _fmt(latest["ngay"]))
+    P.append("<div class='tw'><table class='t'><thead><tr><th class='rk'>#</th><th class='l'>Huyện/TP</th>"
+             "<th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
+    for i, (dd, (n, g)) in enumerate(top_dist, 1):
+        p = _pct(g, n); wpc = round(n * 100 / dmax) if dmax else 0
+        P.append("<tr><td class='rk'>%d</td>"
+                 "<td class='l'><div class='dbar' style='width:%d%%'></div><span class='dnm'>%s</span></td>"
+                 "<td><b>%s</b></td><td>%s</td><td><span class='pill %s'>%d%%</span></td></tr>"
+                 % (i, wpc, _esc(dd), _n(n), _n(g), _cls(p), p))
+    P.append("</tbody></table></div>")
 
     # ----- XÃ KHÓ GIAO -----
     P.append("<div class='sec'>🔴 Xã/phường khó giao nhất · %GTC thấp → cao (≥20 đơn)</div>")
@@ -420,6 +427,9 @@ table.t,table.drv{width:100%;border-collapse:collapse;font-size:12px;background:
 table.t th,table.t td,table.drv th,table.drv td{padding:7px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
 table.t th,table.drv th{color:var(--mut);font-weight:600;font-size:9.5px;text-transform:uppercase;letter-spacing:.02em}
 table.t td.rk,table.t th.rk{text-align:center;color:var(--mut);width:22px;padding-left:2px;padding-right:2px}
+table.t td.l{position:relative;overflow:hidden;text-align:left}
+.dbar{position:absolute;left:0;top:3px;bottom:3px;background:rgba(247,185,85,.16);border-radius:0 4px 4px 0;z-index:0}
+.dnm{position:relative;z-index:1}
 td.l,th.l{text-align:left}td.l{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 tr:last-child td{border-bottom:none}
 .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px}
