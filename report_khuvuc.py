@@ -262,13 +262,14 @@ def build_html(days):
                  "<td><span class='pill %s'>%d%%</span></td></tr>" % (_esc(dist), _esc(ward), n, g, _cls(p), p))
     P.append("</tbody></table></div>")
 
-    # ----- LẠC TUYẾN -----
-    P.append("<div class='sec'>🧭 Đơn lạc tuyến · NV giao ngoài huyện địa bàn chính</div>")
-    P.append("<div class='tw'><table class='t'><thead><tr><th class='l'>Bưu cục</th><th class='l'>Nhân viên</th><th class='l'>Địa bàn chính</th><th>Lạc tuyến</th></tr></thead><tbody>")
-    for bc, nv, md, out, tt in latest["stray"][:15]:
-        P.append("<tr><td class='l'>%s</td><td class='l'>%s</td><td class='l'>%s</td>"
-                 "<td><b class='gtb'>%d</b>/%d</td></tr>"
-                 % (_esc(bc.split(") ")[-1]), _esc(nv), _esc(md), out, tt))
+    # ----- TOP 20 XÃ ĐƠN NHIỀU NHẤT -----
+    P.append("<div class='sec'>📦 Top 20 xã/phường có đơn giao về nhiều nhất vùng</div>")
+    topw = sorted(latest["wards"], key=lambda w: -w[2])[:20]
+    P.append("<div class='tw'><table class='t'><thead><tr><th class='rk'>#</th><th class='l'>Huyện</th><th class='l'>Xã/Phường</th><th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
+    for i, (dist, ward, n, g) in enumerate(topw, 1):
+        p = _pct(g, n)
+        P.append("<tr><td class='rk'>%d</td><td class='l'>%s</td><td class='l'>%s</td><td><b>%d</b></td><td>%d</td>"
+                 "<td><span class='pill %s'>%d%%</span></td></tr>" % (i, _esc(dist), _esc(ward), n, g, _cls(p), p))
     P.append("</tbody></table></div>")
 
     # ----- DRILL AM → BƯU CỤC → NV × XÃ -----
@@ -418,6 +419,7 @@ canvas{display:block;width:100%;height:auto}
 table.t,table.drv{width:100%;border-collapse:collapse;font-size:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 table.t th,table.t td,table.drv th,table.drv td{padding:7px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
 table.t th,table.drv th{color:var(--mut);font-weight:600;font-size:9.5px;text-transform:uppercase;letter-spacing:.02em}
+table.t td.rk,table.t th.rk{text-align:center;color:var(--mut);width:22px;padding-left:2px;padding-right:2px}
 td.l,th.l{text-align:left}td.l{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 tr:last-child td{border-bottom:none}
 .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px}
