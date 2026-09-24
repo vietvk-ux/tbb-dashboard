@@ -93,20 +93,32 @@ async def _get_hubs(session, token):
 
 
 async def fetch_chua_gan(session, hub_id, token):
-    """Đơn tồn CHƯA GÁN CHUYẾN trong ngày theo bưu cục (view 'Chưa có chuyến đi trong ngày').
-    = tổng theo loại của get-general-info order_type=DAILY_TRIP_NONE. Chuẩn theo trang Tồn LGT
-    (VD Bum Tở Giao 653). Trả {'deliver','pick','return','deliver_priority'} (0 nếu lỗi)."""
+    """Đơn tồn CHƯA GÁN CHUYẾN trong ngày theo bưu cục (view Tồn LGT 'Chưa có chuyến đi trong ngày').
+    Dùng get-detail-by-status (view 'Theo phường/xã') → vừa có TỔNG theo loại, vừa TÁCH THEO XÃ,
+    chỉ 1 call/bưu cục (khớp 100% get-general-info; VD Âu Lâu DELIVER 551). Trả
+    {'deliver','pick','return','deliver_priority','wards'} với wards=[(tên xã, số đơn Giao)] giảm dần."""
     try:
-        d = await _post(session, "/core/oss/v1/report/get-general-info",
-                        {"hub_ids": [str(hub_id)], "view_mode": "WARD",
-                         "order_type": "DAILY_TRIP_NONE"}, hub_id, token)
-        data = d.get("data") or []
-        infos = (data[0].get("general_infos") if data else []) or []
-        g = {i.get("order_type"): (i.get("total_order") or 0) for i in infos}
-        return {"deliver": g.get("DELIVER", 0), "pick": g.get("PICK", 0),
-                "return": g.get("RETURN", 0), "deliver_priority": g.get("DELIVER_PRIORITY", 0)}
+        d = await _post(session, "/core/oss/v1/report/get-detail-by-status",
+                        {"hub_id": str(hub_id), "order_type": "DAILY_TRIP_NONE",
+                         "view_mode": "WARD",
+                         "status": ["PICK", "DELIVER", "DELIVER_PRIORITY", "RETURN"]}, hub_id, token)
+        bts = ((d.get("data") or {}).get("detail_backlog_types")) or []
+        tot, wards = {}, []
+        for bt in bts:
+            ot = bt.get("backlog_type")
+            s = 0
+            for w in (bt.get("details") or []):
+                wn = sum(i.get("total_order") or 0 for i in (w.get("order_inventories") or []))
+                s += wn
+                if ot == "DELIVER" and wn > 0:
+                    wards.append((w.get("name") or "?", wn))
+            tot[ot] = s
+        wards.sort(key=lambda x: -x[1])
+        return {"deliver": tot.get("DELIVER", 0), "pick": tot.get("PICK", 0),
+                "return": tot.get("RETURN", 0), "deliver_priority": tot.get("DELIVER_PRIORITY", 0),
+                "wards": wards[:20]}
     except Exception:
-        return {"deliver": 0, "pick": 0, "return": 0, "deliver_priority": 0}
+        return {"deliver": 0, "pick": 0, "return": 0, "deliver_priority": 0, "wards": []}
 
 
 async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem, next_ymd=None):

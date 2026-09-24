@@ -228,11 +228,24 @@ def build_html(rows):
                       _n(bc_onroad[1]) + " đơn", "warn", det))
     # ⏳ Bưu cục chưa gán (backlog) cao nhất — top 10
     if bc_backlog:
-        det = "<div class='dsub'>Top 10 bưu cục tồn nhiều đơn chưa xếp chuyến</div>"
-        det += "".join(
-            "<div class='dl'><span class='dln'>%s</span><span class='dlm'>chưa gán giao</span>"
-            "<span class='pill sm warn'>%s</span></div>" % (_esc(nm), _n(bl))
-            for nm, bl in bc_backlog_list[:10])
+        det = "<div class='dsub'>Top 10 bưu cục tồn nhiều đơn chưa xếp chuyến · bấm bưu cục xem chi tiết xã/phường</div>"
+        ward_of = {r["name"]: r.get("backlog_wards", []) for r in rows}
+        _rw = []
+        for nm, bl in bc_backlog_list[:10]:
+            ws = ward_of.get(nm, [])
+            if ws:
+                wl = "".join(
+                    "<div class='wr'><span class='wn'>%s</span><span class='pill sm warn'>%s</span></div>"
+                    % (_esc(wn), _n(wc)) for wn, wc in ws)
+                _rw.append(
+                    "<details class='bcw'><summary class='dl'><span class='dln'>%s</span>"
+                    "<span class='dlm'>chưa gán giao</span><span class='pill sm warn'>%s</span></summary>"
+                    "<div class='wl'>%s</div></details>" % (_esc(nm), _n(bl), wl))
+            else:
+                _rw.append(
+                    "<div class='dl'><span class='dln'>%s</span><span class='dlm'>chưa gán giao</span>"
+                    "<span class='pill sm warn'>%s</span></div>" % (_esc(nm), _n(bl)))
+        det += "".join(_rw)
         P.append(_hot("⏳", "Bưu cục chưa gán cao nhất", _short(bc_backlog[0]),
                       _n(bc_backlog[1]) + " đơn", "warn", det))
     # NV xuất phát muộn: danh sách cụ thể
@@ -546,6 +559,15 @@ details.ht[open] .hcar{transform:rotate(180deg)}
 .dl:first-child{border-top:none}
 .dln{font-weight:600;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dlm{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46%}
+details.bcw{border-top:1px solid rgba(255,255,255,.05)}
+details.bcw>summary{cursor:pointer;list-style:none}
+details.bcw>summary::-webkit-details-marker{display:none}
+details.bcw>summary.dl{border-top:none}
+details.bcw>summary .dln::before{content:'▸ ';color:var(--mut);font-weight:400}
+details.bcw[open]>summary .dln::before{content:'▾ '}
+.wl{padding:1px 0 7px 15px}
+.wr{display:flex;align-items:center;gap:8px;padding:4px 2px;border-top:1px solid rgba(255,255,255,.04)}
+.wn{flex:1;min-width:0;font-size:11.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hd .nvc:first-child{margin-top:2px}
 .eod{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);
  border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0;text-decoration:none;color:var(--txt);font-weight:600}

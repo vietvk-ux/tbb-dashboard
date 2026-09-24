@@ -125,6 +125,7 @@ async def fetch_live(token):
                 async with sem:
                     bl = await fetch_chua_gan(session, hid, token)
                 backlog = bl.get("deliver", 0)   # Giao "chưa có chuyến đi trong ngày" (chuẩn Tồn LGT)
+                backlog_wards = bl.get("wards", [])   # [(tên xã, số đơn Giao chưa gán)] giảm dần
 
                 async def _list(status):
                     async with sem:
@@ -258,6 +259,7 @@ async def fetch_live(token):
                 h_kien = sum(d["kien"] for d in drivers.values())
                 h_kien_gtc = sum(d["kien_gtc"] for d in drivers.values())
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
+                        "backlog_wards": backlog_wards,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc,
                         "vngh": h_vngh, "vngh_gtc": h_vngh_gtc, "cod_gtb": h_cod_gtb,
@@ -268,6 +270,7 @@ async def fetch_live(token):
             except Exception as e:
                 logger.warning("Hub %s lỗi: %s", name, str(e)[:100])
                 return {"name": name, "prov": _prov(name), "backlog": 0, "ontrip": 0,
+                        "backlog_wards": [],
                         "fin": 0, "gtc": 0, "att": 0, "total": 0, "drivers": []}
 
         return await asyncio.gather(*[one(h) for h in hubs])
