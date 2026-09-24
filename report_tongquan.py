@@ -178,11 +178,6 @@ def build_html(rows):
                  % (cl, val, ic, lab))
     P.append("</section>")
 
-    # Xu hướng %GTC
-    if day_series:
-        P.append("<div class='sec'>📈 %GTC theo ngày (14 ngày gần nhất)</div>")
-        P.append("<div class='card'>%s</div>" % _spark(day_series))
-
     # Điểm nóng — mỗi thẻ bấm mở ra chi tiết NV/bưu cục/tuyến cụ thể
     P.append("<div class='sec'>⚠️ Điểm nóng cần chú ý · bấm mở chi tiết</div>")
     P.append("<section class='hot'>")
@@ -248,25 +243,6 @@ def build_html(rows):
         det += "".join(_rw)
         P.append(_hot("⏳", "Bưu cục chưa gán cao nhất", _short(bc_backlog[0]),
                       _n(bc_backlog[1]) + " đơn", "warn", det))
-    # NV xuất phát muộn: danh sách cụ thể
-    if late_list:
-        det = "".join("<div class='dl'><span class='dln'>%s</span><span class='dlm'>%s</span>"
-                      "<span class='pill sm bad'>%02d:%02d</span></div>"
-                      % (_esc(nm), _esc(bc), st.hour, st.minute) for nm, bc, st in late_list[:30])
-    else:
-        det = "<div class='none'>Không có NV nào xuất phát muộn.</div>"
-    P.append(_hot("🕘", "NV xuất phát muộn (sau 9h30)", "toàn vùng", str(late_nv) + " NV",
-                  "bad" if late_nv else "good", det))
-    if zero_wards:
-        tot_don = sum(w[2] for w in zero_wards)
-        det = ("<div class='dsub'>Toàn bộ xã/tuyến GTC 0%% toàn vùng hôm qua (≥5 đơn) · %d đơn giao hỏng hết</div>"
-               % tot_don)
-        det += "".join(
-            "<div class='dl'><span class='dln'>%s</span><span class='dlm'>%s · 📦%d</span>"
-            "<span class='pill sm bad'>0%%</span></div>" % (_esc(w[1]), _esc(w[0]), w[2])
-            for w in zero_wards[:60])
-        P.append(_hot("🗺", "Xã 0% GTC toàn vùng (hôm qua)", "toàn vùng · %d đơn hỏng" % tot_don,
-                      "%d xã" % len(zero_wards), "bad", det))
     P.append("</section>")
 
     # ===== 📊 BIẾN ĐỘNG %GTC vs HÔM QUA (2 ngày chốt) =====
