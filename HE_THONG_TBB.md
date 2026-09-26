@@ -76,7 +76,7 @@ Gốc: `https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/`
 ### Trang 7 — HIỆU SUẤT CHUYẾN ĐI (`chuyendi.html`, thêm 24/08) — LIVE ~15'
 - `report_chuyendi.py::gen_html(rows)`, dùng lại `report_live.fetch_live` (KHÔNG tốn call API). `fetch_live` thu thêm mỗi NV: `st`/`en` (giờ xuất phát chuyến bắt đầu HÔM NAY / giờ đóng muộn nhất, qua `_vn_time`), `scan_ok`/`scan_tot` (`isScanned`), `ot_done`/`ot_tot` (tiến độ chuyến ĐANG CHẠY).
 - **Đơn/giờ = GTC ÷ (giờ đóng − giờ mở), CHỈ xếp NV đã đóng HẾT chuyến (`ot_tot==0` + cửa sổ ≥2h)** → số trọn vẹn; NV còn chạy xuống mục "🏃 đang chạy".
-- Ngưỡng (theo phân phối thật, trung vị đơn/giờ vùng ~4): cần chú ý = đơn/giờ **<2.5**; muộn **≥9h**; scan **<40%**. Bố cục: hero + dải 6 chỉ số · 🔴 cần chú ý · 🟢 hiệu suất cao · 🧑‍💼 theo AM (drill NV) · 🏃 đang chạy.
+- Ngưỡng (theo phân phối thật, trung vị đơn/giờ vùng ~4): cần chú ý = đơn/giờ **<2.5**; muộn **≥9h**; scan **<40%**. Bố cục: hero + dải 6 chỉ số · 🔴 cần chú ý · 🟢 hiệu suất cao · 🧑‍💼 theo AM (drill NV) · 🏃 đang chạy · **🕘 NV xuất phát muộn (sau 9h30) AM→bưu cục→NV + giờ XP, muộn nhất lên đầu** (thêm 26/09, nguồn `late_nv=[m in timed if m['late']]`).
 
 ### Trang 8 — XẾP HẠNG TỔNG HỢP (`xephang.html`, thêm 24/08) — Supabase 30 ngày
 - `report_xephang.py`, đọc **Supabase 30 ngày gần nhất** (`WINDOW_DAYS=30`; đánh giá ổn định, không live). `report_trend.main()` sinh trang.
