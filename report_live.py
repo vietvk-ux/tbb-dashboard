@@ -378,7 +378,7 @@ def gen_html(rows):
     top_bl = max(rows, key=lambda x: x.get("backlog", 0), default=None)
     diag = []
     if top_bl and top_bl.get("backlog", 0) > 0:
-        diag.append("🔴 Chưa gán dồn <b>%s</b> (%s đơn)" % (_esc(top_bl["name"]), _n(top_bl["backlog"])))
+        diag.append("🔴 Chưa gán cao nhất <b>%s</b> (%s đơn)" % (_esc(top_bl["name"]), _n(top_bl["backlog"])))
     if low_am:
         diag.append("🟠 <b>%d</b>/%d AM &lt;60%%" % (low_am, len(amg)))
     if late_cnt:
