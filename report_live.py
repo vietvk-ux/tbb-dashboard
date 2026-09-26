@@ -402,7 +402,7 @@ def gen_html(rows):
         ("🛍️", _n(R["vngh"]),                                      "TikTok gán",     "232,121,200", ""),
         ("🛍️", _n(R["vngh_gtc"]),                                  "TikTok GTC",     "47,208,122",  ""),
         ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"),     "%GTC TikTok",    "232,121,200", ""),
-        ("💰", ("%str" % _codm(R["cod_gtb"])),                      "COD GTB kẹt",    "247,185,85",  ""),
+        ("💰", ("%str" % _codm(R["cod_gtb"])),                      "COD GTB",        "247,185,85",  ""),
         ("🛒", _n(R["ltc"]),                                        "LTC",            "169,112,255", ""),
     ]
     P.append("<section class='strip'>")
@@ -576,7 +576,7 @@ def gen_html(rows):
              "🏃 <b>Đang chạy</b> = số NV còn chuyến chưa kết thúc · 🚛 <b>Còn phải giao</b> = đơn của chuyến đang chạy CHƯA giao xong (đang trên đường)<br>"
              "📊 <b>Tiến độ chạy</b> = đã giao / tổng đơn của chuyến đang chạy (%) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
              "🕘 <b>XP muộn &gt;9h30</b> = số NV xuất phát sau 9h30 (kỷ luật ra hàng) · 🛍️ <b>TikTok</b> = đơn mã VNGH<br>"
-             "💰 <b>COD GTB kẹt</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công<br>"
+             "💰 <b>COD GTB</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công<br>"
              "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
              "<span style='opacity:.7'>Số LIVE gồm cả chuyến đã kết thúc trong ngày · %GTC còn thấp giữa ngày là bình thường (chuyến chưa đóng) · nguồn nhanh.ghn.vn</span></div>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
