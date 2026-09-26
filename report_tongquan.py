@@ -241,7 +241,7 @@ def build_html(rows):
                     "<div class='dl'><span class='dln'>%s</span><span class='dlm'>chưa gán giao</span>"
                     "<span class='pill sm warn'>%s</span></div>" % (_esc(nm), _n(bl)))
         det += "".join(_rw)
-        P.append(_hot("⏳", "Bưu cục chưa gán cao nhất", _short(bc_backlog[0]),
+        P.append(_hot("⏳", "Bưu cục chưa gán giao cao nhất", _short(bc_backlog[0]),
                       _n(bc_backlog[1]) + " đơn", "warn", det))
     P.append("</section>")
 

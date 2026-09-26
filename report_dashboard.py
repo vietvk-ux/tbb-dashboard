@@ -513,7 +513,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
             P.append("<details class='bc'><summary>")
             P.append("<div class='bch'><span class='bcn'>🧑‍💼 %s</span>"
                      "<span class='pill warn'>%s đơn</span></div>" % (_esc(am), _n(am_tot)))
-            P.append("<div class='bcm'><span>%d bưu cục còn tồn chưa gán</span></div>" % len(bcs))
+            P.append("<div class='bcm'><span>%d bưu cục còn tồn chưa gán giao</span></div>" % len(bcs))
             P.append("</summary><div class='dtl'>")
             for bc, dv, wards in sorted(bcs, key=lambda x: -x[1]):
                 P.append("<details class='bc sub warn'><summary>")
