@@ -19,7 +19,7 @@ def _late(st):
 def _n(x): return "{:,}".format(int(x or 0)).replace(",", ".")
 def _esc(s): return html.escape(str(s if s is not None else ""))
 def _pct(a, b): return round(a * 100 / b) if b else None
-def _cls(p): return "bad" if (p is None or p < 60) else ("warn" if p < 80 else "good")
+def _cls(p): return "bad" if (p is None or p < 60) else ("warn" if p < 70 else "good")
 def _codm(v):
     v = v or 0
     return "0" if v < 1e5 else ("%.1f" % (v / 1e6)).replace(".", ",")
@@ -369,7 +369,7 @@ def _spark(series):
         y = pt + (H - pt - pb) * (1 - gy / 100)
         P.append("<line x1='%d' y1='%.1f' x2='%d' y2='%.1f' class='grid'/>" % (pl, y, W, y))
         P.append("<text x='%d' y='%.1f' class='gl'>%d</text>" % (pl - 4, y + 3, gy))
-    yt = pt + (H - pt - pb) * (1 - 80 / top)
+    yt = pt + (H - pt - pb) * (1 - 70 / top)
     P.append("<line x1='%d' y1='%.1f' x2='%d' y2='%.1f' class='tgt'/>" % (pl, yt, W, yt))
     barw = min(bw * 0.66, 44)
     for i, (lab, v) in enumerate(series):

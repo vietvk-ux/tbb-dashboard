@@ -71,10 +71,10 @@ def _metrics(d, bc, prov):
 
 
 def _gtc_cls(p):
-    """Màu theo chuẩn %GTC toàn dashboard: đỏ <60 · vàng <80 · xanh ≥80."""
+    """Màu theo chuẩn %GTC toàn dashboard: đỏ <60 · vàng <70 · xanh ≥70."""
     if p is None:
         return "na"
-    return "bad" if p < 60 else ("warn" if p < 80 else "good")
+    return "bad" if p < 60 else ("warn" if p < 70 else "good")
 
 
 def _flags(m):

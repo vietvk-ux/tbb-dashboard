@@ -81,7 +81,7 @@ def _n(x):
 def _cls(p):
     if p is None:
         return "na"
-    return "bad" if p < 60 else ("warn" if p < 80 else "good")
+    return "bad" if p < 60 else ("warn" if p < 70 else "good")
 
 
 def _get(url, key, path, tries=3):

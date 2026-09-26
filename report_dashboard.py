@@ -27,7 +27,7 @@ PROV_NAME = {"LCA": "Lào Cai", "YBA": "Yên Bái", "SLA": "Sơn La",
 def _cls(g):
     if g is None:
         return "na"
-    return "bad" if g < 60 else ("warn" if g < 80 else "good")
+    return "bad" if g < 60 else ("warn" if g < 70 else "good")
 
 
 def _n(x):

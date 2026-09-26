@@ -151,7 +151,7 @@ def _load_days(n=KEEP_DAYS):
 def _esc(s): return html.escape(str(s if s is not None else ""))
 def _n(x): return f"{int(x):,}".replace(",", ".")
 def _pct(a, b): return round(a * 100 / b) if b else 0
-def _cls(p): return "bad" if p < 60 else ("warn" if p < 80 else "good")
+def _cls(p): return "bad" if p < 60 else ("warn" if p < 70 else "good")
 
 
 def _iso_week(ds):
