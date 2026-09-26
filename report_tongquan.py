@@ -21,8 +21,13 @@ def _esc(s): return html.escape(str(s if s is not None else ""))
 def _pct(a, b): return round(a * 100 / b) if b else None
 def _cls(p): return "bad" if (p is None or p < 60) else ("warn" if p < 70 else "good")
 def _codm(v):
+    """COD GTB (đồng) → chuỗi KÈM đơn vị: ≥1 tỷ '2,35 tỷ' · ≥100k '86,1tr' · <100k '0'."""
     v = v or 0
-    return "0" if v < 1e5 else ("%.1f" % (v / 1e6)).replace(".", ",")
+    if v < 1e5:
+        return "0"
+    if v >= 1e9:
+        return ("%.2f tỷ" % (v / 1e9)).replace(".", ",")
+    return ("%.1ftr" % (v / 1e6)).replace(".", ",")
 
 
 def _load_days(n=14):
@@ -168,7 +173,7 @@ def build_html(rows):
         ("🏃", _n(ontrip), "Đang chạy", ""),
         ("🚛", _n(on_road), "Còn phải giao", "warn"),
         ("✅", _n(gtc), "GTC nay", "good"),
-        ("💰", _codm(cod_gtb) + "tr", "COD GTB kẹt", "bad"),
+        ("💰", _codm(cod_gtb), "COD GTB kẹt", "bad"),
         ("🛒", _n(ltc), "LTC", "good"),
         ("🛍️", (str(vpct) + "%") if vpct is not None else "—", "%GTC TikTok", _cls(vpct)),
     ]
@@ -193,7 +198,7 @@ def build_html(rows):
     if bc_cod:
         r = rows_by_name.get(bc_cod[0])
         det = _nv_list(r, key=lambda x: -x.get("cod_gtb", 0), only_cod=True) if r else ""
-        P.append(_hot("💰", "Bưu cục COD GTB cao nhất", _short(bc_cod[0]), _codm(bc_cod[1]) + "tr", "bad", det))
+        P.append(_hot("💰", "Bưu cục COD GTB cao nhất", _short(bc_cod[0]), _codm(bc_cod[1]), "bad", det))
     # 👤 NV %GTC thấp nhất toàn vùng (≥30 đơn) — top 15 kém nhất
     if nv_worst:
         d0, bc0 = nv_worst
@@ -211,7 +216,7 @@ def build_html(rows):
         det += "".join(_nv_hotrow(d, bc, "cod") for d, bc in nv_cod_list[:15])
         P.append(_hot("💸", "NV COD GTB kẹt cao nhất",
                       "%s · %s" % (d0.get("name", "—"), _bc_tail(bc0)),
-                      _codm(d0.get("cod_gtb", 0)) + "tr", "bad", det))
+                      _codm(d0.get("cod_gtb", 0)), "bad", det))
     # 🚛 Bưu cục còn phải giao nhiều nhất (đơn đang trên đường của chuyến đang chạy) — top 10
     if bc_onroad:
         det = "<div class='dsub'>Top 10 bưu cục còn nhiều đơn trên đường nhất (chuyến đang chạy)</div>"
@@ -300,7 +305,7 @@ def _nv_hotrow(d, bc, mode):
     name = _esc(d.get("name", "—")); bct = _esc(_bc_tail(bc))
     if mode == "cod":
         meta = "%s · 📥%s ❌%s" % (bct, _n(total), _n(total - gtc))
-        pill = "<span class='pill sm bad'>%str</span>" % _codm(d.get("cod_gtb", 0))
+        pill = "<span class='pill sm bad'>%s</span>" % _codm(d.get("cod_gtb", 0))
     else:
         pc = _pct(gtc, total)
         meta = "%s · 📥%s ✅%s" % (bct, _n(total), _n(gtc))
@@ -329,7 +334,7 @@ def _dl_bc(r):
     """1 dòng bưu cục gọn (dùng trong chi tiết điểm nóng AM)."""
     pc = _pct(r.get("gtc", 0), r.get("total", 0))
     return ("<div class='dl'><span class='dln'>%s</span>"
-            "<span class='dlm'>📥%s ✅%s 💰%str</span><span class='pill sm %s'>%s</span></div>"
+            "<span class='dlm'>📥%s ✅%s 💰%s</span><span class='pill sm %s'>%s</span></div>"
             % (_esc(r["name"]), _n(r.get("total", 0)), _n(r.get("gtc", 0)),
                _codm(r.get("cod_gtb", 0)), _cls(pc), ("%d%%" % pc) if pc is not None else "—"))
 
@@ -395,7 +400,7 @@ def _metaline(prefix, m):
     parts.append("<span class='mi'>🏃%s</span>" % _n(m["ontrip"]))
     parts.append("<span class='mi'>🚛%s</span>" % _n(m["onroad"]))
     parts.append("<span class='mi g'>✅%s</span>" % _n(m["gtc"]))
-    parts.append("<span class='mi cod'>💰%str</span>" % _codm(m["cod"]))
+    parts.append("<span class='mi cod'>💰%s</span>" % _codm(m["cod"]))
     parts.append("<span class='mi ltc'>🛒%s</span>" % _n(m["ltc"]))
     return "<div class='ml'>" + "".join(parts) + "</div>"
 
@@ -406,7 +411,7 @@ def _nv_card(d):
     st = d.get("st"); ot = d.get("ot_tot", 0); od = d.get("ot_done", 0)
     chips = ["📥%s" % _n(total), "<span class='g'>✅%s</span>" % _n(gtc)]
     if cod >= 1e5:
-        chips.append("<span class='cod'>💰%str</span>" % _codm(cod))
+        chips.append("<span class='cod'>💰%s</span>" % _codm(cod))
     if ltc:
         chips.append("<span class='ltc'>🛒%s</span>" % _n(ltc))
     if vngh:

@@ -38,6 +38,16 @@ def _esc(s):
     return html.escape(str(s))
 
 
+def _codm(v):
+    """COD GTB (đồng) → chuỗi KÈM đơn vị: ≥1 tỷ '2,35 tỷ' · ≥100k '86,1tr' · <100k '0'."""
+    v = v or 0
+    if v < 1e5:
+        return "0"
+    if v >= 1e9:
+        return ("%.2f tỷ" % (v / 1e9)).replace(".", ",")
+    return ("%.1ftr" % (v / 1e6)).replace(".", ",")
+
+
 def _cmpd(cur, ref, kind="n", higher_good=True):
     """Δ hôm nay vs hôm qua. kind: n(số)/pct(điểm %)/money(triệu).
     higher_good True→tăng xanh, False→tăng đỏ, None→trung tính (xám)."""
@@ -72,7 +82,7 @@ def _fmt(v, kind="n"):
     if kind == "pct":
         return ("%s%%" % v)
     if kind == "money":
-        return ("%.1f" % (v / 1e6)).replace(".", ",") + "tr"
+        return _codm(v)
     return _n(v)
 
 
@@ -150,8 +160,8 @@ def _bc_drv_details(b, drivers):
     P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
              "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(b["bc"]), cls, pc if pc is not None else "—"))
     P.append("<div class='bcm'><span>📦 %s</span><span>✅ %s</span>"
-             "<span class='b'>❌ %s</span><span>💰 %.0ftr</span></div>"
-             % (_n(b["total"]), _n(b["success"]), _n(b["total"] - b["success"]), bcod / 1e6))
+             "<span class='b'>❌ %s</span><span>💰 %s</span></div>"
+             % (_n(b["total"]), _n(b["success"]), _n(b["total"] - b["success"]), _codm(bcod)))
     P.append("</summary><div class='dtl'>")
     if drivers:
         P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Đơn</th><th>GTC</th><th>LTC</th>"
@@ -160,7 +170,7 @@ def _bc_drv_details(b, drivers):
             dltc = dr.get("ltc", 0)
             ltc_cell = ("<b class='ltc'>%s</b>" % _n(dltc)) if dltc > 0 else "0"
             dcod = dr.get("gtb_cod", 0) or 0
-            cod_cell = ("<b class='cod'>%s</b>" % ("%.1f" % (dcod / 1e6)).replace(".", ",")) if dcod >= 1e5 else "0"
+            cod_cell = ("<b class='cod'>%s</b>" % _codm(dcod)) if dcod >= 1e5 else "0"
             P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
                      "<td><span class='pill sm %s'>%s%%</span></td></tr>"
                      % (_esc(dr["driver_name"]), _n(dr["total"]), _n(dr["success"]), ltc_cell,
@@ -619,8 +629,8 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
     else:
         tot_cod = sum(dr.get("gtb_cod", 0) for dr in danger)
         top3 = " · ".join("%s (%s)" % (dr["driver_name"], dr["bc"]) for dr in danger[:3])
-        P.append("<div class='dsub'>Xếp theo <b>COD GTB / đơn GTB</b> — tiền thu hộ kẹt trên mỗi đơn hỏng. Tổng COD GTB vùng <b>%.0f triệu</b>.<br>🔥 Cao nhất: <b>%s</b> — cần đốc thúc/thu hồi ngay.</div>"
-                 % (tot_cod / 1e6, _esc(top3)))
+        P.append("<div class='dsub'>Xếp theo <b>COD GTB / đơn GTB</b> — tiền thu hộ kẹt trên mỗi đơn hỏng. Tổng COD GTB vùng <b>%s</b>.<br>🔥 Cao nhất: <b>%s</b> — cần đốc thúc/thu hồi ngay.</div>"
+                 % (_codm(tot_cod), _esc(top3)))
         P.append("<table class='drv'><thead><tr><th class='rank'>#</th><th class='lft'>Nhân viên · Bưu cục</th><th>GTB</th><th>COD/GTB (tr)</th><th>%GTC</th></tr></thead><tbody>")
         for i, dr in enumerate(danger[:10], 1):
             gtb = dr["total"] - dr["success"]
@@ -697,8 +707,8 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %d BC·📦 %s·✅ %s·<span style='color:var(--bad)'>❌ %s</span>·💰 %.0ftr</div>"
-                 % (v["bc"], _n(v["total"]), _n(v["success"]), _n(v["total"] - v["success"]), v["cod"] / 1e6))
+        P.append("<div class='pmeta'>🏤 %d BC·📦 %s·✅ %s·<span style='color:var(--bad)'>❌ %s</span>·💰 %s</div>"
+                 % (v["bc"], _n(v["total"]), _n(v["success"]), _n(v["total"] - v["success"]), _codm(v["cod"])))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for b in sorted(am_bcs.get(amn, []), key=lambda x: (x["gtc"] if x["gtc"] is not None else 999)):
@@ -758,7 +768,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                 dltc = dr.get("ltc", 0)
                 ltc_cell = ("<b class='ltc'>%s</b>" % _n(dltc)) if dltc > 0 else "0"
                 dcod = dr.get("gtb_cod", 0) or 0
-                cod_cell = ("<b class='cod'>%s</b>" % ("%.1f" % (dcod / 1e6)).replace(".", ",")) if dcod >= 1e5 else "0"
+                cod_cell = ("<b class='cod'>%s</b>" % _codm(dcod)) if dcod >= 1e5 else "0"
                 P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
                          % (_esc(dr["driver_name"]), _n(dr["total"]), _n(dr["success"]),
                             ltc_cell, _n(dr["total"] - dr["success"]), cod_cell, _cls(dr["gtc"]),
