@@ -335,27 +335,30 @@ def gen_html(rows):
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
     P.append("</section>")
 
-    # ===== Dải chỉ số =====
-    P.append("<section class='strip'>")
-    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📥 Đã gán</div></div>" % _n(R["total"]))
-    P.append("<div class='st cg' onclick=\"var d=document.getElementById('cgd');if(d){d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'});}\">"
-             "<div class='sv bad'>%s</div><div class='sl'>⏳ Chưa gán ▾</div></div>" % _n(R["backlog"]))
-    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🏃 Đang chạy</div></div>" % _n(R["ontrip"]))
-    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🚛 Còn phải giao</div></div>" % _n(on_road))
-    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📊 Tiến độ chạy</div></div>"
-             % (("%d%%" % run_pct) if run_pct is not None else "—"))
-    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ GTC nay</div></div>" % _n(R["gtc"]))
-    P.append("<div class='st'><div class='sv %s'>%s</div><div class='sl'>🕘 XP muộn &gt;9h30</div></div>"
-             % ("warn" if late_cnt else "", _n(late_cnt)))
-    # 3 chỉ số đơn TikTok (VNGH) toàn vùng
-    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🛍️ TikTok gán</div></div>" % _n(R["vngh"]))
-    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛍️ TikTok GTC</div></div>" % _n(R["vngh_gtc"]))
+    # ===== Dải chỉ số · Bento (Mẫu 3) · màu theo từng chỉ số =====
     vpct = _pct(R["vngh_gtc"], R["vngh"])
-    P.append("<div class='st'><div class='sv %s'>%s%%</div><div class='sl'>🛍️ %%GTC TikTok</div></div>"
-             % (_cls(vpct), vpct if vpct is not None else "—"))
-    # COD GTB kẹt (tiền thu hộ kẹt trên đơn giao hỏng) + LTC ở cuối
-    P.append("<div class='st'><div class='sv warn'>%str</div><div class='sl'>💰 COD GTB kẹt</div></div>" % _codm(R["cod_gtb"]))
-    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>🛒 LTC</div></div>" % _n(R["ltc"]))
+    _cgo = ("onclick=\"var d=document.getElementById('cgd');if(d){d.open=true;"
+            "d.scrollIntoView({behavior:'smooth',block:'start'});}\"")
+    kpis = [
+        ("📥", _n(R["total"]),                                      "Đã gán",         "91,140,255",  ""),
+        ("⏳", _n(R["backlog"]),                                    "Chưa gán ▾",     "242,88,95",   "cg"),
+        ("🏃", _n(R["ontrip"]),                                     "Đang chạy",      "55,211,232",  ""),
+        ("🚛", _n(on_road),                                         "Còn phải giao",  "255,138,61",  ""),
+        ("📊", (("%d%%" % run_pct) if run_pct is not None else "—"),"Tiến độ chạy",   "47,208,122",  ""),
+        ("✅", _n(R["gtc"]),                                        "GTC nay",        "47,208,122",  ""),
+        ("🕘", _n(late_cnt),                                        "XP muộn &gt;9h30","247,185,85",  ""),
+        ("🛍️", _n(R["vngh"]),                                      "TikTok gán",     "232,121,200", ""),
+        ("🛍️", _n(R["vngh_gtc"]),                                  "TikTok GTC",     "47,208,122",  ""),
+        ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"),     "%GTC TikTok",    "232,121,200", ""),
+        ("💰", ("%str" % _codm(R["cod_gtb"])),                      "COD GTB kẹt",    "247,185,85",  ""),
+        ("🛒", _n(R["ltc"]),                                        "LTC",            "169,112,255", ""),
+    ]
+    P.append("<section class='strip'>")
+    for ic, val, lab, rgb, extra in kpis:
+        cls = "st cg" if extra == "cg" else "st"
+        oc = (" " + _cgo) if extra == "cg" else ""
+        P.append("<div class='%s' style='--h:%s'%s><div class='sv'>%s</div>"
+                 "<div class='sl'>%s %s</div></div>" % (cls, rgb, oc, val, ic, lab))
     P.append("</section>")
 
     # ===== Drill Chưa gán theo AM → Bưu cục → tuyến (xã) — mở từ tile ⏳ Chưa gán =====
@@ -366,11 +369,12 @@ def gen_html(rows):
         amn = AM_OF.get(r["name"]) or "(chưa phân AM)"
         cg_am.setdefault(amn, []).append(r)
     if cg_am:
-        P.append("<details id='cgd' class='bc bad cgdrill'><summary>")
-        P.append("<div class='bch'><span class='dot bad'></span>"
-                 "<span class='bcn'>⏳ Tồn chưa gán · AM → Bưu cục → tuyến</span>"
-                 "<span class='pill bad'>%s</span></div>" % _n(R["backlog"]))
-        P.append("</summary><div class='dtl'>")
+        P.append("<details id='cgd' class='cgbento'><summary>")
+        P.append("<div class='mic'>⏳</div>"
+                 "<div class='mtx'><div class='mn'>Tồn chưa gán</div>"
+                 "<div class='ms'>AM → Bưu cục → tuyến · bấm mở chi tiết</div></div>"
+                 "<div class='mbig'>%s</div><span class='cvar'>▾</span></summary>"
+                 "<div class='dtl'>" % _n(R["backlog"]))
         for amn, brows in sorted(cg_am.items(), key=lambda kv: -sum(x["backlog"] for x in kv[1])):
             am_tot = sum(x["backlog"] for x in brows)
             P.append("<details class='bc warn'><summary>")
@@ -573,10 +577,26 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .bar i.na{background:#4b5168}
 
 .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px}
-.st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 6px;text-align:center}
+.st{position:relative;overflow:hidden;text-align:center;padding:11px 6px 10px;border-radius:16px;
+ background:radial-gradient(125% 105% at 0% 0%,rgba(var(--h),.16),var(--card) 72%);
+ border:1px solid rgba(var(--h),.24)}
 .st.cg{cursor:pointer}.st.cg:active{transform:scale(.98)}
-details.cgdrill{border-left-width:4px}details.cgdrill>summary{padding:12px}
-.sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+/* Tồn chưa gán · ô feature bento đỏ */
+.cgbento{--h:242,88,95;position:relative;overflow:hidden;display:block;border-radius:18px;margin:2px 0 12px;
+ background:linear-gradient(110deg,rgba(var(--h),.32),#150e13 78%);border:1px solid rgba(var(--h),.5)}
+.cgbento>summary{display:flex;align-items:center;gap:13px;padding:14px 15px;cursor:pointer;list-style:none}
+.cgbento>summary::-webkit-details-marker{display:none}
+.cgbento:active{transform:scale(.995)}
+.cgbento .mic{width:44px;height:44px;border-radius:13px;flex:none;display:grid;place-items:center;font-size:22px;
+ background:rgba(var(--h),.26);border:1px solid rgba(var(--h),.5)}
+.cgbento .mtx{flex:1;min-width:0}
+.cgbento .mn{font-weight:800;font-size:16px;letter-spacing:-.01em}
+.cgbento .ms{font-size:11px;color:var(--mut);margin-top:2px}
+.cgbento .mbig{font-weight:800;font-size:26px;color:#fff;flex:none;font-variant-numeric:tabular-nums}
+.cgbento .cvar{flex:none;color:rgb(var(--h));font-size:14px;transition:transform .2s}
+.cgbento[open] .cvar{transform:rotate(180deg)}
+.cgbento .dtl{padding:0 12px 12px}
+.sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:rgb(var(--h))}
 .sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
 .sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
 
