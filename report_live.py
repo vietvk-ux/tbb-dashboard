@@ -70,10 +70,32 @@ def _tt_chip(vg, vn):
     return "<span class='tt'>🛍️ %s%% (%s/%s)</span>" % (vp, _n(vg), _n(vn))
 
 
-def _bar(pct, cls):
-    """Thanh tiến độ %GTC trực quan."""
+def _bar(pct, cls, target=None):
+    """Thanh tiến độ %GTC trực quan (target=vạch mục tiêu)."""
     w = pct if pct is not None else 0
-    return "<div class='bar'><i class='%s' style='width:%s%%'></i></div>" % (cls, w)
+    tick = ("<span class='tgt' style='left:%d%%'></span>" % target) if target else ""
+    return "<div class='bar'><i class='%s' style='width:%s%%'></i>%s</div>" % (cls, w, tick)
+
+
+def _khuvuc_ref():
+    """Đọc khuvuc_data (file trong repo, 0 creds) → tham chiếu lịch sử:
+    {yp:%GTC hôm qua, avg7p:%GTC TB tuần, avg7t:đơn TB tuần, ndays}. None nếu thiếu."""
+    import glob
+    try:
+        days = []
+        for f in sorted(glob.glob("khuvuc_data/*.json"))[-7:]:
+            d = json.load(open(f, encoding="utf-8"))
+            if d.get("tot"):
+                days.append(d)
+        if not days:
+            return None
+        y = days[-1]
+        st = sum(x["tot"] for x in days)
+        sg = sum(x["gtc"] for x in days)
+        return {"yp": _pct(y["gtc"], y["tot"]), "avg7p": _pct(sg, st),
+                "avg7t": round(st / len(days)), "ndays": len(days)}
+    except Exception:
+        return None
 
 
 def _bc_drv_details(r):
@@ -325,15 +347,45 @@ def gen_html(rows):
              "<div class='ts'>%s · %s</div></header>"
              % (now.strftime("%H:%M"), now.strftime("%d/%m")))
 
-    # ===== Hero %GTC =====
+    # ===== Hero %GTC (có mốc so sánh) =====
+    ref = _khuvuc_ref()
     P.append("<section class='hero %s'>" % _cls(reg_pct))
     P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG TÂY BẮC BỘ</div>")
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
-    P.append(_bar(reg_pct, _cls(reg_pct)))
+    P.append(_bar(reg_pct, _cls(reg_pct), target=80))
     P.append("<div class='hsub'>%s / %s đơn giao thành công · LTC %s · cần giao %s</div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
+    if ref:
+        gap = ""
+        if reg_pct is not None and reg_pct < ref["yp"]:
+            gap = "<span class='rc'>Còn <b>%d</b> điểm tới mốc hôm qua</span>" % (ref["yp"] - reg_pct)
+        P.append("<div class='href'>"
+                 "<span class='rc'>🎯 Mục tiêu <b>80%%</b></span>"
+                 "<span class='rc'>Hôm qua chốt <b>%d%%</b></span>"
+                 "<span class='rc'>TB %d ngày <b>%d%%</b></span>%s</div>"
+                 % (ref["yp"], ref["ndays"], ref["avg7p"], gap))
     P.append("</section>")
+
+    # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
+    amg = {}
+    for r in rows:
+        a = AM_OF.get(r["name"])
+        if not a:
+            continue
+        x = amg.setdefault(a, [0, 0]); x[0] += r["total"]; x[1] += r["gtc"]
+    low_am = sum(1 for t, g in amg.values() if t and _pct(g, t) < 60)
+    top_bl = max(rows, key=lambda x: x.get("backlog", 0), default=None)
+    diag = []
+    if top_bl and top_bl.get("backlog", 0) > 0:
+        diag.append("🔴 Chưa gán dồn <b>%s</b> (%s đơn)" % (_esc(top_bl["name"]), _n(top_bl["backlog"])))
+    if low_am:
+        diag.append("🟠 <b>%d</b>/%d AM &lt;60%%" % (low_am, len(amg)))
+    if late_cnt:
+        diag.append("🕘 <b>%s</b> NV ra hàng muộn" % _n(late_cnt))
+    if not diag:
+        diag.append("✅ Vùng vận hành ổn định")
+    P.append("<div class='diag'>⚡ %s</div>" % " · ".join(diag))
 
     # ===== Dải chỉ số · Bento (Mẫu 3) · màu theo từng chỉ số =====
     vpct = _pct(R["vngh_gtc"], R["vngh"])
@@ -569,8 +621,18 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
 .hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
 .hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
+.hsub .ld{color:var(--txt);font-weight:700}
+.href{display:flex;flex-wrap:wrap;gap:6px 7px;margin-top:12px}
+.rc{font-size:11px;color:var(--mut);background:rgba(255,255,255,.05);border:1px solid var(--line);
+ border-radius:99px;padding:3px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rc b{color:var(--txt);font-weight:800}
+.diag{background:radial-gradient(120% 100% at 0% 0%,rgba(255,255,255,.05),var(--card) 72%);
+ border:1px solid var(--line);border-radius:14px;padding:10px 13px;margin:0 0 12px;
+ font-size:12.5px;line-height:1.55;color:var(--mut)}
+.diag b{color:var(--txt);font-weight:800}
 
-.bar{height:7px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+.bar{position:relative;height:7px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+.tgt{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.65);border-radius:2px;z-index:2}
 .bar i{display:block;height:100%;border-radius:99px;transition:width .5s}
 .bar i.good{background:linear-gradient(90deg,#25b56b,#2fd07a)}
 .bar i.warn{background:linear-gradient(90deg,#e39a2e,#f7b955)}
