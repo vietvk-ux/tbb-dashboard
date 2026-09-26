@@ -423,7 +423,7 @@ def gen_html(rows):
     if cg_am:
         P.append("<details id='cgd' class='cgbento'><summary>")
         P.append("<div class='mic'>⏳</div>"
-                 "<div class='mtx'><div class='mn'>Tồn chưa gán</div>"
+                 "<div class='mtx'><div class='mn'>Tồn chưa gán giao</div>"
                  "<div class='ms'>AM → Bưu cục → tuyến · bấm mở chi tiết</div></div>"
                  "<div class='mbig'>%s</div><span class='cvar'>▾</span></summary>"
                  "<div class='dtl'>" % _n(R["backlog"]))

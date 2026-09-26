@@ -506,7 +506,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
         am = AM_OF.get(nm) or "(chưa phân AM)"
         am_bc.setdefault(am, []).append((nm, dv, v.get("wards", [])))
     if am_bc:
-        P.append("<div class='sec'>🗺 Tồn chưa gán theo tuyến phường/xã · AM → bưu cục → xã "
+        P.append("<div class='sec'>🗺 Tồn chưa gán giao theo tuyến phường/xã · AM → bưu cục → xã "
                  "(số Giao chưa xếp chuyến, chuyển sang mai)</div>")
         for am, bcs in sorted(am_bc.items(), key=lambda kv: -sum(b[1] for b in kv[1])):
             am_tot = sum(b[1] for b in bcs)
