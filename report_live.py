@@ -391,23 +391,28 @@ def gen_html(rows):
     vpct = _pct(R["vngh_gtc"], R["vngh"])
     _cgo = ("onclick=\"var d=document.getElementById('cgd');if(d){d.open=true;"
             "d.scrollIntoView({behavior:'smooth',block:'start'});}\"")
+    # Kỷ luật ngữ nghĩa: NEU = ô đếm số (tối trung tính) · màu chỉ dành cho ô cảnh báo
+    NEU, AMBER, RED, GREEN = "128,140,174", "247,185,85", "242,88,95", "47,208,122"
+    xp_rgb = RED if late_cnt else NEU                       # xuất phát muộn: đỏ khi >0
+    tt_rgb = {"good": GREEN, "warn": AMBER, "bad": RED}.get(_cls(vpct), NEU) if vpct is not None else NEU
+    #      icon, giá trị, nhãn, màu rgb, extra, neu(ô trung tính)
     kpis = [
-        ("📥", _n(R["total"]),                                      "Đã gán",         "91,140,255",  ""),
-        ("⏳", _n(R["backlog"]),                                    "Chưa gán ▾",     "242,88,95",   "cg"),
-        ("🏃", _n(R["ontrip"]),                                     "Đang chạy",      "55,211,232",  ""),
-        ("🚛", _n(on_road),                                         "Còn phải giao",  "255,138,61",  ""),
-        ("📊", (("%d%%" % run_pct) if run_pct is not None else "—"),"Tiến độ chạy",   "47,208,122",  ""),
-        ("✅", _n(R["gtc"]),                                        "GTC nay",        "47,208,122",  ""),
-        ("🕘", _n(late_cnt),                                        "XP muộn &gt;9h30","247,185,85",  ""),
-        ("🛍️", _n(R["vngh"]),                                      "TikTok gán",     "232,121,200", ""),
-        ("🛍️", _n(R["vngh_gtc"]),                                  "TikTok GTC",     "47,208,122",  ""),
-        ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"),     "%GTC TikTok",    "232,121,200", ""),
-        ("💰", ("%str" % _codm(R["cod_gtb"])),                      "COD GTB",        "247,185,85",  ""),
-        ("🛒", _n(R["ltc"]),                                        "LTC",            "169,112,255", ""),
+        ("📥", _n(R["total"]),                                       "Đã gán",          NEU,     "",   True),
+        ("⏳", _n(R["backlog"]),                                     "Chưa gán ▾",      AMBER,   "cg", False),
+        ("🏃", _n(R["ontrip"]),                                      "Đang chạy",       NEU,     "",   True),
+        ("🚛", _n(on_road),                                          "Còn phải giao",   NEU,     "",   True),
+        ("📊", (("%d%%" % run_pct) if run_pct is not None else "—"), "Tiến độ chạy",    NEU,     "",   True),
+        ("✅", _n(R["gtc"]),                                         "GTC nay",         NEU,     "",   True),
+        ("🕘", _n(late_cnt),                                         "XP muộn &gt;9h30",xp_rgb,  "",   not late_cnt),
+        ("🛍️", _n(R["vngh"]),                                       "TikTok gán",      NEU,     "",   True),
+        ("🛍️", _n(R["vngh_gtc"]),                                   "TikTok GTC",      NEU,     "",   True),
+        ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"),      "%GTC TikTok",     tt_rgb,  "",   vpct is None),
+        ("💰", ("%str" % _codm(R["cod_gtb"])),                       "COD GTB",         AMBER,   "",   False),
+        ("🛒", _n(R["ltc"]),                                         "LTC",             NEU,     "",   True),
     ]
     P.append("<section class='strip'>")
-    for ic, val, lab, rgb, extra in kpis:
-        cls = "st cg" if extra == "cg" else "st"
+    for ic, val, lab, rgb, extra, neu in kpis:
+        cls = "st" + (" cg" if extra == "cg" else "") + (" neu" if neu else "")
         oc = (" " + _cgo) if extra == "cg" else ""
         P.append("<div class='%s' style='--h:%s'%s><div class='sv'>%s</div>"
                  "<div class='sl'>%s %s</div></div>" % (cls, rgb, oc, val, ic, lab))
@@ -644,6 +649,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
  background:radial-gradient(125% 105% at 0% 0%,rgba(var(--h),.16),var(--card) 72%);
  border:1px solid rgba(var(--h),.24)}
 .st.cg{cursor:pointer}.st.cg:active{transform:scale(.98)}
+.st.neu{background:radial-gradient(125% 105% at 0% 0%,rgba(var(--h),.08),var(--card) 78%);border-color:rgba(var(--h),.15)}
+.st.neu .sv{color:#e9eefc}
 /* Tồn chưa gán · ô feature bento đỏ */
 .cgbento{--h:242,88,95;position:relative;overflow:hidden;display:block;border-radius:18px;margin:2px 0 12px;
  background:linear-gradient(110deg,rgba(var(--h),.32),#150e13 78%);border:1px solid rgba(var(--h),.5)}
