@@ -33,11 +33,13 @@ def _esc(s):
 
 
 def _codm(v):
-    """COD GTB (đồng) → chuỗi triệu, vd 1.234.567 → '1,2'. <100k hiện '0'."""
+    """COD GTB (đồng) → chuỗi KÈM đơn vị: ≥1 tỷ '1,17 tỷ' · ≥100k '928,4tr' · <100k '0'."""
     v = v or 0
     if v < 1e5:
         return "0"
-    return ("%.1f" % (v / 1e6)).replace(".", ",")
+    if v >= 1e9:
+        return ("%.2f tỷ" % (v / 1e9)).replace(".", ",")
+    return ("%.1ftr" % (v / 1e6)).replace(".", ",")
 
 
 def _prov(name):
@@ -106,7 +108,7 @@ def _bc_drv_details(r):
     P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
              "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
     P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
-             "<span class='gtb'>❌COD %str</span><span class='ltc'>LTC %s</span>%s</div>"
+             "<span class='gtb'>❌COD %s</span><span class='ltc'>LTC %s</span>%s</div>"
              % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]), _codm(r.get("cod_gtb", 0)),
                 _n(r.get("ltc", 0)), _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0))))
     P.append("</summary><div class='dtl'>")
@@ -117,7 +119,7 @@ def _bc_drv_details(r):
         for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
             pc2 = _pct(d["gtc"], d["total"])
             cgtb = d.get("cod_gtb", 0)
-            gtb_cell = ("<b class='gtb'>%str</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
+            gtb_cell = ("<b class='gtb'>%s</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
             ltc = d.get("ltc", 0)
             ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
             P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
@@ -396,13 +398,14 @@ def gen_html(rows, giao_120h=None):
         if not a:
             continue
         x = amg.setdefault(a, [0, 0]); x[0] += r["total"]; x[1] += r["gtc"]
-    low_am = sum(1 for t, g in amg.values() if t and _pct(g, t) < 60)
+    am_pcts = [(a, _pct(g, t)) for a, (t, g) in amg.items() if t]  # (tên AM, %GTC)
+    worst_am = min(am_pcts, key=lambda x: x[1]) if am_pcts else None
     top_bl = max(rows, key=lambda x: x.get("backlog", 0), default=None)
     diag = []
     if top_bl and top_bl.get("backlog", 0) > 0:
         diag.append("🔴 Chưa gán giao cao nhất <b>%s</b> (%s đơn)" % (_esc(top_bl["name"]), _n(top_bl["backlog"])))
-    if low_am:
-        diag.append("🟠 <b>%d</b>/%d AM &lt;60%%" % (low_am, len(amg)))
+    if worst_am:
+        diag.append("🟠 AM yếu nhất <b>%s</b> (%d%%)" % (_esc(worst_am[0]), round(worst_am[1])))
     if late_cnt:
         diag.append("🕘 <b>%s</b> NV xuất phát muộn" % _n(late_cnt))
     if not diag:
@@ -429,7 +432,7 @@ def gen_html(rows, giao_120h=None):
         ("🛍️", _n(R["vngh"]),                                       "TikTok gán",      NEU,     "",   True),
         ("🛍️", _n(R["vngh_gtc"]),                                   "TikTok GTC",      NEU,     "",   True),
         ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"),      "%GTC TikTok",     tt_rgb,  "",   vpct is None),
-        ("💰", ("%str" % _codm(R["cod_gtb"])),                       "COD GTB",         AMBER,   "",   False),
+        ("💰", _codm(R["cod_gtb"]),                       "COD GTB",         AMBER,   "",   False),
         ("🛒", _n(R["ltc"]),                                         "LTC",             NEU,     "",   True),
     ]
     P.append("<section class='strip'>")
@@ -524,7 +527,7 @@ def gen_html(rows, giao_120h=None):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='gtb'>❌COD %str</span>·<span class='ltc'>LTC %s</span>%s</div>"
+        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='gtb'>❌COD %s</span>·<span class='ltc'>LTC %s</span>%s</div>"
                  % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _codm(v.get("cod_gtb", 0)), _n(v["ltc"]),
                     ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else ""))
         P.append("</summary>")
@@ -546,7 +549,7 @@ def gen_html(rows, giao_120h=None):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='gtb'>❌COD %str</span>·<span class='ltc'>LTC %s</span>%s</div>"
+        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='gtb'>❌COD %s</span>·<span class='ltc'>LTC %s</span>%s</div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _codm(v.get("cod_gtb", 0)), _n(v["ltc"]),
                     ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else ""))
@@ -572,7 +575,7 @@ def gen_html(rows, giao_120h=None):
                  % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
-                 "<span class='w'>⏳ %s</span><span>✅ %s</span><span class='gtb'>❌COD %str</span>"
+                 "<span class='w'>⏳ %s</span><span>✅ %s</span><span class='gtb'>❌COD %s</span>"
                  "<span class='ltc'>LTC %s</span>%s</div>"
                  % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
                     _codm(r.get("cod_gtb", 0)), _n(r.get("ltc", 0)),
@@ -585,7 +588,7 @@ def gen_html(rows, giao_120h=None):
             for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
                 pc2 = _pct(d["gtc"], d["total"])
                 cgtb = d.get("cod_gtb", 0)  # COD kẹt trên đơn GTB (đã thao tác nhưng giao hỏng)
-                gtb_cell = ("<b class='gtb'>%str</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
+                gtb_cell = ("<b class='gtb'>%s</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
                 ltc = d.get("ltc", 0)
                 ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
                 P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
