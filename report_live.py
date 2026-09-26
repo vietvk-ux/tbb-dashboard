@@ -358,8 +358,8 @@ def gen_html(rows):
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
     if ref:
         gap = ""
-        if reg_pct is not None and reg_pct < ref["yp"]:
-            gap = "<span class='rc'>Còn <b>%d</b> điểm tới mốc hôm qua</span>" % (ref["yp"] - reg_pct)
+        if reg_pct is not None and reg_pct < 70:
+            gap = "<span class='rc'>Còn <b>%d</b> điểm tới mục tiêu 70%%</span>" % (70 - reg_pct)
         P.append("<div class='href'>"
                  "<span class='rc'>🎯 Mục tiêu <b>70%%</b></span>"
                  "<span class='rc'>Hôm qua chốt <b>%d%%</b></span>"
