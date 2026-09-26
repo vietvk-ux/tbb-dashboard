@@ -132,6 +132,26 @@ def _bc_drv_details(r):
     return "".join(P)
 
 
+async def fetch_giao_120h(session, hub_ids, token):
+    """Tổng đơn GIAO tồn quá 120h toàn vùng (đơn đỏ SLA, khớp trang Tồn đọng).
+    1 CALL: get-general-info truyền HẾT hub_ids (view WARD, order_type=ALL) →
+    trả bản gộp cả vùng; cộng bucket 120_192 + 192 của DELIVER. Lỗi → None."""
+    try:
+        d = await _post(session, "/core/oss/v1/report/get-general-info",
+                        {"hub_ids": [str(h) for h in hub_ids], "view_mode": "WARD",
+                         "order_type": "ALL"}, hub_ids[0] if hub_ids else "1", token)
+        tot = 0
+        for e in (d.get("data") or []):
+            for gi in (e.get("general_infos") or []):
+                if gi.get("order_type") == "DELIVER":
+                    tot += sum(i.get("total_order") or 0
+                               for i in (gi.get("order_inventories") or [])
+                               if i.get("duration") in ("120_192", "192"))
+        return tot
+    except Exception:
+        return None
+
+
 async def fetch_live(token):
     today = datetime.now(VN).date()
     ymd = today.year * 10000 + today.month * 100 + today.day
@@ -295,10 +315,12 @@ async def fetch_live(token):
                         "backlog_wards": [],
                         "fin": 0, "gtc": 0, "att": 0, "total": 0, "drivers": []}
 
-        return await asyncio.gather(*[one(h) for h in hubs])
+        rows = await asyncio.gather(*[one(h) for h in hubs])
+        giao_120h = await fetch_giao_120h(session, [str(h["locationCode"]) for h in hubs], token)
+        return rows, giao_120h
 
 
-def gen_html(rows):
+def gen_html(rows, giao_120h=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0}
@@ -401,7 +423,7 @@ def gen_html(rows):
         ("⏳", _n(R["backlog"]),                                     "Chưa gán ▾",      AMBER,   "cg", False),
         ("🏃", _n(R["ontrip"]),                                      "Đang chạy",       NEU,     "",   True),
         ("🚛", _n(on_road),                                          "Còn phải giao",   NEU,     "",   True),
-        ("📊", (("%d%%" % run_pct) if run_pct is not None else "—"), "Tiến độ chạy",    NEU,     "",   True),
+        ("🔴", (_n(giao_120h) if giao_120h is not None else "—"),    "Giao &gt;120h",   RED,     "",   False),
         ("✅", _n(R["gtc"]),                                         "GTC nay",         NEU,     "",   True),
         ("🕘", _n(late_cnt),                                         "XP muộn &gt;9h30",xp_rgb,  "",   not late_cnt),
         ("🛍️", _n(R["vngh"]),                                       "TikTok gán",      NEU,     "",   True),
@@ -579,7 +601,7 @@ def gen_html(rows):
     P.append("<div class='foot'><b>📖 Giải thích chỉ số</b><br>"
              "📥 <b>Đã gán</b> = đơn đã xếp vào chuyến hôm nay · ⏳ <b>Chưa gán</b> = đơn tồn ở kho chưa xếp chuyến<br>"
              "🏃 <b>Đang chạy</b> = số NV còn chuyến chưa kết thúc · 🚛 <b>Còn phải giao</b> = đơn của chuyến đang chạy CHƯA giao xong (đang trên đường)<br>"
-             "📊 <b>Tiến độ chạy</b> = đã giao / tổng đơn của chuyến đang chạy (%) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
+             "🔴 <b>Giao &gt;120h</b> = đơn Giao tồn quá 120 giờ toàn vùng (đơn đỏ SLA, khớp trang Tồn đọng) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
              "🕘 <b>XP muộn &gt;9h30</b> = số NV xuất phát sau 9h30 (kỷ luật ra hàng) · 🛍️ <b>TikTok</b> = đơn mã VNGH<br>"
              "💰 <b>COD GTB</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công<br>"
              "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
@@ -808,7 +830,7 @@ def main():
     if not token:
         raise SystemExit("Thiếu NHANH_TOKEN")
     try:
-        rows = asyncio.run(fetch_live(token))
+        rows, giao_120h = asyncio.run(fetch_live(token))
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
@@ -817,7 +839,7 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    h = gen_html(rows)
+    h = gen_html(rows, giao_120h)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
