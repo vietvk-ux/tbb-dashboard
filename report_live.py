@@ -382,7 +382,7 @@ def gen_html(rows):
     if low_am:
         diag.append("🟠 <b>%d</b>/%d AM &lt;60%%" % (low_am, len(amg)))
     if late_cnt:
-        diag.append("🕘 <b>%s</b> NV ra hàng muộn" % _n(late_cnt))
+        diag.append("🕘 <b>%s</b> NV xuất phát muộn" % _n(late_cnt))
     if not diag:
         diag.append("✅ Vùng vận hành ổn định")
     P.append("<div class='diag'>⚡ %s</div>" % " · ".join(diag))
