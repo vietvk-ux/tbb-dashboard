@@ -397,24 +397,34 @@ def gen_html(rows):
             P.append("</div></details>")
         P.append("</div></details>")
 
-    P.append("<a class='eod tq' href='tongquan.html'><span>📋 Báo cáo tổng quan</span>"
-             "<span class='arw'>số chính cần theo dõi →</span></a>")
-    P.append("<a class='eod' href='eod.html'><span>📊 Báo cáo %GTC cuối ngày</span>"
-             "<span class='arw'>chi tiết nhân viên →</span></a>")
-    P.append("<a class='eod' href='backlog.html'><span>📦 Tồn đọng Lấy · Giao · Trả</span>"
-             "<span class='arw'>theo khung giờ →</span></a>")
-    P.append("<a class='eod' href='trend.html'><span>📈 Xu hướng theo ngày</span>"
-             "<span class='arw'>biểu đồ %GTC →</span></a>")
-    P.append("<a class='eod' href='nhanvien.html'><span>⚡ Năng suất Nhân viên</span>"
-             "<span class='arw'>xếp hạng GTC/ngày →</span></a>")
-    P.append("<a class='eod' href='khuvuc.html'><span>🗺 Bản đồ khu vực</span>"
-             "<span class='arw'>nhiệt · %GTC theo xã →</span></a>")
-    P.append("<a class='eod' href='chuyendi.html'><span>🚚 Hiệu suất chuyến đi</span>"
-             "<span class='arw'>đơn/giờ · giờ ra hàng →</span></a>")
-    P.append("<a class='eod' href='xephang.html'><span>🏆 Xếp hạng tổng hợp</span>"
-             "<span class='arw'>AM · bưu cục · NV →</span></a>")
-    P.append("<a class='eod' href='khochuyentiep.html'><span>📦 Kho Chuyển Tiếp</span>"
-             "<span class='arw'>tồn luân chuyển →</span></a>")
+    # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
+    #        href, icon, tên, phụ đề, màu RGB, [7 cột mini-nhịp]
+    _menu = [
+        ("eod.html", "📊", "%GTC cuối ngày", "chi tiết nhân viên", "47,208,122", [45, 60, 52, 74, 66, 88, 80]),
+        ("backlog.html", "📦", "Tồn Lấy·Giao·Trả", "theo khung giờ", "247,185,85", [70, 55, 80, 48, 66, 40, 58]),
+        ("trend.html", "📈", "Xu hướng theo ngày", "biểu đồ %GTC", "55,211,232", [30, 42, 50, 62, 58, 76, 90]),
+        ("nhanvien.html", "⚡", "Năng suất Nhân viên", "xếp hạng GTC/ngày", "169,112,255", [60, 72, 55, 84, 66, 90, 78]),
+        ("khuvuc.html", "🗺", "Bản đồ khu vực", "nhiệt · %GTC theo xã", "34,195,166", [50, 66, 44, 72, 58, 80, 62]),
+        ("chuyendi.html", "🚚", "Hiệu suất chuyến đi", "đơn/giờ · giờ ra hàng", "255,138,61", [40, 58, 70, 52, 78, 64, 86]),
+        ("xephang.html", "🏆", "Xếp hạng tổng hợp", "AM · bưu cục · NV", "255,213,74", [55, 48, 70, 62, 84, 74, 92]),
+        ("khochuyentiep.html", "📦", "Kho Chuyển Tiếp", "tồn luân chuyển", "255,110,169", [48, 62, 54, 70, 60, 78, 66]),
+    ]
+    P.append("<div class='menu'>")
+    # Ô nổi bật (span 2): Báo cáo tổng quan + %GTC vùng lớn
+    P.append("<a class='mtile feat' href='tongquan.html' style='--h:91,140,255'>"
+             "<div class='mic'>📋</div>"
+             "<div class='mtx'><div class='mn'>Báo cáo tổng quan</div>"
+             "<div class='ms'>số chính cần theo dõi</div></div>"
+             "<div class='mbig'>%s<span>%%</span></div></a>"
+             % (reg_pct if reg_pct is not None else "—"))
+    for href, ic, nm, sub, rgb, bars in _menu:
+        spark = "".join("<i style='height:%d%%'></i>" % b for b in bars)
+        P.append("<a class='mtile' href='%s' style='--h:%s'>"
+                 "<div class='mic'>%s</div>"
+                 "<div class='mtx'><div class='mn'>%s</div><div class='ms'>%s</div></div>"
+                 "<div class='mspark'>%s</div></a>"
+                 % (href, rgb, ic, nm, sub, spark))
+    P.append("</div>")
 
     # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
     am_rows = {}
@@ -577,6 +587,27 @@ details.cgdrill{border-left-width:4px}details.cgdrill>summary{padding:12px}
 .eod:active{transform:scale(.99)}
 .eod.tq{background:linear-gradient(135deg,#1e3a8a,#2563eb);border-color:#3b82f6;font-size:15px}
 .eod.tq .arw{color:#c7dbff}
+/* ===== MENU BÁO CÁO · Bento (Mẫu 3) ===== */
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 10px}
+.mtile{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;
+ min-height:100px;padding:13px;border-radius:18px;text-decoration:none;color:var(--txt);
+ background:radial-gradient(125% 105% at 0% 0%,rgba(var(--h),.20),#0e1424 68%);
+ border:1px solid rgba(var(--h),.26);transition:transform .16s,border-color .16s}
+.mtile:active{transform:scale(.98)}
+.mtile .mic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:17px;
+ background:rgba(var(--h),.24);border:1px solid rgba(var(--h),.4)}
+.mtile .mn{font-weight:800;font-size:13.5px;line-height:1.18;letter-spacing:-.01em}
+.mtile .ms{font-size:10.5px;color:var(--mut);margin-top:3px;line-height:1.25}
+.mtile .mspark{display:flex;align-items:flex-end;gap:3px;height:16px;margin-top:9px}
+.mtile .mspark i{flex:1;background:rgba(var(--h),.62);border-radius:2px 2px 0 0;min-height:2px}
+.mtile.feat{grid-column:1 / -1;flex-direction:row;align-items:center;gap:13px;min-height:auto;
+ background:linear-gradient(110deg,rgba(var(--h),.30),#0e1424 78%);border-color:rgba(var(--h),.46)}
+.mtile.feat .mic{width:44px;height:44px;font-size:22px;flex:none}
+.mtile.feat .mtx{flex:1;min-width:0}
+.mtile.feat .mn{font-size:16px}
+.mtile.feat .mbig{font-family:inherit;font-weight:800;font-size:30px;line-height:1;color:#fff;flex:none;
+ font-variant-numeric:tabular-nums}
+.mtile.feat .mbig span{font-size:15px;color:rgba(var(--h),1);margin-left:2px}
 
 .sec{font-size:12px;font-weight:700;letter-spacing:.05em;color:#b9c0da;text-transform:uppercase;margin:20px 4px 10px}
 
