@@ -242,6 +242,43 @@ def gen_html(rows):
         P.append("<div class='none'>Không có chuyến đang chạy.</div>")
     P.append("</section>")
 
+    # 🕘 NV xuất phát muộn — gộp AM → bưu cục → nhân viên
+    late_nv = [m for m in timed if m["late"]]
+    P.append("<div class='sec' style='color:var(--bad)'>🕘 NV xuất phát muộn (sau 9h30) · AM → bưu cục → nhân viên</div>")
+    P.append("<section class='card' style='padding:2px 10px'>")
+    if late_nv:
+        P.append("<div class='note'>%d người xuất phát chuyến đầu tiên SAU 9h30 · bấm AM để xem bưu cục → nhân viên · muộn nhất lên đầu.</div>"
+                 % len(late_nv))
+        amg = {}
+        for m in late_nv:
+            amn = AM_OF.get(m["bc"]) or "(chưa gán AM)"
+            a = amg.setdefault(amn, {"n": 0, "bcs": {}})
+            a["n"] += 1
+            a["bcs"].setdefault(m["bc"], []).append(m)
+        for amn, a in sorted(amg.items(), key=lambda kv: -kv[1]["n"]):
+            P.append("<details class='bc'><summary>"
+                     "<span class='amn'>%s</span>"
+                     "<span class='ammet'>%d NV muộn · %d bưu cục ▾</span>"
+                     "</summary><div class='dtl'>"
+                     % (_esc(amn), a["n"], len(a["bcs"])))
+            for bc, nvs in sorted(a["bcs"].items(), key=lambda kv: -len(kv[1])):
+                P.append("<details class='bc sub'><summary>"
+                         "<span class='amn' style='font-size:13px'>%s</span>"
+                         "<span class='ammet'>%d NV muộn</span>"
+                         "</summary><div class='dtl'>"
+                         % (_esc(bc), len(nvs)))
+                P.append("<table class='drv'><thead><tr><th>Nhân viên</th>"
+                         "<th>Giờ xuất phát</th></tr></thead><tbody>")
+                for m in sorted(nvs, key=lambda x: -x["start_h"]):
+                    P.append("<tr><td class='nv'>%s</td>"
+                             "<td><span class='pill sm bad'>%s</span></td></tr>"
+                             % (_esc(m["name"]), m["start"]))
+                P.append("</tbody></table></div></details>")
+            P.append("</div></details>")
+    else:
+        P.append("<div class='none'>Không có NV xuất phát muộn.</div>")
+    P.append("</section>")
+
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
     P.append("<div class='foot'>Đơn/giờ = đơn giao thành công ÷ (giờ đóng − giờ xuất phát) · "
