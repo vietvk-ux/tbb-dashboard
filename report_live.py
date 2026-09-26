@@ -401,11 +401,16 @@ def gen_html(rows, giao_120h=None):
     am_pcts = [(a, _pct(g, t)) for a, (t, g) in amg.items() if t]  # (tên AM, %GTC)
     worst_am = min(am_pcts, key=lambda x: x[1]) if am_pcts else None
     top_bl = max(rows, key=lambda x: x.get("backlog", 0), default=None)
+    # Bưu cục %GTC <50% (chỉ tính BC ≥20 đơn đã đóng chuyến, tránh nhiễu BC lẻ)
+    bc_low = sum(1 for r in rows if r["total"] >= 20
+                 and _pct(r["gtc"], r["total"]) is not None and _pct(r["gtc"], r["total"]) < 50)
     diag = []
     if top_bl and top_bl.get("backlog", 0) > 0:
         diag.append("🔴 Chưa gán giao cao nhất <b>%s</b> (%s đơn)" % (_esc(top_bl["name"]), _n(top_bl["backlog"])))
     if worst_am:
         diag.append("🟠 AM yếu nhất <b>%s</b> (%d%%)" % (_esc(worst_am[0]), round(worst_am[1])))
+    if bc_low:
+        diag.append("🏤 <b>%d</b> bưu cục %%GTC &lt;50%%" % bc_low)
     if late_cnt:
         diag.append("🕘 <b>%s</b> NV xuất phát muộn" % _n(late_cnt))
     if not diag:
