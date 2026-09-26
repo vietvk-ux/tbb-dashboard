@@ -353,7 +353,7 @@ def gen_html(rows):
     P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG TÂY BẮC BỘ</div>")
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
-    P.append(_bar(reg_pct, _cls(reg_pct), target=80))
+    P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     P.append("<div class='hsub'>%s / %s đơn giao thành công · LTC %s · cần giao %s</div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
     if ref:
@@ -361,7 +361,7 @@ def gen_html(rows):
         if reg_pct is not None and reg_pct < ref["yp"]:
             gap = "<span class='rc'>Còn <b>%d</b> điểm tới mốc hôm qua</span>" % (ref["yp"] - reg_pct)
         P.append("<div class='href'>"
-                 "<span class='rc'>🎯 Mục tiêu <b>80%%</b></span>"
+                 "<span class='rc'>🎯 Mục tiêu <b>70%%</b></span>"
                  "<span class='rc'>Hôm qua chốt <b>%d%%</b></span>"
                  "<span class='rc'>TB %d ngày <b>%d%%</b></span>%s</div>"
                  % (ref["yp"], ref["ndays"], ref["avg7p"], gap))
