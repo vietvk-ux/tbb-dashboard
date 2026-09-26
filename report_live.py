@@ -51,7 +51,7 @@ def _pct(gtc, att):
 def _cls(p):
     if p is None:
         return "na"
-    return "bad" if p < 50 else ("warn" if p < 70 else "good")
+    return "bad" if p < 60 else ("warn" if p < 70 else "good")
 
 
 def _tt_cell(vg, vn):
