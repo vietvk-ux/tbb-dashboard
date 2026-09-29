@@ -862,23 +862,30 @@ def _fetch_bc_days(d, n=7):
     if not (url and key):
         return []
     since = (d - timedelta(days=n)).isoformat()
-    try:
-        rows, off = [], 0
-        while True:
-            r = requests.get(url + "/rest/v1/bao_cao_buu_cuc",
-                             params=[("select", "ngay,buu_cuc,don_giao,gtc,gtb,chua_gan,ltc,vngh_don,vngh_gtc"),
-                                     ("ngay", "gte." + since), ("ngay", "lt." + d.isoformat()),
-                                     ("order", "id.asc"), ("limit", "1000"), ("offset", str(off))],
-                             headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
-            if not r.ok:
-                break
-            c = r.json(); rows += c
-            if len(c) < 1000:
-                break
-            off += 1000
-        return rows
-    except Exception:
-        return []
+    # Thử select ĐỦ (kèm cột TikTok mới); nếu migration CHƯA chạy (cột chưa có) →
+    # PostgREST lỗi → lùi về cột cơ bản để so sánh AM vẫn chạy (TikTok hiện "—").
+    for sel in ("ngay,buu_cuc,don_giao,gtc,gtb,chua_gan,ltc,vngh_don,vngh_gtc",
+                "ngay,buu_cuc,don_giao,gtc,gtb,chua_gan,ltc"):
+        try:
+            rows, off, okall = [], 0, True
+            while True:
+                r = requests.get(url + "/rest/v1/bao_cao_buu_cuc",
+                                 params=[("select", sel),
+                                         ("ngay", "gte." + since), ("ngay", "lt." + d.isoformat()),
+                                         ("order", "id.asc"), ("limit", "1000"), ("offset", str(off))],
+                                 headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
+                if not r.ok:
+                    okall = False
+                    break
+                c = r.json(); rows += c
+                if len(c) < 1000:
+                    break
+                off += 1000
+            if okall:
+                return rows
+        except Exception:
+            continue
+    return []
 
 
 def _fetch_nv_cod_days(d, n=7):
