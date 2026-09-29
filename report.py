@@ -270,7 +270,8 @@ def aggregate(payload):
                              "succ": it["succ"], "cod": it["cod"], "vngh": code.startswith("VNGH"),
                              "fail": it.get("fail", "")}
 
-    # 1b) GỘP đơn LẤY (PICK) → LTC (lấy thành công) theo (bưu cục, mã đơn)
+    # 1b) GỘP đơn LẤY (PICK) theo (bưu cục, mã đơn) → LTC (lấy thành công) + LTB (lấy thất bại)
+    #     Gộp mã đơn: succ = lấy được ở BẤT KỲ chuyến; att = đã thao tác ở bất kỳ chuyến.
     bestp = {}
     for t in ok:
         for it in t.get("items", []):
@@ -278,16 +279,26 @@ def aggregate(payload):
                 continue
             key = (t["bc"], it["code"])
             cur = bestp.get(key)
-            if cur is None or (it["succ"] and not cur[3]):
-                bestp[key] = (t["bc"], pcode_of(t["bc"]),
-                              f"{t.get('driver_id','')}|{t['bc']}", it["succ"])
+            if cur is None:
+                bestp[key] = [t["bc"], pcode_of(t["bc"]),
+                              f"{t.get('driver_id','')}|{t['bc']}", it["succ"], it["att"]]
+            else:
+                if it["succ"]:
+                    cur[3] = True
+                if it["att"]:
+                    cur[4] = True
     ltc_bc, ltc_prov, ltc_drv = {}, {}, {}
-    for bc, pc, dk, succ in bestp.values():
+    ltb_bc, ltb_prov = {}, {}
+    for bc, pc, dk, succ, att in bestp.values():
         if succ:
             ltc_bc[bc] = ltc_bc.get(bc, 0) + 1
             ltc_prov[pc] = ltc_prov.get(pc, 0) + 1
             ltc_drv[dk] = ltc_drv.get(dk, 0) + 1
+        elif att:                       # đã thao tác nhưng KHÔNG lấy được = lấy thất bại
+            ltb_bc[bc] = ltb_bc.get(bc, 0) + 1
+            ltb_prov[pc] = ltb_prov.get(pc, 0) + 1
     grand_ltc = sum(ltc_bc.values())
+    grand_ltb = sum(ltb_bc.values())
 
     # 2) Đếm số chuyến (bc/prov/driver) — chuyến có ≥1 đơn deliver
     prov_trips, bc_trips, drv_trips = {}, {}, {}
@@ -342,10 +353,10 @@ def aggregate(payload):
     def gtc(v): return round(v["success"]/v["total"]*100, 1) if v["total"] else None
     prov_list = sorted([{"prov": v["prov"], "bc_count": len(v["bcs"]), "trips": prov_trips.get(v["prov"], 0),
                           "total": v["total"], "success": v["success"], "gtc": gtc(v),
-                          "ltc": ltc_prov.get(v["prov"], 0)}
+                          "ltc": ltc_prov.get(v["prov"], 0), "ltb": ltb_prov.get(v["prov"], 0)}
                          for v in provs.values()], key=lambda x: -x["total"])
     bc_list = sorted([{**v, "trips": bc_trips.get(v["bc"], 0), "gtc": gtc(v),
-                       "ltc": ltc_bc.get(v["bc"], 0)} for v in bcs.values()],
+                       "ltc": ltc_bc.get(v["bc"], 0), "ltb": ltb_bc.get(v["bc"], 0)} for v in bcs.values()],
                      key=lambda x: -x["total"])
     def _drv_time(v):
         dkey = f"{v['driver_id']}|{v['bc']}"
@@ -389,7 +400,7 @@ def aggregate(payload):
         fail_notes[rec["fail"][:46]] += 1
     return {"date": payload["date"], "hub_count": payload["hub_count"], "errors": err_count,
             "grand": {"trips": grand_trips, "total": grand_total, "success": grand_success, "gtc": grand_gtc,
-                      "ltc": grand_ltc,
+                      "ltc": grand_ltc, "ltb": grand_ltb,
                       "vngh_total": vngh_total, "vngh_success": vngh_success, "vngh_gtc": vngh_gtc},
             "fail": {"groups": fail_g, "top": fail_notes.most_common(8), "tong": fail_tot},
             "provinces": prov_list, "bcs": bc_list, "drivers": driver_list}

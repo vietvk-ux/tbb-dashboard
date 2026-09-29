@@ -93,7 +93,7 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         "ngay": date_iso, "so_buu_cuc": agg["hub_count"], "so_chuyen": g["trips"],
         "don_giao": g["total"], "gtc": g["success"], "gtb": g["total"] - g["success"],
         "pct_gtc": g["gtc"], "cod_gtb": round(total_cod), "chua_gan": total_backlog,
-        "ltc": g.get("ltc", 0),
+        "ltc": g.get("ltc", 0), "ltb": g.get("ltb", 0),
         "vngh_don": g.get("vngh_total"), "vngh_gtc": g.get("vngh_gtc"),
         "gio_xuat_phat_tb": gio_xp_tb, "so_nv_muon": so_nv_muon,
     }], "ngay")
@@ -103,7 +103,7 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         "ngay": date_iso, "buu_cuc": b["bc"], "tinh": b["prov"], "so_chuyen": b.get("trips", 0),
         "don_giao": b["total"], "gtc": b["success"], "gtb": b["total"] - b["success"],
         "pct_gtc": b["gtc"], "chua_gan": backlog.get(b["bc"], {}).get("deliver", 0),
-        "ltc": b.get("ltc", 0),
+        "ltc": b.get("ltc", 0), "ltb": b.get("ltb", 0),
         # COD & TikTok theo bưu cục (để so sánh từng AM; cột thêm 2026-09-28,
         # _upsert tự bỏ cột nếu migration chưa chạy nên không vỡ sync)
         "cod_gtb": round(b.get("gtb_cod", 0)),

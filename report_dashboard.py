@@ -419,6 +419,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
             ("❌ GTB", total_gtb, y.get("gtb"), _avg("gtb"), "n", False),
             ("⏳ Chưa gán", total_backlog, y.get("chua_gan"), _avg("chua_gan"), "n", False),
             ("🛒 LTC", g.get("ltc", 0), y.get("ltc"), _avg("ltc"), "n", True),
+            ("🚫 LTB (lấy hỏng)", g.get("ltb", 0), y.get("ltb"), _avg("ltb"), "n", False),
             ("💰 COD GTB", total_cod, y.get("cod_gtb"), _avg("cod_gtb"), "money", False),
             ("🛍️ TikTok gán", g.get("vngh_total", 0), y.get("vngh_don"), _avg("vngh_don"), "n", None),
             ("🛍️ %GTC TikTok", g.get("vngh_gtc"), y.get("vngh_gtc"), _avg("vngh_gtc", 1), "pct", True),
@@ -440,10 +441,10 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                 a = AM_OF.get(b["bc"])
                 if not a:
                     continue
-                x = amn_now.setdefault(a, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0,
+                x = amn_now.setdefault(a, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0, "ltb": 0,
                                            "cod": 0, "vd": 0, "vs": 0})
                 x["don"] += b["total"]; x["gtc"] += b["success"]
-                x["gtb"] += b["total"] - b["success"]; x["ltc"] += b.get("ltc", 0)
+                x["gtb"] += b["total"] - b["success"]; x["ltc"] += b.get("ltc", 0); x["ltb"] += b.get("ltb", 0)
                 x["cg"] += backlog.get(b["bc"], {}).get("deliver", 0)
                 x["cod"] += b.get("gtb_cod", 0)
                 x["vd"] += b.get("vngh_total", 0); x["vs"] += b.get("vngh_success", 0)
@@ -455,11 +456,11 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                 if not a:
                     continue
                 k = (a, b.get("ngay"))
-                x = amday.setdefault(k, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0,
+                x = amday.setdefault(k, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0, "ltb": 0,
                                          "cod": 0, "vd": 0, "vs": 0})
                 x["don"] += b.get("don_giao") or 0; x["gtc"] += b.get("gtc") or 0
                 x["gtb"] += b.get("gtb") or 0; x["cg"] += b.get("chua_gan") or 0
-                x["ltc"] += b.get("ltc") or 0
+                x["ltc"] += b.get("ltc") or 0; x["ltb"] += b.get("ltb") or 0
                 vd = b.get("vngh_don") or 0; vgpct = b.get("vngh_gtc")
                 x["vd"] += vd
                 if vgpct is not None:
@@ -476,13 +477,13 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
             for a, lst in am_days.items():
                 nd = len(lst)
                 t = {m: round(sum(v[m] for v in lst) / nd)
-                     for m in ("don", "gtc", "gtb", "cg", "ltc", "cod", "vd", "vs")}
+                     for m in ("don", "gtc", "gtb", "cg", "ltc", "ltb", "cod", "vd", "vs")}
                 pcs = [v["gtc"] / v["don"] * 100 for v in lst if v["don"]]
                 t["pc"] = round(sum(pcs) / len(pcs), 1) if pcs else None
                 svd = sum(v["vd"] for v in lst); svs = sum(v["vs"] for v in lst)
                 t["vpc"] = round(svs / svd * 100, 1) if svd else None
                 amn_tb7[a] = t
-            EMPTY = {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0,
+            EMPTY = {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0, "ltb": 0,
                      "cod": 0, "vd": 0, "vs": 0, "pc": None, "vpc": None}
 
             def _pc(x):
@@ -511,6 +512,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                     ("❌ GTB", n["gtb"], hq["gtb"], tb.get("gtb"), "n", False),
                     ("⏳ Chưa gán", n["cg"], hq["cg"], tb.get("cg"), "n", False),
                     ("🛒 LTC", n["ltc"], hq["ltc"], tb.get("ltc"), "n", True),
+                    ("🚫 LTB (lấy hỏng)", n["ltb"], hq["ltb"], tb.get("ltb"), "n", False),
                     ("💰 COD GTB", n["cod"], hq["cod"], tb.get("cod"), "money", False),
                     ("🛍️ TikTok gán", n["vd"], hq["vd"], tb.get("vd"), "n", None),
                     ("🛍️ %GTC TikTok", _vp(n), _vp(hq), tb.get("vpc"), "pct", True),
@@ -841,15 +843,20 @@ def _fetch_hist(d):
     if not (url and key):
         return []
     since = (d - timedelta(days=8)).isoformat()
-    try:
-        r = requests.get(url + "/rest/v1/bao_cao_vung",
-                         params=[("select", "ngay,pct_gtc,don_giao,gtc,gtb,cod_gtb,chua_gan,ltc,vngh_don,vngh_gtc"),
-                                 ("ngay", "gte." + since), ("ngay", "lt." + d.isoformat()),
-                                 ("order", "ngay.desc")],
-                         headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
-        return r.json() if r.ok else []
-    except Exception:
-        return []
+    # Thử kèm cột ltb (mới); nếu migration LTB chưa chạy → lùi bỏ ltb (vẫn có các cột khác).
+    for sel in ("ngay,pct_gtc,don_giao,gtc,gtb,cod_gtb,chua_gan,ltc,ltb,vngh_don,vngh_gtc",
+                "ngay,pct_gtc,don_giao,gtc,gtb,cod_gtb,chua_gan,ltc,vngh_don,vngh_gtc"):
+        try:
+            r = requests.get(url + "/rest/v1/bao_cao_vung",
+                             params=[("select", sel),
+                                     ("ngay", "gte." + since), ("ngay", "lt." + d.isoformat()),
+                                     ("order", "ngay.desc")],
+                             headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
+            if r.ok:
+                return r.json()
+        except Exception:
+            continue
+    return []
 
 
 def _fetch_bc_days(d, n=7):
@@ -864,7 +871,8 @@ def _fetch_bc_days(d, n=7):
     since = (d - timedelta(days=n)).isoformat()
     # Thử select ĐỦ (kèm cột TikTok mới); nếu migration CHƯA chạy (cột chưa có) →
     # PostgREST lỗi → lùi về cột cơ bản để so sánh AM vẫn chạy (TikTok hiện "—").
-    for sel in ("ngay,buu_cuc,don_giao,gtc,gtb,chua_gan,ltc,vngh_don,vngh_gtc",
+    for sel in ("ngay,buu_cuc,don_giao,gtc,gtb,chua_gan,ltc,ltb,vngh_don,vngh_gtc",
+                "ngay,buu_cuc,don_giao,gtc,gtb,chua_gan,ltc,vngh_don,vngh_gtc",
                 "ngay,buu_cuc,don_giao,gtc,gtb,chua_gan,ltc"):
         try:
             rows, off, okall = [], 0, True
