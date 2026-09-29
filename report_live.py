@@ -322,7 +322,7 @@ async def fetch_live(token):
         return rows, giao_120h
 
 
-def gen_html(rows, giao_120h=None):
+def gen_html(rows, giao_120h=None, nv_xuly=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0}
@@ -497,27 +497,49 @@ def gen_html(rows, giao_120h=None):
             P.append("</div></details>")
         P.append("</div></details>")
 
-    # ===== 👤 NV GTC < mục tiêu 50% (≥30 đơn), toàn vùng — bento giống Tồn chưa gán =====
-    low_nv = sorted([(d, r["name"]) for r in rows for d in r.get("drivers", [])
-                     if d.get("total", 0) >= 30 and _pct(d["gtc"], d["total"]) is not None
-                     and _pct(d["gtc"], d["total"]) < 50],
-                    key=lambda x: (_pct(x[0]["gtc"], x[0]["total"]), -x[0].get("total", 0)))
-    if low_nv:
-        P.append("<details class='cgbento'><summary>"
-                 "<div class='mic'>👤</div>"
-                 "<div class='mtx'><div class='mn'>NV GTC &lt; mục tiêu 50%%</div>"
-                 "<div class='ms'>≥30 đơn · %%GTC thấp → cao · bấm mở danh sách cần đốc thúc</div></div>"
-                 "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
-                 "</summary><div class='dtl'>" % len(low_nv))
-        P.append("<table class='drv'><thead><tr><th>Nhân viên · bưu cục</th><th>Đơn</th>"
-                 "<th>Hỏng</th><th>%GTC</th></tr></thead><tbody>")
-        for d, bc in low_nv[:20]:
-            pc = _pct(d["gtc"], d["total"])
-            P.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td>"
-                     "<td><b class='w'>%s</b></td><td><span class='pill sm %s'>%s%%</span></td></tr>"
-                     % (_esc(d["name"]), _esc(bc), _n(d["total"]),
-                        _n(d["total"] - d["gtc"]), _cls(pc), pc))
-        P.append("</tbody></table></div></details>")
+    # ===== 👤 NV cần xử lý — %GTC kém DAI DẲNG 14 ngày (Supabase); Supabase lỗi → fallback HÔM NAY =====
+    if nv_xuly is not None:
+        if nv_xuly:
+            P.append("<details class='cgbento'><summary>"
+                     "<div class='mic'>👤</div>"
+                     "<div class='mtx'><div class='mn'>NV cần xử lý · kém dai dẳng</div>"
+                     "<div class='ms'>%%GTC TB &lt;50%% qua ≥5/14 ngày hoạt động · bấm mở hồ sơ</div></div>"
+                     "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
+                     "</summary><div class='dtl'>" % len(nv_xuly))
+            for x in nv_xuly[:20]:
+                cells = "".join("<span class='cel %s'></span>"
+                                % ("z" if (s["don"] < 10 or s["pc"] is None) else _cls(s["pc"]))
+                                for s in x["series"])
+                P.append("<div class='nvx'><div class='nvxh'>"
+                         "<span class='nvxn'>%s<i>%s</i></span>"
+                         "<span class='pill sm %s'>%s%%</span></div>"
+                         "<div class='streak'>%s</div>"
+                         "<div class='nvxm'><span class='w'>🔴 %d/%d ngày yếu</span> · 🕘 muộn %d · 📦 %s đơn</div></div>"
+                         % (_esc(x["ten"]), _esc(x["bc"]), _cls(x["avg"]), x["avg"],
+                            cells, x["yeu"], x["act"], x["muon"], _n(x["don"])))
+            P.append("</div></details>")
+    else:
+        # Fallback (không có Supabase/lỗi): NV %GTC <50% HÔM NAY (≥30 đơn)
+        low_nv = sorted([(d, r["name"]) for r in rows for d in r.get("drivers", [])
+                         if d.get("total", 0) >= 30 and _pct(d["gtc"], d["total"]) is not None
+                         and _pct(d["gtc"], d["total"]) < 50],
+                        key=lambda x: (_pct(x[0]["gtc"], x[0]["total"]), -x[0].get("total", 0)))
+        if low_nv:
+            P.append("<details class='cgbento'><summary>"
+                     "<div class='mic'>👤</div>"
+                     "<div class='mtx'><div class='mn'>NV GTC &lt; mục tiêu 50%% (hôm nay)</div>"
+                     "<div class='ms'>≥30 đơn · %%GTC thấp → cao · bấm mở danh sách</div></div>"
+                     "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
+                     "</summary><div class='dtl'>" % len(low_nv))
+            P.append("<table class='drv'><thead><tr><th>Nhân viên · bưu cục</th><th>Đơn</th>"
+                     "<th>Hỏng</th><th>%GTC</th></tr></thead><tbody>")
+            for d, bc in low_nv[:20]:
+                pc = _pct(d["gtc"], d["total"])
+                P.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td>"
+                         "<td><b class='w'>%s</b></td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                         % (_esc(d["name"]), _esc(bc), _n(d["total"]),
+                            _n(d["total"] - d["gtc"]), _cls(pc), pc))
+            P.append("</tbody></table></div></details>")
 
     # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
     #        href, icon, tên, phụ đề, màu RGB, [7 cột mini-nhịp]
@@ -530,6 +552,7 @@ def gen_html(rows, giao_120h=None):
         ("chuyendi.html", "🚚", "Hiệu suất chuyến đi", "đơn/giờ · giờ ra hàng", "255,138,61", [40, 58, 70, 52, 78, 64, 86]),
         ("xephang.html", "🏆", "Xếp hạng tổng hợp", "AM · bưu cục · NV", "255,213,74", [55, 48, 70, 62, 84, 74, 92]),
         ("khochuyentiep.html", "📦", "Kho Chuyển Tiếp", "tồn luân chuyển", "255,110,169", [48, 62, 54, 70, 60, 78, 66]),
+        ("nvxuly.html", "👤", "Quản lý Nhân viên", "kém dai dẳng · tra cứu hồ sơ", "242,88,95", [70, 55, 66, 48, 60, 52, 44]),
     ]
     P.append("<div class='menu'>")
     # Ô nổi bật (span 2): Báo cáo tổng quan + %GTC vùng lớn
@@ -728,6 +751,17 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .cgbento .cvar{flex:none;color:rgb(var(--h));font-size:14px;transition:transform .2s}
 .cgbento[open] .cvar{transform:rotate(180deg)}
 .cgbento .dtl{padding:0 12px 12px}
+/* NV cần xử lý — thẻ NV + streak 14 ngày */
+.nvx{padding:9px 0;border-top:1px solid rgba(255,255,255,.06)}
+.nvx:first-child{border-top:none}
+.nvxh{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.nvxn{flex:1;min-width:0;font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nvxn i{font-style:normal;color:var(--mut);font-weight:400;font-size:11px;margin-left:6px}
+.streak{display:flex;gap:3px;flex-wrap:nowrap}
+.streak .cel{flex:1;height:15px;border-radius:3px;min-width:5px}
+.streak .cel.good{background:var(--good)}.streak .cel.warn{background:var(--warn)}
+.streak .cel.bad{background:var(--bad)}.streak .cel.z{background:#2a3050}
+.nvxm{margin-top:5px;color:var(--mut);font-size:10.5px;font-variant-numeric:tabular-nums}
 .sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:rgb(var(--h))}
 .sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
 .sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
@@ -872,6 +906,19 @@ def main():
         raise SystemExit("Thiếu NHANH_TOKEN")
     try:
         rows, giao_120h = asyncio.run(fetch_live(token))
+        # NV cần xử lý (kém dai dẳng 14 ngày, đọc Supabase — có creds trong step live).
+        # Supabase thiếu/lỗi → None → gen_html tự fallback về "NV <50% hôm nay".
+        nv_xuly, _nvr = None, None
+        try:
+            import report_nvxuly
+            _nvr = report_nvxuly.fetch()
+            if _nvr:
+                nv_xuly = sorted([x for x in report_nvxuly.build(_nvr)
+                                  if x["act"] >= report_nvxuly.MIN_ACTIVE
+                                  and x["avg"] is not None and x["avg"] < report_nvxuly.YEU],
+                                 key=lambda x: (x["avg"], -x["yeu"]))
+        except Exception as e:
+            logger.warning("NV cần xử lý (Supabase) lỗi, dùng bản hôm nay: %s", str(e)[:120])
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
@@ -880,10 +927,20 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    h = gen_html(rows, giao_120h)
+    h = gen_html(rows, giao_120h, nv_xuly)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
+
+    # Trang QUẢN LÝ NHÂN VIÊN đầy đủ (nvxuly.html) — tra cứu hồ sơ bất kỳ NV + streak 14 ngày.
+    # Tái dùng _nvr (đã fetch ở trên); Supabase lỗi → GIỮ trang cũ.
+    if _nvr:
+        try:
+            import report_nvxuly
+            with open(os.path.join(outdir, "nvxuly.html"), "w", encoding="utf-8") as f:
+                f.write(report_nvxuly.gen_html(_nvr))
+        except Exception as e:
+            logger.warning("Tạo nvxuly.html lỗi (bỏ qua): %s", str(e)[:150])
 
     # (Trang đơn TikTok vngh.html đã bỏ 24/08 — 3 chỉ số TikTok vẫn giữ ở dải chỉ số index)
 
