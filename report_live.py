@@ -407,6 +407,10 @@ def gen_html(rows, giao_120h=None):
     nv_low = sum(1 for r in rows for d in r.get("drivers", [])
                  if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
                  and _pct(d["gtc"], d["total"]) < 50)
+    # Tỉ lệ NV đạt mục tiêu (%GTC ≥50%) trên tổng NV đủ điều kiện (≥20 đơn) — sức khỏe đội ngũ
+    nv_qual = sum(1 for r in rows for d in r.get("drivers", [])
+                  if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None)
+    nv_rate = round((nv_qual - nv_low) * 100 / nv_qual) if nv_qual else None
     diag = []
     if top_bl and top_bl.get("backlog", 0) > 0:
         diag.append("🔴 Chưa gán giao cao nhất <b>%s</b> (%s đơn)" % (_esc(top_bl["name"]), _n(top_bl["backlog"])))
@@ -416,6 +420,8 @@ def gen_html(rows, giao_120h=None):
         diag.append("🏤 <b>%d</b> bưu cục %%GTC &lt;50%%" % bc_low)
     if nv_low:
         diag.append("👤 <b>%d</b> NV %%GTC &lt;50%%" % nv_low)
+    if nv_rate is not None:
+        diag.append("✅ <b>%d%%</b> NV đạt (≥50%%, %d NV)" % (nv_rate, nv_qual))
     if not diag:
         diag.append("✅ Vùng vận hành ổn định")
     P.append("<div class='diag'>⚡ %s</div>" % " · ".join(diag))
