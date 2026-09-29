@@ -322,8 +322,13 @@ def aggregate(payload):
         pc, bc = rec["prov"], rec["bc"]
         pr = provs.setdefault(pc, {"prov": pc, "total": 0, "success": 0, "bcs": set()})
         pr["total"] += 1; pr["success"] += 1 if rec["succ"] else 0; pr["bcs"].add(bc)
-        br = bcs.setdefault(bc, {"bc": bc, "prov": pc, "total": 0, "success": 0})
+        br = bcs.setdefault(bc, {"bc": bc, "prov": pc, "total": 0, "success": 0,
+                                 "vngh_total": 0, "vngh_success": 0, "gtb_cod": 0.0})
         br["total"] += 1; br["success"] += 1 if rec["succ"] else 0
+        if rec["vngh"]:
+            br["vngh_total"] += 1
+            if rec["succ"]:
+                br["vngh_success"] += 1
         dkey = f"{rec['driver_id']}|{bc}"
         dr = drivers.setdefault(dkey, {"driver_id": rec["driver_id"], "driver_name": rec["driver_name"],
                                        "bc": bc, "prov": pc, "total": 0, "success": 0, "gtb_cod": 0.0})
@@ -332,6 +337,7 @@ def aggregate(payload):
             dr["success"] += 1
         else:
             dr["gtb_cod"] += rec["cod"]
+            br["gtb_cod"] += rec["cod"]
 
     def gtc(v): return round(v["success"]/v["total"]*100, 1) if v["total"] else None
     prov_list = sorted([{"prov": v["prov"], "bc_count": len(v["bcs"]), "trips": prov_trips.get(v["prov"], 0),

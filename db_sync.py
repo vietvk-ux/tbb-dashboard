@@ -104,6 +104,12 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         "don_giao": b["total"], "gtc": b["success"], "gtb": b["total"] - b["success"],
         "pct_gtc": b["gtc"], "chua_gan": backlog.get(b["bc"], {}).get("deliver", 0),
         "ltc": b.get("ltc", 0),
+        # COD & TikTok theo bưu cục (để so sánh từng AM; cột thêm 2026-09-28,
+        # _upsert tự bỏ cột nếu migration chưa chạy nên không vỡ sync)
+        "cod_gtb": round(b.get("gtb_cod", 0)),
+        "vngh_don": b.get("vngh_total", 0),
+        "vngh_gtc": (round(b["vngh_success"] / b["vngh_total"] * 100, 1)
+                     if b.get("vngh_total") else None),
     } for b in agg["bcs"]]
     _upsert(url, key, "bao_cao_buu_cuc", bc_rows, "ngay,buu_cuc")
 
