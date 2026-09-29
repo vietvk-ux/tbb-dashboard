@@ -320,6 +320,11 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
     d = agg["date"]
     total_gtb = g["total"] - g["success"]
     total_cod = sum(x.get("gtb_cod", 0) for x in agg["drivers"])
+    region_late = sum(1 for x in agg["drivers"] if x.get("late"))
+    bc_late = {}
+    for _d in agg["drivers"]:
+        if _d.get("late"):
+            bc_late[_d["bc"]] = bc_late.get(_d["bc"], 0) + 1
     gen_at = datetime.now(VN).strftime("%H:%M %d/%m/%Y")
 
     # gom nhân viên theo bưu cục
@@ -423,6 +428,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
             ("💰 COD GTB", total_cod, y.get("cod_gtb"), _avg("cod_gtb"), "money", False),
             ("🛍️ TikTok gán", g.get("vngh_total", 0), y.get("vngh_don"), _avg("vngh_don"), "n", None),
             ("🛍️ %GTC TikTok", g.get("vngh_gtc"), y.get("vngh_gtc"), _avg("vngh_gtc", 1), "pct", True),
+            ("🕐 NV muộn (>9h30)", region_late, y.get("so_nv_muon"), _avg("so_nv_muon"), "n", False),
         ]
         P.append("<section class='card'><table class='drv'><thead><tr><th class='lft'>Chỉ số vùng</th>"
                  "<th>Hôm nay</th><th>Hôm qua</th><th>TB 7 ngày</th></tr></thead><tbody>")
@@ -434,7 +440,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
 
         # --- Từng AM: Hôm nay · Hôm qua · TB 7 ngày (bấm mở xem chi tiết) ---
         if bc_days:
-            nv_cod = _fetch_nv_cod_days(agg["date"], 7)   # {(am,ngay): COD} — COD lịch sử dùng NGAY
+            nv_days = _fetch_nv_days(agg["date"], 7)   # {(am,ngay):{cod,late}} — dùng NGAY
             # hôm nay theo AM (từ agg — có sẵn cod/vngh per bưu cục)
             amn_now = {}
             for b in agg["bcs"]:
@@ -442,12 +448,13 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                 if not a:
                     continue
                 x = amn_now.setdefault(a, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0, "ltb": 0,
-                                           "cod": 0, "vd": 0, "vs": 0})
+                                           "cod": 0, "vd": 0, "vs": 0, "late": 0})
                 x["don"] += b["total"]; x["gtc"] += b["success"]
                 x["gtb"] += b["total"] - b["success"]; x["ltc"] += b.get("ltc", 0); x["ltb"] += b.get("ltb", 0)
                 x["cg"] += backlog.get(b["bc"], {}).get("deliver", 0)
                 x["cod"] += b.get("gtb_cod", 0)
                 x["vd"] += b.get("vngh_total", 0); x["vs"] += b.get("vngh_success", 0)
+                x["late"] += bc_late.get(b["bc"], 0)
             # lịch sử theo (AM, ngày): bc_days (đơn/gtc/gtb/cg/ltc + TikTok) + nv_cod (COD)
             d1date = hist[0]["ngay"]
             amday = {}
@@ -457,7 +464,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                     continue
                 k = (a, b.get("ngay"))
                 x = amday.setdefault(k, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0, "ltb": 0,
-                                         "cod": 0, "vd": 0, "vs": 0})
+                                         "cod": 0, "vd": 0, "vs": 0, "late": 0})
                 x["don"] += b.get("don_giao") or 0; x["gtc"] += b.get("gtc") or 0
                 x["gtb"] += b.get("gtb") or 0; x["cg"] += b.get("chua_gan") or 0
                 x["ltc"] += b.get("ltc") or 0; x["ltb"] += b.get("ltb") or 0
@@ -465,8 +472,9 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                 x["vd"] += vd
                 if vgpct is not None:
                     x["vs"] += round(vd * vgpct / 100)
-            for k in amday:                       # COD lịch sử từ bao_cao_nhan_vien
-                amday[k]["cod"] = nv_cod.get(k, 0)
+            for k in amday:                       # COD + NV muộn lịch sử từ bao_cao_nhan_vien
+                nd = nv_days.get(k, {})
+                amday[k]["cod"] = nd.get("cod", 0); amday[k]["late"] = nd.get("late", 0)
             amn_hq = {}         # hôm qua theo AM
             am_days = {}        # AM → list các ngày
             for (a, day), v in amday.items():
@@ -477,14 +485,14 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
             for a, lst in am_days.items():
                 nd = len(lst)
                 t = {m: round(sum(v[m] for v in lst) / nd)
-                     for m in ("don", "gtc", "gtb", "cg", "ltc", "ltb", "cod", "vd", "vs")}
+                     for m in ("don", "gtc", "gtb", "cg", "ltc", "ltb", "cod", "vd", "vs", "late")}
                 pcs = [v["gtc"] / v["don"] * 100 for v in lst if v["don"]]
                 t["pc"] = round(sum(pcs) / len(pcs), 1) if pcs else None
                 svd = sum(v["vd"] for v in lst); svs = sum(v["vs"] for v in lst)
                 t["vpc"] = round(svs / svd * 100, 1) if svd else None
                 amn_tb7[a] = t
             EMPTY = {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0, "ltb": 0,
-                     "cod": 0, "vd": 0, "vs": 0, "pc": None, "vpc": None}
+                     "cod": 0, "vd": 0, "vs": 0, "late": 0, "pc": None, "vpc": None}
 
             def _pc(x):
                 return round(x["gtc"] / x["don"] * 100, 1) if x["don"] else None
@@ -516,6 +524,7 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                     ("💰 COD GTB", n["cod"], hq["cod"], tb.get("cod"), "money", False),
                     ("🛍️ TikTok gán", n["vd"], hq["vd"], tb.get("vd"), "n", None),
                     ("🛍️ %GTC TikTok", _vp(n), _vp(hq), tb.get("vpc"), "pct", True),
+                    ("🕐 NV muộn (>9h30)", n["late"], hq["late"], tb.get("late"), "n", False),
                 ]
                 for lbl, cur, hqv, tbv, kind, hg in amrows:
                     P.append("<tr><td class='nv'>%s</td><td>%s</td><td class='mut'>%s</td><td class='mut'>%s</td></tr>"
@@ -844,8 +853,8 @@ def _fetch_hist(d):
         return []
     since = (d - timedelta(days=8)).isoformat()
     # Thử kèm cột ltb (mới); nếu migration LTB chưa chạy → lùi bỏ ltb (vẫn có các cột khác).
-    for sel in ("ngay,pct_gtc,don_giao,gtc,gtb,cod_gtb,chua_gan,ltc,ltb,vngh_don,vngh_gtc",
-                "ngay,pct_gtc,don_giao,gtc,gtb,cod_gtb,chua_gan,ltc,vngh_don,vngh_gtc"):
+    for sel in ("ngay,pct_gtc,don_giao,gtc,gtb,cod_gtb,chua_gan,ltc,ltb,vngh_don,vngh_gtc,so_nv_muon",
+                "ngay,pct_gtc,don_giao,gtc,gtb,cod_gtb,chua_gan,ltc,vngh_don,vngh_gtc,so_nv_muon"):
         try:
             r = requests.get(url + "/rest/v1/bao_cao_vung",
                              params=[("select", sel),
@@ -896,9 +905,10 @@ def _fetch_bc_days(d, n=7):
     return []
 
 
-def _fetch_nv_cod_days(d, n=7):
-    """COD GTB theo (AM, ngày) n ngày TRƯỚC d — gộp từ bao_cao_nhan_vien (đã có sẵn
-    cod_gtb → COD so sánh hôm qua/TB7 dùng ngay, không cần chờ). Trả {(am, ngay): cod}."""
+def _fetch_nv_days(d, n=7):
+    """COD GTB + NV xuất phát muộn theo (AM, ngày) n ngày TRƯỚC d — gộp từ
+    bao_cao_nhan_vien (có sẵn cod_gtb + xuat_phat_muon → dùng NGAY). Chịu lỗi cột
+    xuat_phat_muon thiếu (lùi chỉ cod). Trả {(am, ngay): {'cod':, 'late':}}."""
     import requests
     url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
     key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
@@ -906,30 +916,36 @@ def _fetch_nv_cod_days(d, n=7):
     if not (url and key):
         return {}
     since = (d - timedelta(days=n)).isoformat()
-    out = {}
-    try:
-        off = 0
-        while True:
-            r = requests.get(url + "/rest/v1/bao_cao_nhan_vien",
-                             params=[("select", "ngay,buu_cuc,cod_gtb"),
-                                     ("ngay", "gte." + since), ("ngay", "lt." + d.isoformat()),
-                                     ("order", "id.asc"), ("limit", "1000"), ("offset", str(off))],
-                             headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
-            if not r.ok:
-                break
-            c = r.json()
-            for row in c:
-                am = AM_OF.get(row.get("buu_cuc"))
-                if not am:
-                    continue
-                k = (am, row.get("ngay"))
-                out[k] = out.get(k, 0) + (row.get("cod_gtb") or 0)
-            if len(c) < 1000:
-                break
-            off += 1000
-        return out
-    except Exception:
-        return {}
+    for sel in ("ngay,buu_cuc,cod_gtb,xuat_phat_muon", "ngay,buu_cuc,cod_gtb"):
+        out, ok = {}, True
+        try:
+            off = 0
+            while True:
+                r = requests.get(url + "/rest/v1/bao_cao_nhan_vien",
+                                 params=[("select", sel),
+                                         ("ngay", "gte." + since), ("ngay", "lt." + d.isoformat()),
+                                         ("order", "id.asc"), ("limit", "1000"), ("offset", str(off))],
+                                 headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
+                if not r.ok:
+                    ok = False
+                    break
+                c = r.json()
+                for row in c:
+                    am = AM_OF.get(row.get("buu_cuc"))
+                    if not am:
+                        continue
+                    x = out.setdefault((am, row.get("ngay")), {"cod": 0, "late": 0})
+                    x["cod"] += row.get("cod_gtb") or 0
+                    if row.get("xuat_phat_muon"):
+                        x["late"] += 1
+                if len(c) < 1000:
+                    break
+                off += 1000
+            if ok:
+                return out
+        except Exception:
+            continue
+    return {}
 
 
 def main():
