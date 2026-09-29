@@ -160,6 +160,65 @@ def _card(x, rank=None):
     return "".join(P)
 
 
+# ============================================================================
+#  NHÚNG vào TRANG TRỰC TIẾP (index/live) — toàn bộ nội dung trang này gói gọn
+#  trong 1 ô bento. Class riêng .nvmgr/.q* để KHÔNG đụng CSS/JS trang trực tiếp;
+#  tái dùng biến màu (--mut/--line/--card2/--bad…) + lớp .pill/.streak/.cel của
+#  trang trực tiếp. embed(rows) → {"n", "html", "css", "js"} cho report_live.
+# ============================================================================
+def _embed_card(x, rank=None):
+    cl = _cls(x["avg"])
+    rk = ("<span class='qrk'>%d</span>" % rank) if rank else ""
+    cells = "".join("<span class='cel %s'></span>"
+                    % ("z" if (s["don"] < MIN_DON_DAY or s["pc"] is None) else _cls(s["pc"]))
+                    for s in x["series"])
+    P = ["<details class='qcard %s'><summary>" % cl]
+    P.append("<div class='qhd'>%s<div class='qnm'>%s<i>%s</i></div>"
+             "<span class='pill sm %s'>%s%%</span></div>"
+             % (rk, _esc(x["ten"]), _esc(x["bc"]), cl,
+                x["avg"] if x["avg"] is not None else "—"))
+    P.append("<div class='streak'>%s</div>" % cells)
+    P.append("<div class='qmt'><span class='w'>🔴 %d/%d ngày yếu</span>"
+             "<span>🕘 muộn %d</span><span>📦 %s đơn</span><span class='cd'>💰 %s</span></div>"
+             % (x["yeu"], x["act"], x["muon"], _n(x["don"]), _codm(x["cod"])))
+    P.append("</summary><div class='qdtl'><table class='qt'><thead><tr><th class='l'>Ngày</th>"
+             "<th>Đơn</th><th>%GTC</th><th>Muộn</th></tr></thead><tbody>")
+    for s in reversed(x["series"]):
+        pc = s["pc"]
+        pcell = ("<span class='pill sm %s'>%s%%</span>" % (_cls(pc), pc)) if pc is not None else "—"
+        P.append("<tr><td class='l'>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>"
+                 % (s["ng"], _n(s["don"]), pcell, "🕘" if s["muon"] else "·"))
+    P.append("</tbody></table></div></details>")
+    return "".join(P)
+
+
+def embed(rows):
+    """Trả về khối nhúng (ô tra cứu + TOÀN BỘ danh sách NV cần xử lý + hồ sơ 14 ngày)."""
+    data = build(rows) if rows else []
+    flagged = sorted([x for x in data if x["act"] >= MIN_ACTIVE and x["avg"] is not None and x["avg"] < YEU],
+                     key=lambda x: (x["avg"], -x["yeu"]))
+    idx = [{"ten": x["ten"], "bc": x["bc"], "avg": x["avg"], "yeu": x["yeu"], "act": x["act"],
+            "muon": x["muon"], "don": x["don"], "cod": x["cod"], "series": x["series"]}
+           for x in sorted(data, key=lambda x: (x["avg"] if x["avg"] is not None else 999))
+           if x["act"] >= 3]
+    H = ["<div class='nvmgr'>"]
+    H.append("<input class='qsearch' id='nvmq' placeholder='🔎 Tra cứu hồ sơ nhân viên (tên / bưu cục)…' "
+             "oninput='nvmSearch()' autocomplete='off' onclick='event.stopPropagation()'>")
+    H.append("<div id='nvmres' class='qres'></div>")
+    H.append("<div class='qsec'>📋 %d NV cần xử lý · %%GTC dưới %d%% dai dẳng (≥%d/%d ngày hoạt động)</div>"
+             % (len(flagged), YEU, MIN_ACTIVE, WINDOW))
+    if flagged:
+        for i, x in enumerate(flagged, 1):
+            H.append(_embed_card(x, rank=i))
+    else:
+        H.append("<div class='qnone'>Không có NV nào yếu dai dẳng. 👍</div>")
+    H.append("<div class='qfoot'>Nhìn %d ngày · ngày hoạt động = giao ≥%d đơn · dữ liệu chốt cuối ngày (Supabase). "
+             "Streak: 🟥&lt;50%% · 🟨50-70%% · 🟩≥70%% · ⬛ ít đơn.</div>" % (WINDOW, MIN_DON_DAY))
+    H.append("</div>")
+    js = "var NVM=%s;\n%s" % (json.dumps(idx, ensure_ascii=False), _EMBED_JS)
+    return {"n": len(flagged), "html": "".join(H), "css": _EMBED_CSS, "js": js}
+
+
 def gen_html(rows):
     now = datetime.now(VN)
     data = build(rows) if rows else []
@@ -300,5 +359,63 @@ function doSearch(){
   if(q.length<2){box.innerHTML='';return;}
   var hit=NV.filter(function(x){return _norm(x.ten).indexOf(q)>=0||_norm(x.bc).indexOf(q)>=0;}).slice(0,15);
   box.innerHTML=hit.length?("<div class='sec'>🔎 "+hit.length+" kết quả</div>"+hit.map(_card).join('')):"<div class='none'>Không tìm thấy NV.</div>";
+}
+"""
+
+# ---- CSS nhúng vào TRANG TRỰC TIẾP (scope .nvmgr, dùng biến màu của trang đó) ----
+_EMBED_CSS = """
+.nvmgr{margin-top:2px}
+.nvmgr .qsearch{width:100%;padding:11px 13px;border-radius:12px;border:1px solid var(--line);
+ background:var(--bg2);color:var(--txt);font-size:14px;outline:none;margin:2px 0 10px;-webkit-appearance:none}
+.nvmgr .qsearch:focus{border-color:#4a5384}
+.nvmgr .qres:not(:empty){margin-bottom:12px}
+.nvmgr .qsec{font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:var(--mut);margin:8px 2px 8px}
+.nvmgr .qcard{border-radius:13px;margin:7px 0;overflow:hidden;background:var(--card2);border:1px solid var(--line)}
+.nvmgr .qcard.bad{border-color:rgba(242,88,95,.42)}
+.nvmgr .qcard.warn{border-color:rgba(247,185,85,.34)}
+.nvmgr .qcard>summary{padding:10px 12px;cursor:pointer;list-style:none;display:flex;flex-direction:column;gap:7px}
+.nvmgr .qcard>summary::-webkit-details-marker{display:none}
+.nvmgr .qhd{display:flex;align-items:center;gap:9px}
+.nvmgr .qrk{width:21px;height:21px;border-radius:6px;background:rgba(242,88,95,.2);color:var(--bad);
+ font-weight:800;font-size:11px;display:grid;place-items:center;flex:none}
+.nvmgr .qnm{flex:1;min-width:0;font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nvmgr .qnm i{font-style:normal;color:var(--mut);font-weight:400;font-size:11px;margin-left:7px}
+.nvmgr .qmt{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--mut);font-size:10.5px;font-variant-numeric:tabular-nums}
+.nvmgr .qmt .w{color:var(--bad);font-weight:700}.nvmgr .qmt .cd{color:var(--warn)}
+.nvmgr .qdtl{padding:0 12px 11px}
+.nvmgr table.qt{width:100%;border-collapse:collapse;font-size:11.5px;font-variant-numeric:tabular-nums}
+.nvmgr table.qt th,.nvmgr table.qt td{padding:5px 4px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05)}
+.nvmgr table.qt th{color:var(--mut);font-weight:600;font-size:9px;text-transform:uppercase}
+.nvmgr table.qt th.l,.nvmgr table.qt td.l{text-align:left}
+.nvmgr table.qt tbody tr:last-child td{border-bottom:none}
+.nvmgr .qnone{color:var(--mut);text-align:center;padding:16px;font-size:12.5px}
+.nvmgr .qfoot{color:#6d7492;font-size:10px;line-height:1.6;margin:10px 2px 2px}
+"""
+
+# ---- JS nhúng (namespaced nvm*) — ô tra cứu bất kỳ NV trên trang trực tiếp ----
+_EMBED_JS = """
+function _nvmcls(p){return p==null?'na':(p<50?'bad':(p<70?'warn':'good'));}
+function _nvmcodm(v){v=v||0;if(v<1e5)return'0';if(v>=1e9)return(v/1e9).toFixed(2).replace('.',',')+' tỷ';return(v/1e6).toFixed(1).replace('.',',')+'tr';}
+function _nvmcard(x){
+  var cl=_nvmcls(x.avg);
+  var cells=x.series.map(function(s){var c=(s.don<10||s.pc==null)?'z':_nvmcls(s.pc);
+    return "<span class='cel "+c+"'></span>";}).join('');
+  var rows=x.series.slice().reverse().map(function(s){
+    var p=s.pc==null?'—':"<span class='pill sm "+_nvmcls(s.pc)+"'>"+s.pc+"%</span>";
+    return "<tr><td class='l'>"+s.ng+"</td><td>"+s.don.toLocaleString('vi')+"</td><td>"+p+"</td><td>"+(s.muon?'🕘':'·')+"</td></tr>";}).join('');
+  return "<details class='qcard "+cl+"' open><summary><div class='qhd'><div class='qnm'>"+x.ten+
+    "<i>"+x.bc+"</i></div><span class='pill sm "+cl+"'>"+(x.avg==null?'—':x.avg+'%')+
+    "</span></div><div class='streak'>"+cells+"</div><div class='qmt'><span class='w'>🔴 "+x.yeu+"/"+x.act+
+    " ngày yếu</span><span>🕘 muộn "+x.muon+"</span><span>📦 "+x.don.toLocaleString('vi')+" đơn</span><span class='cd'>💰 "+
+    _nvmcodm(x.cod)+"</span></div></summary><div class='qdtl'><table class='qt'><thead><tr><th class='l'>Ngày</th><th>Đơn</th><th>%GTC</th><th>Muộn</th></tr></thead><tbody>"+
+    rows+"</tbody></table></div></details>";
+}
+function _nvmnorm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/đ/g,'d');}
+function nvmSearch(){
+  var el=document.getElementById('nvmq');if(!el)return;
+  var q=_nvmnorm(el.value.trim());var box=document.getElementById('nvmres');
+  if(q.length<2){box.innerHTML='';return;}
+  var hit=NVM.filter(function(x){return _nvmnorm(x.ten).indexOf(q)>=0||_nvmnorm(x.bc).indexOf(q)>=0;}).slice(0,15);
+  box.innerHTML=hit.length?("<div class='qsec'>🔎 "+hit.length+" kết quả</div>"+hit.map(_nvmcard).join('')):"<div class='qnone'>Không tìm thấy NV.</div>";
 }
 """

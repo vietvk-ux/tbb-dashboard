@@ -322,7 +322,7 @@ async def fetch_live(token):
         return rows, giao_120h
 
 
-def gen_html(rows, giao_120h=None, nv_xuly=None):
+def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0}
@@ -363,6 +363,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None):
     P.append("<meta name='theme-color' content='#0a0d18'>")
     P.append("<title>TBB trực tiếp · %s</title>" % now.strftime("%H:%M"))
     P.append(_CSS)
+    if nvm is not None:
+        P.append("<style>%s</style>" % nvm["css"])
     P.append("<div class='wrap'>")
 
     # ===== Header dính =====
@@ -497,27 +499,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None):
             P.append("</div></details>")
         P.append("</div></details>")
 
-    # ===== 👤 NV cần xử lý — %GTC kém DAI DẲNG 14 ngày (Supabase); Supabase lỗi → fallback HÔM NAY =====
-    if nv_xuly is not None:
-        if nv_xuly:
-            P.append("<details class='cgbento'><summary>"
-                     "<div class='mic'>👤</div>"
-                     "<div class='mtx'><div class='mn'>NV cần xử lý · kém dai dẳng</div>"
-                     "<div class='ms'>%%GTC TB &lt;50%% qua ≥5/14 ngày hoạt động · bấm mở hồ sơ</div></div>"
-                     "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
-                     "</summary><div class='dtl'>" % len(nv_xuly))
-            for x in nv_xuly[:20]:
-                cells = "".join("<span class='cel %s'></span>"
-                                % ("z" if (s["don"] < 10 or s["pc"] is None) else _cls(s["pc"]))
-                                for s in x["series"])
-                P.append("<div class='nvx'><div class='nvxh'>"
-                         "<span class='nvxn'>%s<i>%s</i></span>"
-                         "<span class='pill sm %s'>%s%%</span></div>"
-                         "<div class='streak'>%s</div>"
-                         "<div class='nvxm'><span class='w'>🔴 %d/%d ngày yếu</span> · 🕘 muộn %d · 📦 %s đơn</div></div>"
-                         % (_esc(x["ten"]), _esc(x["bc"]), _cls(x["avg"]), x["avg"],
-                            cells, x["yeu"], x["act"], x["muon"], _n(x["don"])))
-            P.append("</div></details>")
+    # ===== 👤 NV cần xử lý — NHÚNG TOÀN BỘ TRANG QUẢN LÝ NHÂN VIÊN (tra cứu hồ sơ +
+    #        đủ danh sách + streak 14 ngày). Supabase (creds có trong step live);
+    #        Supabase lỗi → fallback NV %GTC<50% HÔM NAY.
+    if nvm is not None:
+        P.append("<details id='nvxuly' class='cgbento'><summary>"
+                 "<div class='mic'>👤</div>"
+                 "<div class='mtx'><div class='mn'>NV cần xử lý · kém dai dẳng</div>"
+                 "<div class='ms'>tra cứu hồ sơ + toàn bộ danh sách · %%GTC TB &lt;50%% qua ≥5/14 ngày</div></div>"
+                 "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
+                 "</summary><div class='dtl'>%s</div></details>" % (nvm["n"], nvm["html"]))
     else:
         # Fallback (không có Supabase/lỗi): NV %GTC <50% HÔM NAY (≥30 đơn)
         low_nv = sorted([(d, r["name"]) for r in rows for d in r.get("drivers", [])
@@ -676,6 +667,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None):
              "<span class='rfi'>⟳</span></button>")
     P.append("<script>function rf(){var b=document.getElementById('rf');"
              "b.classList.add('spin');location.replace(location.pathname+'?t='+Date.now());}</script>")
+    if nvm is not None:
+        P.append("<script>%s</script>" % nvm["js"])
     P.append("</div></body></html>")
     return "\n".join(P)
 
@@ -908,11 +901,12 @@ def main():
         rows, giao_120h = asyncio.run(fetch_live(token))
         # NV cần xử lý (kém dai dẳng 14 ngày, đọc Supabase — có creds trong step live).
         # Supabase thiếu/lỗi → None → gen_html tự fallback về "NV <50% hôm nay".
-        nv_xuly, _nvr = None, None
+        nv_xuly, _nvr, nvm = None, None, None
         try:
             import report_nvxuly
             _nvr = report_nvxuly.fetch()
             if _nvr:
+                nvm = report_nvxuly.embed(_nvr)   # khối nhúng đầy đủ (tra cứu + danh sách + hồ sơ)
                 nv_xuly = sorted([x for x in report_nvxuly.build(_nvr)
                                   if x["act"] >= report_nvxuly.MIN_ACTIVE
                                   and x["avg"] is not None and x["avg"] < report_nvxuly.YEU],
@@ -927,7 +921,7 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    h = gen_html(rows, giao_120h, nv_xuly)
+    h = gen_html(rows, giao_120h, nv_xuly, nvm)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
