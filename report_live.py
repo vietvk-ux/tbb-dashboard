@@ -491,6 +491,28 @@ def gen_html(rows, giao_120h=None):
             P.append("</div></details>")
         P.append("</div></details>")
 
+    # ===== 👤 NV cần đốc thúc — %GTC thấp nhất (≥30 đơn), toàn vùng =====
+    low_nv = sorted([(d, r["name"]) for r in rows for d in r.get("drivers", [])
+                     if d.get("total", 0) >= 30 and _pct(d["gtc"], d["total"]) is not None
+                     and _pct(d["gtc"], d["total"]) < 70],
+                    key=lambda x: (_pct(x[0]["gtc"], x[0]["total"]), -x[0].get("total", 0)))
+    if low_nv:
+        P.append("<details class='bc bad'><summary>"
+                 "<div class='bch'><span class='dot bad'></span>"
+                 "<span class='bcn'>👤 NV cần đốc thúc · dưới mục tiêu 70%%</span>"
+                 "<span class='pill bad'>%d NV</span></div>"
+                 "<div class='bcm'><span>≥30 đơn · %%GTC thấp → cao · bấm mở danh sách</span></div>"
+                 "</summary><div class='dtl'>" % len(low_nv))
+        P.append("<table class='drv'><thead><tr><th>Nhân viên · bưu cục</th><th>Đơn</th>"
+                 "<th>Hỏng</th><th>%GTC</th></tr></thead><tbody>")
+        for d, bc in low_nv[:20]:
+            pc = _pct(d["gtc"], d["total"])
+            P.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td>"
+                     "<td><b class='w'>%s</b></td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                     % (_esc(d["name"]), _esc(bc), _n(d["total"]),
+                        _n(d["total"] - d["gtc"]), _cls(pc), pc))
+        P.append("</tbody></table></div></details>")
+
     # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
     #        href, icon, tên, phụ đề, màu RGB, [7 cột mini-nhịp]
     _menu = [
@@ -785,6 +807,7 @@ table.drv th{color:var(--mut);font-weight:600;font-size:9.5px;text-transform:upp
 table.drv th:first-child,table.drv td:first-child{text-align:left}
 table.drv tbody tr:last-child td{border-bottom:none}
 td.nv{font-weight:600;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.nv .sc{font-size:9.5px;color:var(--mut);font-weight:400;margin-top:1px;overflow:hidden;text-overflow:ellipsis}
 .tt{color:#e879c8;font-weight:700}
 @media(max-width:430px){
   table.drv{font-size:11px}
