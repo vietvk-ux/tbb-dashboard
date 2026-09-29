@@ -491,17 +491,17 @@ def gen_html(rows, giao_120h=None):
             P.append("</div></details>")
         P.append("</div></details>")
 
-    # ===== 👤 NV cần đốc thúc — %GTC thấp nhất (≥30 đơn), toàn vùng =====
+    # ===== 👤 NV GTC < mục tiêu 50% (≥30 đơn), toàn vùng — bento giống Tồn chưa gán =====
     low_nv = sorted([(d, r["name"]) for r in rows for d in r.get("drivers", [])
                      if d.get("total", 0) >= 30 and _pct(d["gtc"], d["total"]) is not None
-                     and _pct(d["gtc"], d["total"]) < 70],
+                     and _pct(d["gtc"], d["total"]) < 50],
                     key=lambda x: (_pct(x[0]["gtc"], x[0]["total"]), -x[0].get("total", 0)))
     if low_nv:
-        P.append("<details class='bc bad'><summary>"
-                 "<div class='bch'><span class='dot bad'></span>"
-                 "<span class='bcn'>👤 NV cần đốc thúc · dưới mục tiêu 70%%</span>"
-                 "<span class='pill bad'>%d NV</span></div>"
-                 "<div class='bcm'><span>≥30 đơn · %%GTC thấp → cao · bấm mở danh sách</span></div>"
+        P.append("<details class='cgbento'><summary>"
+                 "<div class='mic'>👤</div>"
+                 "<div class='mtx'><div class='mn'>NV GTC &lt; mục tiêu 50%%</div>"
+                 "<div class='ms'>≥30 đơn · %%GTC thấp → cao · bấm mở danh sách cần đốc thúc</div></div>"
+                 "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
                  "</summary><div class='dtl'>" % len(low_nv))
         P.append("<table class='drv'><thead><tr><th>Nhân viên · bưu cục</th><th>Đơn</th>"
                  "<th>Hỏng</th><th>%GTC</th></tr></thead><tbody>")
@@ -718,6 +718,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .cgbento .mn{font-weight:800;font-size:16px;letter-spacing:-.01em}
 .cgbento .ms{font-size:11px;color:var(--mut);margin-top:2px}
 .cgbento .mbig{font-weight:800;font-size:26px;color:#fff;flex:none;font-variant-numeric:tabular-nums}
+.cgbento .mbig .u{font-size:13px;color:rgb(var(--h));margin-left:3px;font-weight:700}
 .cgbento .cvar{flex:none;color:rgb(var(--h));font-size:14px;transition:transform .2s}
 .cgbento[open] .cvar{transform:rotate(180deg)}
 .cgbento .dtl{padding:0 12px 12px}
