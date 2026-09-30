@@ -100,6 +100,43 @@ def _khuvuc_ref():
         return None
 
 
+def _drv_table(drv):
+    """Bảng nhân viên của 1 bưu cục. Mỗi NV BẤM MỞ được → hàng con %GTC theo xã/phường
+    (từ d['wards'] gộp lúc bóc chuyến, 0 call thêm). NV không có đơn giao → không mở."""
+    if not drv:
+        return "<div class='none'>Chưa có chuyến hôm nay.</div>"
+    P = ["<table class='drv'><thead><tr><th>Nhân viên</th><th>Gán</th><th>GTC</th>"
+         "<th>LTC</th><th>COD GTB</th><th>%GTC</th><th>🛍️GTC</th></tr></thead><tbody>"]
+    for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
+        pc2 = _pct(d["gtc"], d["total"])
+        cgtb = d.get("cod_gtb", 0)
+        gtb_cell = ("<b class='gtb'>%s</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
+        ltc = d.get("ltc", 0)
+        ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
+        wards = {k: v for k, v in d.get("wards", {}).items() if v[0] > 0}
+        has = bool(wards) and d["total"] > 0
+        cx = "<span class='cx'>▸</span>" if has else ""
+        attr = " class='dnv' onclick='tgw(this)'" if has else ""
+        P.append("<tr%s><td class='nv'>%s%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+                 "<td><span class='pill sm %s'>%s%%</span></td><td>%s</td></tr>"
+                 % (attr, cx, _esc(d["name"]), _n(d["total"]), _n(d["gtc"]),
+                    ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—",
+                    _tt_cell(d.get("vngh_gtc", 0), d.get("vngh", 0))))
+        if has:
+            ws = sorted(wards.items(), key=lambda kv: -kv[1][0])
+            cells = []
+            for wn, (tot, gtc) in ws:
+                pcw = _pct(gtc, tot)
+                cells.append("<div class='wrow'><span class='wnm'>%s</span>"
+                             "<span class='wct'>%s/%s</span><span class='pill sm %s'>%s%%</span></div>"
+                             % (_esc(wn), _n(gtc), _n(tot), _cls(pcw), pcw if pcw is not None else "—"))
+            P.append("<tr class='wsub'><td colspan='7'>"
+                     "<div class='whd'>🏘 %%GTC theo xã/phường · %d tuyến (đơn giao hôm nay)</div>"
+                     "<div class='wgrid'>%s</div></td></tr>" % (len(ws), "".join(cells)))
+    P.append("</tbody></table>")
+    return "".join(P)
+
+
 def _bc_drv_details(r):
     """1 bưu cục dạng <details> LỒNG (bấm mở ra bảng nhân viên) — dùng trong mục AM/tỉnh."""
     pc = _pct(r["gtc"], r["total"])
@@ -112,24 +149,7 @@ def _bc_drv_details(r):
              % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]), _codm(r.get("cod_gtb", 0)),
                 _n(r.get("ltc", 0)), _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0))))
     P.append("</summary><div class='dtl'>")
-    drv = r.get("drivers", [])
-    if drv:
-        P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Gán</th><th>GTC</th>"
-                 "<th>LTC</th><th>COD GTB</th><th>%GTC</th><th>🛍️GTC</th></tr></thead><tbody>")
-        for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
-            pc2 = _pct(d["gtc"], d["total"])
-            cgtb = d.get("cod_gtb", 0)
-            gtb_cell = ("<b class='gtb'>%s</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
-            ltc = d.get("ltc", 0)
-            ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
-            P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                     "<td><span class='pill sm %s'>%s%%</span></td><td>%s</td></tr>"
-                     % (_esc(d["name"]), _n(d["total"]), _n(d["gtc"]),
-                        ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—",
-                        _tt_cell(d.get("vngh_gtc", 0), d.get("vngh", 0))))
-        P.append("</tbody></table>")
-    else:
-        P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
+    P.append(_drv_table(r.get("drivers", [])))
     P.append("</div></details>")
     return "".join(P)
 
@@ -189,7 +209,8 @@ async def fetch_live(token):
                             "ltc": 0, "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0,
                             # hiệu suất chuyến đi: giờ xuất phát/kết thúc, scan, tiến độ chuyến đang chạy
                             "st": None, "en": None, "scan_ok": 0, "scan_tot": 0,
-                            "ot_done": 0, "ot_tot": 0}
+                            "ot_done": 0, "ot_tot": 0,
+                            "wards": {}}   # %GTC theo xã/phường: {tên xã: [gán, gtc]}
 
                 def _dk(did, dn):
                     # GỘP theo driver_id (phân biệt 2 người TRÙNG TÊN); thiếu id → theo tên
@@ -205,10 +226,13 @@ async def fetch_live(token):
                     try:
                         async with sem:
                             items = await _fetch_all_items(session, token, hid, t["tripCode"])
-                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?, COD, số kiện)
+                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?, COD, số kiện, xã)
+                        def _wd(x):
+                            info = x.get("deliverInfo") or x.get("receiverContact") or {}
+                            return (info.get("wardName") or "").strip() or None
                         recs = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True,
                                  x.get("isUpdated") is True, is_ontrip, float(x.get("collectAmount") or 0),
-                                 len(x.get("items") or []) or 1)
+                                 len(x.get("items") or []) or 1, _wd(x))
                                 for x in items if x.get("type") == "DELIVER"]
                         # PICK: (mã đơn, tài xế, đã lấy thành công?)
                         picks = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True)
@@ -233,20 +257,23 @@ async def fetch_live(token):
                 # tính cho chuyến hiện tại). GTC=đơn giao xong ở BẤT KỲ chuyến nào.
                 best = {}
                 for did, dn, recs, _picks, _meta in res:
-                    for oc, rdid, rdn, succ, att, ot, cod, kien in recs:
+                    for oc, rdid, rdn, succ, att, ot, cod, kien, ward in recs:
                         if not oc:
                             continue
                         score = (4 if succ else 0) + (2 if att else 0) + (1 if ot else 0)
                         cur = best.get(oc)
                         if cur is None or score > cur[0]:
-                            best[oc] = (score, rdid, rdn, succ, att, cod, kien)
-                for oc, (score, rdid, rdn, succ, att, cod, kien) in best.items():
+                            best[oc] = (score, rdid, rdn, succ, att, cod, kien, ward)
+                for oc, (score, rdid, rdn, succ, att, cod, kien, ward) in best.items():
                     d = drivers.setdefault(_dk(rdid, rdn), _drv0(rdid, rdn))
                     d["total"] += 1
                     d["kien"] += kien              # số kiện của đơn giao (khối lượng)
+                    w = d["wards"].setdefault(ward or "— (không rõ xã)", [0, 0])
+                    w[0] += 1                       # đơn gán ở xã này
                     if succ:
                         d["gtc"] += 1
                         d["kien_gtc"] += kien
+                        w[1] += 1                   # GTC ở xã này
                     if att:
                         d["att"] += 1
                         if not succ:               # GTB = đã thao tác nhưng giao HỎNG → COD kẹt
@@ -630,24 +657,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
                     _codm(r.get("cod_gtb", 0)), _n(r.get("ltc", 0)),
                     _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0))))
         P.append("</summary>")
-        drv = r["drivers"]  # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao)
+        # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao); bấm NV → %GTC theo xã
         P.append("<div class='dtl'>")
-        if drv:
-            P.append("<table class='drv'><thead><tr><th>Nhân viên</th><th>Gán</th><th>GTC</th><th>LTC</th><th>COD GTB</th><th>%GTC</th><th>🛍️GTC</th></tr></thead><tbody>")
-            for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
-                pc2 = _pct(d["gtc"], d["total"])
-                cgtb = d.get("cod_gtb", 0)  # COD kẹt trên đơn GTB (đã thao tác nhưng giao hỏng)
-                gtb_cell = ("<b class='gtb'>%s</b>" % _codm(cgtb)) if cgtb >= 1e5 else "0"
-                ltc = d.get("ltc", 0)
-                ltc_cell = ("<b class='ltc'>%s</b>" % _n(ltc)) if ltc > 0 else "0"
-                P.append("<tr><td class='nv'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                         "<td><span class='pill sm %s'>%s%%</span></td><td>%s</td></tr>"
-                         % (_esc(d["name"]), _n(d["total"]), _n(d["gtc"]),
-                            ltc_cell, gtb_cell, _cls(pc2), pc2 if pc2 is not None else "—",
-                            _tt_cell(d.get("vngh_gtc", 0), d.get("vngh", 0))))
-            P.append("</tbody></table>")
-        else:
-            P.append("<div class='none'>Chưa có chuyến hôm nay.</div>")
+        P.append(_drv_table(r["drivers"]))
         P.append("</div></details>")
 
     P.append("<div class='foot'><b>📖 Giải thích chỉ số</b><br>"
@@ -658,6 +670,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
              "💰 <b>COD GTB</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công<br>"
              "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
              "<span style='opacity:.7'>Số LIVE gồm cả chuyến đã kết thúc trong ngày · %GTC còn thấp giữa ngày là bình thường (chuyến chưa đóng) · nguồn nhanh.ghn.vn</span></div>")
+    P.append("<script>function tgw(tr){tr.classList.toggle('op');"
+             "var s=tr.nextElementSibling;if(s&&s.classList.contains('wsub'))s.classList.toggle('show');}</script>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
              "document.querySelectorAll('.bc[data-k]').forEach(function(e){var k=e.dataset.k||'';"
              "var s=(!q||k.indexOf(q)>=0);e.style.display=s?'':'none';if(s)n++;});"
@@ -842,6 +856,19 @@ table.drv tbody tr:last-child td{border-bottom:none}
 td.nv{font-weight:600;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 td.nv .sc{font-size:9.5px;color:var(--mut);font-weight:400;margin-top:1px;overflow:hidden;text-overflow:ellipsis}
 .tt{color:#e879c8;font-weight:700}
+/* NV bấm mở → %GTC theo xã/phường (live hôm nay) */
+tr.dnv{cursor:pointer}
+tr.dnv .cx{display:inline-block;color:var(--mut);font-size:8px;margin-right:5px;transition:transform .18s;vertical-align:middle}
+tr.dnv.op .cx{transform:rotate(90deg);color:var(--txt)}
+tr.dnv.op>td{border-bottom:none}
+tr.wsub{display:none}tr.wsub.show{display:table-row}
+tr.wsub>td{padding:2px 6px 10px !important;text-align:left}
+.whd{font-size:9.5px;color:var(--mut);font-weight:700;letter-spacing:.02em;margin:2px 0 6px;text-transform:uppercase}
+.wgrid{display:flex;flex-direction:column;gap:5px}
+.wrow{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--line);
+  border-radius:9px;padding:6px 9px}
+.wrow .wnm{flex:1;min-width:0;font-size:11.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrow .wct{color:var(--mut);font-size:10.5px;font-variant-numeric:tabular-nums}
 @media(max-width:430px){
   table.drv{font-size:11px}
   table.drv th,table.drv td{padding:6px 2px}
