@@ -601,8 +601,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='gtb'>❌COD %s</span>·<span class='ltc'>LTC %s</span>%s</div>"
-                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _codm(v.get("cod_gtb", 0)), _n(v["ltc"]),
+        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='ltc'>LTC %s</span>%s</div>"
+                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["ltc"]),
                     ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else ""))
         P.append("</summary>")
         P.append("<div class='dtl'>")
@@ -623,9 +623,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='gtb'>❌COD %s</span>·<span class='ltc'>LTC %s</span>%s</div>"
+        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='ltc'>LTC %s</span>%s</div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
-                    _codm(v.get("cod_gtb", 0)), _n(v["ltc"]),
+                    _n(v["ltc"]),
                     ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else ""))
         P.append("</summary>")
         P.append("<div class='dtl'>")
