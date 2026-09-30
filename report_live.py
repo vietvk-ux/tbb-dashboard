@@ -306,7 +306,7 @@ async def fetch_live(token):
                     if en and (d["en"] is None or en > d["en"]):
                         d["en"] = en
                     if meta["ot"]:
-                        for oc, rdid, rdn, succ, att, ot, cod, kien in recs:
+                        for oc, rdid, rdn, succ, att, ot, cod, kien, _ward in recs:
                             if not oc:
                                 continue
                             d["ot_tot"] += 1
