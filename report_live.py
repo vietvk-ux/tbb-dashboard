@@ -739,7 +739,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<details id='nvxuly' class='cgbento'><summary>"
                  "<div class='mic'>👤</div>"
                  "<div class='mtx'><div class='mn'>NV cần xử lý · kém dai dẳng</div>"
-                 "<div class='ms'>tra cứu hồ sơ + toàn bộ danh sách · %%GTC TB &lt;50%% qua ≥5/14 ngày</div></div>"
+                 "<div class='ms'>tra cứu hồ sơ + toàn bộ danh sách · %%GTC TB &lt;40%% qua ≥5/14 ngày</div></div>"
                  "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
                  "</summary><div class='dtl'>%s</div></details>" % (nvm["n"], nvm["html"]))
     else:

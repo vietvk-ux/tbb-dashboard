@@ -22,7 +22,7 @@ VN = timezone(timedelta(hours=7))
 WINDOW = 14           # số ngày nhìn lại
 MIN_DON_DAY = 10      # ngày "hoạt động" = giao ≥10 đơn (bỏ ngày lẻ)
 MIN_ACTIVE = 5        # đủ mẫu để kết luận dai dẳng
-YEU = 50             # %GTC < 50 = ngày yếu / NV yếu
+YEU = 40             # %GTC < 40 = ngày yếu / NV yếu (mốc nhóm yếu NHẤT, đổi 50→40 ngày 30/09)
 EMBED_MAX = 25        # số NV tối đa hiển thị trong ô bento trang trực tiếp
 
 
@@ -182,7 +182,7 @@ def embed(rows):
     else:
         H.append("<div class='qnone'>Không có NV nào yếu dai dẳng. 👍</div>")
     H.append("<div class='qfoot'>Nhìn %d ngày · ngày hoạt động = giao ≥%d đơn · dữ liệu chốt cuối ngày (Supabase). "
-             "Streak: 🟥&lt;50%% · 🟨50-70%% · 🟩≥70%% · ⬛ ít đơn.</div>" % (WINDOW, MIN_DON_DAY))
+             "Streak: 🟥&lt;40%% · 🟨40-70%% · 🟩≥70%% · ⬛ ít đơn.</div>" % (WINDOW, MIN_DON_DAY))
     H.append("</div>")
     js = "var NVM=%s;\n%s" % (json.dumps(idx, ensure_ascii=False), _EMBED_JS)
     return {"n": len(flagged), "html": "".join(H), "css": _EMBED_CSS, "js": js}
@@ -222,7 +222,7 @@ _EMBED_CSS = """
 
 # ---- JS nhúng (namespaced nvm*) — ô tra cứu bất kỳ NV trên trang trực tiếp ----
 _EMBED_JS = """
-function _nvmcls(p){return p==null?'na':(p<50?'bad':(p<70?'warn':'good'));}
+function _nvmcls(p){return p==null?'na':(p<40?'bad':(p<70?'warn':'good'));}
 function _nvmcodm(v){v=v||0;if(v<1e5)return'0';if(v>=1e9)return(v/1e9).toFixed(2).replace('.',',')+' tỷ';return(v/1e6).toFixed(1).replace('.',',')+'tr';}
 function _nvmcard(x){
   var cl=_nvmcls(x.avg);
