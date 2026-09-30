@@ -894,17 +894,17 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
 _CSS = """<style>
 :root{
- --bg:#070911;--bg2:#0c0f18;--card:rgba(21,26,47,.6);--card2:rgba(29,35,59,.58);--line:rgba(255,255,255,.13);
- --mut:#aeb5d4;--txt:#eff3fd;--good:#52e2a2;--warn:#f7bd4d;--bad:#f77c8a;--ink:#0a0d18;
+ --bg:#0a0e1a;--bg2:#10131f;--card:rgba(27,33,56,.56);--card2:rgba(35,42,68,.55);--line:rgba(255,255,255,.16);
+ --mut:#b9c0dc;--txt:#f5f8ff;--good:#5ee7ab;--warn:#f9c559;--bad:#f98795;--ink:#0a0d18;
  --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
  color:var(--txt);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.4;
  background:
-  radial-gradient(80% 34% at 12% -6%,rgba(79,70,229,.34) 0%,transparent 50%),
-  radial-gradient(76% 32% at 96% 3%,rgba(150,80,220,.28) 0%,transparent 48%),
-  radial-gradient(110% 46% at 60% 105%,rgba(13,148,136,.28) 0%,transparent 56%),
-  radial-gradient(62% 32% at 84% 66%,rgba(99,102,241,.22) 0%,transparent 54%),#070911;
+  radial-gradient(80% 34% at 12% -6%,rgba(90,82,236,.4) 0%,transparent 50%),
+  radial-gradient(76% 32% at 96% 3%,rgba(160,92,228,.33) 0%,transparent 48%),
+  radial-gradient(110% 46% at 60% 105%,rgba(16,160,146,.33) 0%,transparent 56%),
+  radial-gradient(62% 32% at 84% 66%,rgba(110,113,245,.26) 0%,transparent 54%),#0a0e1a;
  background-attachment:fixed}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));padding-bottom:calc(30px + env(safe-area-inset-bottom))}
 /* Kính mờ dùng chung — đọc rõ cả nơi nền tối lẫn nơi có ánh sáng */
