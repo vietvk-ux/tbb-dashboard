@@ -658,7 +658,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"),      "%GTC TikTok",     tt_rgb,  "",   vpct is None),
         ("💰", _codm(R["cod_gtb"]),                       "COD GTB",         AMBER,   "",   False),
         ("🛒", _n(R["ltc"]),                                         "LTC",             NEU,     "",   True),
-        ("📦", _n(R["ltb"]),                                         "LTB (lấy hỏng)",  (RED if R["ltb"] else NEU), "", not R["ltb"]),
+        ("📦", _n(R["ltb"]),                                         "LTB (lấy thất bại)",  (RED if R["ltb"] else NEU), "", not R["ltb"]),
         ("🎯", _n(nv_qual - nv_low),                                 "NV đạt ≥50%",     GREEN,   "",   (nv_qual - nv_low) == 0),
     ]
     P.append("<div class='sectitle'>📊 Chỉ số khác</div>")
