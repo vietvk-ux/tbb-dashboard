@@ -23,6 +23,7 @@ WINDOW = 14           # số ngày nhìn lại
 MIN_DON_DAY = 10      # ngày "hoạt động" = giao ≥10 đơn (bỏ ngày lẻ)
 MIN_ACTIVE = 5        # đủ mẫu để kết luận dai dẳng
 YEU = 50             # %GTC < 50 = ngày yếu / NV yếu
+EMBED_MAX = 25        # số NV tối đa hiển thị trong ô bento trang trực tiếp (đủ ở nvxuly.html)
 
 
 def _n(x):
@@ -205,11 +206,17 @@ def embed(rows):
     H.append("<input class='qsearch' id='nvmq' placeholder='🔎 Tra cứu hồ sơ nhân viên (tên / bưu cục)…' "
              "oninput='nvmSearch()' autocomplete='off' onclick='event.stopPropagation()'>")
     H.append("<div id='nvmres' class='qres'></div>")
-    H.append("<div class='qsec'>📋 %d NV cần xử lý · %%GTC dưới %d%% dai dẳng (≥%d/%d ngày hoạt động)</div>"
-             % (len(flagged), YEU, MIN_ACTIVE, WINDOW))
+    shown = flagged[:EMBED_MAX]
+    lbl = ("📋 %d NV cần xử lý · hiển thị %d nặng nhất" % (len(flagged), len(shown))) \
+        if len(flagged) > EMBED_MAX else \
+        ("📋 %d NV cần xử lý · %%GTC dưới %d%% dai dẳng (≥%d/%d ngày hoạt động)"
+         % (len(flagged), YEU, MIN_ACTIVE, WINDOW))
+    H.append("<div class='qsec'>%s</div>" % lbl)
     if flagged:
-        for i, x in enumerate(flagged, 1):
+        for i, x in enumerate(shown, 1):
             H.append(_embed_card(x, rank=i))
+        if len(flagged) > EMBED_MAX:
+            H.append("<a class='qmore' href='nvxuly.html'>Xem đủ %d NV cần xử lý →</a>" % len(flagged))
     else:
         H.append("<div class='qnone'>Không có NV nào yếu dai dẳng. 👍</div>")
     H.append("<div class='qfoot'>Nhìn %d ngày · ngày hoạt động = giao ≥%d đơn · dữ liệu chốt cuối ngày (Supabase). "
@@ -389,6 +396,8 @@ _EMBED_CSS = """
 .nvmgr table.qt th.l,.nvmgr table.qt td.l{text-align:left}
 .nvmgr table.qt tbody tr:last-child td{border-bottom:none}
 .nvmgr .qnone{color:var(--mut);text-align:center;padding:16px;font-size:12.5px}
+.nvmgr .qmore{display:block;text-align:center;text-decoration:none;color:var(--bad);font-weight:700;font-size:12.5px;
+ padding:11px;margin:8px 0 2px;border:1px solid rgba(242,88,95,.32);border-radius:12px;background:rgba(242,88,95,.08)}
 .nvmgr .qfoot{color:#6d7492;font-size:10px;line-height:1.6;margin:10px 2px 2px}
 """
 
