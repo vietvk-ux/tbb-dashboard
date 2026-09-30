@@ -543,7 +543,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
         ("chuyendi.html", "🚚", "Hiệu suất chuyến đi", "đơn/giờ · giờ ra hàng", "255,138,61", [40, 58, 70, 52, 78, 64, 86]),
         ("xephang.html", "🏆", "Xếp hạng tổng hợp", "AM · bưu cục · NV", "255,213,74", [55, 48, 70, 62, 84, 74, 92]),
         ("khochuyentiep.html", "📦", "Kho Chuyển Tiếp", "tồn luân chuyển", "255,110,169", [48, 62, 54, 70, 60, 78, 66]),
-        ("nvxuly.html", "👤", "Quản lý Nhân viên", "kém dai dẳng · tra cứu hồ sơ", "242,88,95", [70, 55, 66, 48, 60, 52, 44]),
     ]
     P.append("<div class='menu'>")
     # Ô nổi bật (span 2): Báo cáo tổng quan + %GTC vùng lớn
@@ -926,16 +925,8 @@ def main():
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
 
-    # Trang QUẢN LÝ NHÂN VIÊN đầy đủ (nvxuly.html) — tra cứu hồ sơ bất kỳ NV + streak 14 ngày.
-    # Tái dùng _nvr (đã fetch ở trên); Supabase lỗi → GIỮ trang cũ.
-    if _nvr:
-        try:
-            import report_nvxuly
-            with open(os.path.join(outdir, "nvxuly.html"), "w", encoding="utf-8") as f:
-                f.write(report_nvxuly.gen_html(_nvr))
-        except Exception as e:
-            logger.warning("Tạo nvxuly.html lỗi (bỏ qua): %s", str(e)[:150])
-
+    # (Trang QUẢN LÝ NHÂN VIÊN riêng nvxuly.html đã BỎ 30/09 — dữ liệu NV nay nằm gọn
+    #  trong ô bento "NV cần xử lý" ngay trên trang trực tiếp qua report_nvxuly.embed)
     # (Trang đơn TikTok vngh.html đã bỏ 24/08 — 3 chỉ số TikTok vẫn giữ ở dải chỉ số index)
 
     # Trang hiệu suất chuyến đi NV — dùng lại rows (giờ XP/đóng, đơn/giờ, scan, đang chạy)
