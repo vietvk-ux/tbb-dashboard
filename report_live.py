@@ -225,6 +225,23 @@ async def fetch_giao_120h(session, hub_ids, token):
         return None
 
 
+async def _giao120h_one(session, hid, token):
+    """Giao>120h của 1 bưu cục (get-general-info hub đơn) → int; lỗi → 0. Dùng để drill AM→BC."""
+    try:
+        d = await _post(session, "/core/oss/v1/report/get-general-info",
+                        {"hub_ids": [str(hid)], "view_mode": "WARD", "order_type": "ALL"}, hid, token)
+        tot = 0
+        for e in (d.get("data") or []):
+            for gi in (e.get("general_infos") or []):
+                if gi.get("order_type") == "DELIVER":
+                    tot += sum(i.get("total_order") or 0
+                               for i in (gi.get("order_inventories") or [])
+                               if i.get("duration") in ("120_192", "192"))
+        return tot
+    except Exception:
+        return 0
+
+
 async def fetch_live(token):
     today = datetime.now(VN).date()
     ymd = today.year * 10000 + today.month * 100 + today.day
@@ -241,6 +258,8 @@ async def fetch_live(token):
                     bl = await fetch_chua_gan(session, hid, token)
                 backlog = bl.get("deliver", 0)   # Giao "chưa có chuyến đi trong ngày" (chuẩn Tồn LGT)
                 backlog_wards = bl.get("wards", [])   # [(tên xã, số đơn Giao chưa gán)] giảm dần
+                async with sem:
+                    g120 = await _giao120h_one(session, hid, token)   # Giao>120h bưu cục này (drill)
 
                 async def _list(status):
                     async with sem:
@@ -381,7 +400,7 @@ async def fetch_live(token):
                 h_kien = sum(d["kien"] for d in drivers.values())
                 h_kien_gtc = sum(d["kien_gtc"] for d in drivers.values())
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
-                        "backlog_wards": backlog_wards,
+                        "backlog_wards": backlog_wards, "giao120h": g120,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc,
                         "vngh": h_vngh, "vngh_gtc": h_vngh_gtc, "cod_gtb": h_cod_gtb,
@@ -396,7 +415,8 @@ async def fetch_live(token):
                         "fin": 0, "gtc": 0, "att": 0, "total": 0, "drivers": []}
 
         rows = await asyncio.gather(*[one(h) for h in hubs])
-        giao_120h = await fetch_giao_120h(session, [str(h["locationCode"]) for h in hubs], token)
+        # Tổng Giao>120h = Σ per-hub (đã lấy trong one()) → khớp drill AM→BC.
+        giao_120h = sum(r.get("giao120h", 0) for r in rows)
         return rows, giao_120h
 
 
@@ -512,14 +532,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     cg_spark = ""
     if trend and len(trend) >= 2:
         cg_spark = _spark([t["chuagan"] for t in trend], "#34d399", w=60, h=22)
-    _open_cg = ("onclick=\"var d=document.getElementById('cgd');if(d){d.open=true;"
-                "d.scrollIntoView({behavior:'smooth',block:'start'});}\"")
-    _open_nvx = ("onclick=\"var d=document.getElementById('nvxuly');if(d){d.open=true;"
-                 "d.scrollIntoView({behavior:'smooth',block:'start'});}\"")
+    def _opendrill(_id):
+        return ("onclick=\"var d=document.getElementById('%s');if(d){d.open=true;"
+                "d.scrollIntoView({behavior:'smooth',block:'start'});}\"" % _id)
+    _open_cg, _open_nvx, _open_g120 = _opendrill('cgd'), _opendrill('nvxuly'), _opendrill('g120d')
     P.append("<div class='sectitle'>⚡ Cần làm ngay · nặng → nhẹ</div><section class='prilist'>")
-    P.append("<div class='todo bd'><div class='tic'>🔴</div><div class='tdt'>"
-             "<div class='ttn'>Giao quá 120h (đỏ SLA)</div><div class='tts'>đơn treo lâu nhất toàn vùng</div></div>"
-             "<div class='ttv'>%s</div></div>" % (_n(giao_120h) if giao_120h is not None else "—"))
+    P.append("<div class='todo bd' %s><div class='tic'>🔴</div><div class='tdt'>"
+             "<div class='ttn'>Giao quá 120h (đỏ SLA)</div><div class='tts'>bấm mở AM → bưu cục</div></div>"
+             "<div class='ttv'>%s</div></div>"
+             % (_open_g120, _n(giao_120h) if giao_120h is not None else "—"))
     P.append("<div class='todo wn' %s><div class='tic'>⏳</div><div class='tdt'>"
              "<div class='ttn'>Tồn chưa gán giao</div><div class='tts'>bấm mở AM → bưu cục → xã</div></div>"
              "%s<div class='ttv'>%s</div></div>"
@@ -679,6 +700,36 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                     P.append("<div class='note'>Không lấy được chi tiết tuyến (thử lại lần sau).</div>")
                 P.append("</div></details>")
             P.append("</div></details>")
+        P.append("</div></details>")
+
+    # ===== 🔴 Giao>120h drill — AM → bưu cục (mở từ ô 'Cần làm ngay') =====
+    g_am = {}
+    for r in rows:
+        g = r.get("giao120h", 0)
+        if g <= 0:
+            continue
+        amn = AM_OF.get(r["name"]) or "(chưa phân AM)"
+        g_am.setdefault(amn, []).append((r["name"], g))
+    if g_am:
+        P.append("<details id='g120d' class='cgbento'><summary>")
+        P.append("<div class='mic'>🔴</div>"
+                 "<div class='mtx'><div class='mn'>Giao quá 120h (đỏ SLA)</div>"
+                 "<div class='ms'>AM → bưu cục · đơn tồn quá 120 giờ · bấm mở</div></div>"
+                 "<div class='mbig'>%s</div><span class='cvar'>▾</span></summary>"
+                 "<div class='dtl'>" % _n(giao_120h or 0))
+        for amn, bcs in sorted(g_am.items(), key=lambda kv: -sum(g for _, g in kv[1])):
+            am_tot = sum(g for _, g in bcs)
+            P.append("<details class='bc bad'><summary>")
+            P.append("<div class='bch'><span class='dot bad'></span><span class='bcn'>🧑‍💼 %s</span>"
+                     "<span class='pill bad'>%s</span></div>"
+                     "<div class='bcm'><span>%d bưu cục có đơn đỏ</span></div>"
+                     "</summary><div class='dtl'>" % (_esc(amn), _n(am_tot), len(bcs)))
+            P.append("<table class='drv'><thead><tr><th>Bưu cục</th>"
+                     "<th>Giao &gt;120h</th></tr></thead><tbody>")
+            for bcn, g in sorted(bcs, key=lambda x: -x[1]):
+                P.append("<tr><td class='nv'>%s</td><td><b class='w'>%s</b></td></tr>"
+                         % (_esc(bcn), _n(g)))
+            P.append("</tbody></table></div></details>")
         P.append("</div></details>")
 
     # ===== 👤 NV cần xử lý — NHÚNG TOÀN BỘ TRANG QUẢN LÝ NHÂN VIÊN (tra cứu hồ sơ +
