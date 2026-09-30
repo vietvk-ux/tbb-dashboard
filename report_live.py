@@ -100,6 +100,59 @@ def _khuvuc_ref():
         return None
 
 
+def _fetch_region_trend(days=8):
+    """Lịch sử VÙNG N ngày (chốt cuối ngày) từ Supabase bao_cao_vung: %GTC + chưa gán.
+    Trả list cũ→mới [{ngay,pct,chuagan}] (bỏ ngày null pct); None nếu thiếu creds/lỗi."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return None
+    try:
+        import requests
+        h = {"apikey": key, "Authorization": "Bearer " + key}
+        r = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc,chua_gan"
+                         "&order=ngay.desc&limit=%d" % (url, days), headers=h, timeout=20)
+        if not r.ok:
+            return None
+        out = [{"ngay": x["ngay"], "pct": x.get("pct_gtc"), "chuagan": x.get("chua_gan")}
+               for x in reversed(r.json()) if x.get("pct_gtc") is not None]
+        return out or None
+    except Exception:
+        return None
+
+
+def _spark(vals, color, w=240, h=46, target=None, pad=6):
+    """Đường xu hướng nhỏ (SVG) từ list số; target = vạch ngang đứt (mục tiêu). '' nếu <2 điểm."""
+    xs = [v for v in vals if v is not None]
+    if len(xs) < 2:
+        return ""
+    lo, hi = min(xs), max(xs)
+    if target is not None:
+        hi = max(hi, target); lo = min(lo, target)
+    rng = (hi - lo) or 1
+    n = len(vals)
+
+    def X(i):
+        return pad + i * (w - 2 * pad) / (n - 1)
+
+    def Y(v):
+        return pad + (hi - v) / rng * (h - 2 * pad)
+
+    pts = " ".join("%.1f,%.1f" % (X(i), Y(v)) for i, v in enumerate(vals) if v is not None)
+    tline = ""
+    if target is not None:
+        ty = Y(target)
+        tline = ("<line x1='0' y1='%.1f' x2='%d' y2='%.1f' stroke='rgba(167,139,250,.5)' "
+                 "stroke-width='1' stroke-dasharray='4 4'/>" % (ty, w, ty))
+    lx, ly = X(n - 1), Y(xs[-1])
+    return ("<svg class='spk' viewBox='0 0 %d %d' width='100%%' height='%d' preserveAspectRatio='none'>%s"
+            "<polyline points='%s' fill='none' stroke='%s' stroke-width='2.4' "
+            "stroke-linecap='round' stroke-linejoin='round'/>"
+            "<circle cx='%.1f' cy='%.1f' r='3' fill='%s'/></svg>"
+            % (w, h, h, tline, pts, color, lx, ly, color))
+
+
 def _drv_table(drv):
     """Bảng nhân viên của 1 bưu cục. Mỗi NV BẤM MỞ được → hàng con %GTC theo xã/phường
     (từ d['wards'] gộp lúc bóc chuyến, 0 call thêm). NV không có đơn giao → không mở."""
@@ -347,7 +400,7 @@ async def fetch_live(token):
         return rows, giao_120h
 
 
-def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
+def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0}
@@ -385,7 +438,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
     P.append("<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>")
     P.append("<meta name='robots' content='noindex,nofollow'>")
     P.append("<meta http-equiv='refresh' content='300'>")
-    P.append("<meta name='theme-color' content='#0a0d18'>")
+    P.append("<meta name='theme-color' content='#080a16'>")
+    P.append("<link rel='preconnect' href='https://fonts.googleapis.com'>")
+    P.append("<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>")
+    P.append("<link rel='stylesheet' href='https://fonts.googleapis.com/css2?"
+             "family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap'>")
     P.append("<title>TBB trực tiếp · %s</title>" % now.strftime("%H:%M"))
     P.append(_CSS)
     if nvm is not None:
@@ -398,24 +455,82 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
              "<div class='ts'>%s · %s</div></header>"
              % (now.strftime("%H:%M"), now.strftime("%d/%m")))
 
-    # ===== Hero %GTC (có mốc so sánh) =====
     ref = _khuvuc_ref()
+
+    # ===== ĐÈN TRẠNG THÁI (thông minh theo tiến độ ngày) =====
+    done_ratio = (R["att"] / R["total"]) if R["total"] else 0
+    yp = ref["yp"] if ref else None
+    if R["total"] == 0:
+        vk, vic, vst, vsub = "neu", "⏳", "CHƯA CÓ DỮ LIỆU", "Đang chờ chuyến đầu ngày"
+    elif done_ratio < 0.45:
+        vk, vic, vst = "neu", "⏳", "ĐANG LUỸ KẾ TRONG NGÀY"
+        vsub = ("Còn sớm — %%GTC chưa đủ để đánh giá%s · xem việc cần làm bên dưới"
+                % (" · hôm qua chốt %d%%" % yp if yp is not None else ""))
+    elif reg_pct is not None and reg_pct >= 70:
+        vk, vic, vst, vsub = "good", "🟢", "ĐẠT MỤC TIÊU", "Vượt/đạt mốc 70% — giữ nhịp"
+    elif reg_pct is not None and reg_pct >= 60:
+        vk, vic, vst = "warn", "🟡", "CẦN CHÚ Ý"
+        vsub = "Dưới mục tiêu · còn %d điểm tới 70%%" % (70 - reg_pct)
+    else:
+        vk, vic, vst = "bad", "🔴", "DƯỚI MỤC TIÊU"
+        vsub = "Cần đốc gấp · còn %d điểm tới 70%%" % (70 - (reg_pct or 0))
+    P.append("<section class='verdict %s'><div class='vic'>%s</div>"
+             "<div class='vtx'><div class='vst'>%s</div><div class='vsub'>%s</div></div>"
+             "<div class='vpct'><b>%s%s</b><i>%%GTC · %s</i></div></section>"
+             % (vk, vic, vst, vsub,
+                (reg_pct if reg_pct is not None else "—"),
+                ("%" if reg_pct is not None else ""), now.strftime("%H:%M")))
+
+    # ===== Hero %GTC + đường xu hướng 8 ngày (chốt cuối ngày) =====
     P.append("<section class='hero %s'>" % _cls(reg_pct))
-    P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG TÂY BẮC BỘ</div>")
+    P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG · TỚI HIỆN TẠI</div>")
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     P.append("<div class='hsub'>%s / %s đơn giao thành công · LTC %s · cần giao %s</div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
+    if trend and len(trend) >= 2:
+        pcts = [t["pct"] for t in trend]
+        P.append("<div class='sparkwrap'><div class='spklbl'>Xu hướng %d ngày (chốt cuối ngày) · "
+                 "nay đang luỹ kế</div>%s</div>"
+                 % (len(pcts), _spark(pcts, "#fbbf24", w=280, h=50, target=70)))
     if ref:
         gap = ""
         if reg_pct is not None and reg_pct < 70:
-            gap = "<span class='rc'>Còn <b>%d</b> điểm tới mục tiêu 70%%</span>" % (70 - reg_pct)
+            gap = "<span class='rc'>Còn <b>%d</b> điểm tới 70%%</span>" % (70 - reg_pct)
         P.append("<div class='href'>"
                  "<span class='rc'>🎯 Mục tiêu <b>70%%</b></span>"
-                 "<span class='rc'>Hôm qua chốt <b>%d%%</b></span>"
+                 "<span class='rc'>Hôm qua <b>%d%%</b></span>"
                  "<span class='rc'>TB %d ngày <b>%d%%</b></span>%s</div>"
                  % (ref["yp"], ref["ndays"], ref["avg7p"], gap))
+    P.append("</section>")
+
+    # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
+    nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
+    coll_nv = sum(len(us) for us in collectable.values()) if collectable else None
+    coll_amt = sum(u["amount"] for us in collectable.values() for u in us) if collectable else 0
+    cg_spark = ""
+    if trend and len(trend) >= 2:
+        cg_spark = _spark([t["chuagan"] for t in trend], "#34d399", w=60, h=22)
+    _open_cg = ("onclick=\"var d=document.getElementById('cgd');if(d){d.open=true;"
+                "d.scrollIntoView({behavior:'smooth',block:'start'});}\"")
+    _open_nvx = ("onclick=\"var d=document.getElementById('nvxuly');if(d){d.open=true;"
+                 "d.scrollIntoView({behavior:'smooth',block:'start'});}\"")
+    P.append("<div class='sectitle'>⚡ Cần làm ngay · nặng → nhẹ</div><section class='prilist'>")
+    P.append("<div class='todo bd'><div class='tic'>🔴</div><div class='tdt'>"
+             "<div class='ttn'>Giao quá 120h (đỏ SLA)</div><div class='tts'>đơn treo lâu nhất toàn vùng</div></div>"
+             "<div class='ttv'>%s</div></div>" % (_n(giao_120h) if giao_120h is not None else "—"))
+    P.append("<div class='todo wn' %s><div class='tic'>⏳</div><div class='tdt'>"
+             "<div class='ttn'>Tồn chưa gán giao</div><div class='tts'>bấm mở AM → bưu cục → xã</div></div>"
+             "%s<div class='ttv'>%s</div></div>"
+             % (_open_cg, cg_spark, _n(R["backlog"])))
+    P.append("<div class='todo vi' %s><div class='tic'>👤</div><div class='tdt'>"
+             "<div class='ttn'>NV cần xử lý</div><div class='tts'>%%GTC kém dai dẳng · bấm mở</div></div>"
+             "<div class='ttv'>%s</div></div>" % (_open_nvx, _n(nvx_n)))
+    if coll_nv is not None:
+        P.append("<a class='todo wn lnk' href='chuyendi.html'><div class='tic'>💵</div><div class='tdt'>"
+                 "<div class='ttn'>NV chưa nộp tiền</div><div class='tts'>%s đang treo · xem chi tiết →</div></div>"
+                 "<div class='ttv'>%s</div></a>" % (_codm(coll_amt), _n(coll_nv)))
     P.append("</section>")
 
     # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
@@ -507,10 +622,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
     #      icon, giá trị, nhãn, màu rgb, extra, neu(ô trung tính)
     kpis = [
         ("📥", _n(R["total"]),                                       "Đã gán",          NEU,     "",   True),
-        ("⏳", _n(R["backlog"]),                                     "Chưa gán ▾",      AMBER,   "cg", False),
         ("🏃", _n(R["ontrip"]),                                      "Đang chạy",       NEU,     "",   True),
         ("🚛", _n(on_road),                                          "Còn phải giao",   NEU,     "",   True),
-        ("🔴", (_n(giao_120h) if giao_120h is not None else "—"),    "Giao &gt;120h",   RED,     "",   False),
         ("✅", _n(R["gtc"]),                                         "GTC nay",         NEU,     "",   True),
         ("🕘", _n(late_cnt),                                         "XP muộn &gt;9h30",xp_rgb,  "",   not late_cnt),
         ("🛍️", _n(R["vngh"]),                                       "TikTok gán",      NEU,     "",   True),
@@ -519,6 +632,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
         ("💰", _codm(R["cod_gtb"]),                       "COD GTB",         AMBER,   "",   False),
         ("🛒", _n(R["ltc"]),                                         "LTC",             NEU,     "",   True),
     ]
+    P.append("<div class='sectitle'>📊 Chỉ số khác</div>")
     P.append("<section class='strip'>")
     for ic, val, lab, rgb, extra, neu in kpis:
         cls = "st" + (" cg" if extra == "cg" else "") + (" neu" if neu else "")
@@ -729,18 +843,27 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
 
 _CSS = """<style>
 :root{
- --bg:#0a0d18;--bg2:#0e1220;--card:#161b2d;--card2:#1b2136;--line:#272d45;
- --mut:#8b92ab;--txt:#eef0f7;--good:#2fd07a;--warn:#f7b955;--bad:#f2585f;--ink:#0a0d18
-}
+ --bg:#080a16;--bg2:#0e111c;--card:rgba(20,25,46,.52);--card2:rgba(28,34,58,.5);--line:rgba(255,255,255,.13);
+ --mut:#aab2e0;--txt:#eef1ff;--good:#34d399;--warn:#fbbf24;--bad:#fb7185;--ink:#0a0d18;
+ --vi:#a78bfa;--cy:#22d3ee}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
- background:linear-gradient(180deg,#0b0f1c 0%,#0a0d18 240px,#0a0d18 100%);color:var(--txt);
- -webkit-font-smoothing:antialiased;font-size:15px;line-height:1.35}
+body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+ color:var(--txt);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.4;
+ background:
+  radial-gradient(90% 42% at 12% -6%,#4f46e5 0%,transparent 46%),
+  radial-gradient(85% 40% at 96% 3%,#a855f7 0%,transparent 44%),
+  radial-gradient(120% 55% at 60% 104%,#0d9488 0%,transparent 52%),
+  radial-gradient(70% 40% at 84% 66%,#6366f1 0%,transparent 50%),#080a16;
+ background-attachment:fixed}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));padding-bottom:calc(30px + env(safe-area-inset-bottom))}
+/* Kính mờ dùng chung — đọc rõ cả nơi nền tối lẫn nơi có ánh sáng */
+.hero,.verdict,.prilist,.diag,.st,.cgbento,.bc,.mtile,.foot{
+ backdrop-filter:blur(13px) saturate(1.25);-webkit-backdrop-filter:blur(13px) saturate(1.25)}
+.brand,.hpct,.sv,.mbig,.vst,.vpct b,.ttv,.hh,.amn{font-family:'Sora','Manrope',sans-serif}
 
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
- padding:calc(12px + env(safe-area-inset-top)) 2px 10px;background:linear-gradient(180deg,#0a0d18 70%,rgba(10,13,24,0));margin-bottom:4px}
-.brand{font-weight:800;letter-spacing:.06em;font-size:15px;display:flex;align-items:center;gap:8px}
+ padding:calc(12px + env(safe-area-inset-top)) 2px 10px;background:linear-gradient(180deg,rgba(8,10,22,.85) 66%,rgba(8,10,22,0));backdrop-filter:blur(8px);margin-bottom:4px}
+.brand{font-weight:800;letter-spacing:.04em;font-size:15px;display:flex;align-items:center;gap:8px}
 .ts{color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 .live{width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(47,208,122,.6);animation:pulse 1.8s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,208,122,.55)}70%{box-shadow:0 0 0 7px rgba(47,208,122,0)}100%{box-shadow:0 0 0 0 rgba(47,208,122,0)}}
@@ -762,7 +885,42 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .rc{font-size:11px;color:var(--mut);background:rgba(255,255,255,.05);border:1px solid var(--line);
  border-radius:99px;padding:3px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rc b{color:var(--txt);font-weight:800}
-.diag{background:radial-gradient(120% 100% at 0% 0%,rgba(255,255,255,.05),var(--card) 72%);
+.sparkwrap{margin-top:12px}
+.spklbl{font-size:9.5px;color:var(--mut);font-weight:600;letter-spacing:.02em;margin-bottom:3px}
+svg.spk{display:block}
+/* ĐÈN TRẠNG THÁI */
+.verdict{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:4px 0 12px;border-radius:18px;
+ background:linear-gradient(120deg,rgba(139,147,255,.18),var(--card));border:1px solid rgba(139,147,255,.34)}
+.verdict.good{background:linear-gradient(120deg,rgba(52,211,153,.2),var(--card));border-color:rgba(52,211,153,.4)}
+.verdict.warn{background:linear-gradient(120deg,rgba(251,191,36,.2),var(--card));border-color:rgba(251,191,36,.4)}
+.verdict.bad{background:linear-gradient(120deg,rgba(251,113,133,.22),var(--card));border-color:rgba(251,113,133,.45)}
+.vic{width:44px;height:44px;border-radius:13px;flex:none;display:grid;place-items:center;font-size:22px;
+ background:rgba(255,255,255,.08);border:1px solid var(--line)}
+.vtx{flex:1;min-width:0}
+.vst{font-weight:800;font-size:15px;letter-spacing:.02em}
+.verdict.neu .vst{color:var(--vi)}.verdict.good .vst{color:var(--good)}.verdict.warn .vst{color:var(--warn)}.verdict.bad .vst{color:var(--bad)}
+.vsub{font-size:11px;color:var(--mut);margin-top:2px;line-height:1.4}
+.vpct{text-align:right;flex:none}
+.vpct b{font-weight:800;font-size:26px;font-variant-numeric:tabular-nums}
+.vpct i{display:block;font-style:normal;font-size:8.5px;color:var(--mut);font-weight:600}
+/* CẦN LÀM NGAY */
+.sectitle{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);margin:14px 3px 8px}
+.prilist{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;background:none;border:none;padding:0}
+.todo{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:15px;text-decoration:none;color:var(--txt);
+ background:var(--card);border:1px solid var(--line)}
+.todo.bd{border-color:rgba(251,113,133,.4)}.todo.wn{border-color:rgba(251,191,36,.34)}.todo.vi{border-color:rgba(167,139,250,.4)}
+.todo.lnk:active{transform:scale(.99)}
+.todo .tic{width:34px;height:34px;border-radius:11px;flex:none;display:grid;place-items:center;font-size:17px;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.todo.bd .tic{background:rgba(251,113,133,.16);border-color:rgba(251,113,133,.38)}
+.todo.wn .tic{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.34)}
+.todo.vi .tic{background:rgba(167,139,250,.16);border-color:rgba(167,139,250,.4)}
+.todo .tdt{flex:1;min-width:0}
+.todo .ttn{font-weight:700;font-size:13px}
+.todo .tts{font-size:10.5px;color:var(--mut);margin-top:1px}
+.todo .ttv{font-weight:800;font-size:22px;flex:none;font-variant-numeric:tabular-nums}
+.todo.bd .ttv{color:var(--bad)}.todo.wn .ttv{color:var(--warn)}.todo.vi .ttv{color:var(--txt)}
+.todo svg.spk{width:56px;height:22px;flex:none}
+.diag{background:radial-gradient(120% 100% at 0% 0%,rgba(255,255,255,.06),var(--card) 72%);
  border:1px solid var(--line);border-radius:14px;padding:10px 13px;margin:0 0 12px;
  font-size:12.5px;line-height:1.55;color:var(--mut)}
 .diag b{color:var(--txt);font-weight:800}
@@ -944,8 +1102,6 @@ display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-col
 .fab .rfi{font-size:26px;line-height:1;font-weight:700}
 .fab.spin .rfi{animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-body{background:radial-gradient(130% 100% at 50% -10%,rgba(34,197,94,.10),transparent 65%),#0e2318 !important;background-attachment:fixed}
-.top{background:linear-gradient(180deg,#0e2318 62%,rgba(14,35,24,0)) !important}
 </style></head><body>"""
 
 
@@ -994,6 +1150,15 @@ def main():
                                  key=lambda x: (x["avg"], -x["yeu"]))
         except Exception as e:
             logger.warning("NV cần xử lý (Supabase) lỗi, dùng bản hôm nay: %s", str(e)[:120])
+        # Xu hướng vùng 8 ngày (Supabase) cho hero + ô "cần làm ngay". Lỗi → None (ẩn spark).
+        trend = _fetch_region_trend(8)
+        # Phiếu thu CHƯA thu tiền (dùng cho ô "cần làm ngay" + trang chuyến đi). Fetch 1 lần.
+        collectable = None
+        try:
+            import report_chuyendi
+            collectable = report_chuyendi.fetch_collectable(token)
+        except Exception as ce:
+            logger.warning("Phiếu thu treo lỗi (ẩn): %s", str(ce)[:120])
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
@@ -1002,7 +1167,7 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    h = gen_html(rows, giao_120h, nv_xuly, nvm)
+    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
@@ -1011,14 +1176,9 @@ def main():
     #  trong ô bento "NV cần xử lý" ngay trên trang trực tiếp qua report_nvxuly.embed)
     # (Trang đơn TikTok vngh.html đã bỏ 24/08 — 3 chỉ số TikTok vẫn giữ ở dải chỉ số index)
 
-    # Trang hiệu suất chuyến đi NV — dùng lại rows (giờ XP/đóng, đơn/giờ, scan, đang chạy)
-    # + phiếu thu CHƯA thu tiền theo bưu cục (get-collectable-amount-by-hub; lỗi→ẩn mục).
+    # Trang hiệu suất chuyến đi NV — dùng lại rows + collectable ĐÃ fetch ở trên (0 call thêm).
     try:
         import report_chuyendi
-        try:
-            collectable = report_chuyendi.fetch_collectable(token)
-        except Exception as ce:
-            logger.warning("Phiếu thu treo lỗi (ẩn mục): %s", str(ce)[:120]); collectable = None
         with open(os.path.join(outdir, "chuyendi.html"), "w", encoding="utf-8") as f:
             f.write(report_chuyendi.gen_html(rows, collectable))
     except Exception as e:
