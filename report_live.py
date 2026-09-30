@@ -276,7 +276,7 @@ async def fetch_live(token):
 
                 def _drv0(did, dn):
                     return {"id": did, "name": dn, "chuyen": 0, "gtc": 0, "att": 0, "total": 0,
-                            "ltc": 0, "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0,
+                            "ltc": 0, "ltb": 0, "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0,
                             # hiệu suất chuyến đi: giờ xuất phát/kết thúc, scan, tiến độ chuyến đang chạy
                             "st": None, "en": None, "scan_ok": 0, "scan_tot": 0,
                             "ot_done": 0, "ot_tot": 0,
@@ -304,8 +304,9 @@ async def fetch_live(token):
                                  x.get("isUpdated") is True, is_ontrip, float(x.get("collectAmount") or 0),
                                  len(x.get("items") or []) or 1, _wd(x))
                                 for x in items if x.get("type") == "DELIVER"]
-                        # PICK: (mã đơn, tài xế, đã lấy thành công?)
-                        picks = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True)
+                        # PICK: (mã đơn, tài xế, đã lấy thành công?, đã thao tác?) → LTC + LTB
+                        picks = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True,
+                                  x.get("isUpdated") is True)
                                  for x in items if x.get("type") == "PICK"]
                         for x in items:
                             if x.get("type") == "DELIVER":
@@ -352,19 +353,23 @@ async def fetch_live(token):
                         d["vngh"] += 1
                         if succ:
                             d["vngh_gtc"] += 1
-                # LTC (lấy thành công): gộp mã đơn PICK, thành công ở bất kỳ chuyến nào
+                # LẤY (PICK): gộp mã đơn → LTC (lấy thành công) + LTB (đã thao tác nhưng KHÔNG lấy được).
+                # Ưu tiên bản ghi: lấy thành công > đã thao tác > chưa thao tác (score psucc*2+patt).
                 bestp = {}
                 for did, dn, _recs, picks, _meta in res:
-                    for oc, rdid, rdn, psucc in picks:
+                    for oc, rdid, rdn, psucc, patt in picks:
                         if not oc:
                             continue
+                        sc = (2 if psucc else 0) + (1 if patt else 0)
                         cur = bestp.get(oc)
-                        if cur is None or (psucc and not cur[2]):
-                            bestp[oc] = (rdid, rdn, psucc)
-                for oc, (rdid, rdn, psucc) in bestp.items():
+                        if cur is None or sc > cur[0]:
+                            bestp[oc] = (sc, rdid, rdn, psucc, patt)
+                for oc, (sc, rdid, rdn, psucc, patt) in bestp.items():
                     d = drivers.setdefault(_dk(rdid, rdn), _drv0(rdid, rdn))
                     if psucc:
                         d["ltc"] += 1
+                    elif patt:                        # đã thao tác nhưng không lấy được = LTB
+                        d["ltb"] += 1
                 # HIỆU SUẤT CHUYẾN ĐI: giờ xuất phát (chuyến bắt đầu HÔM NAY) / kết thúc,
                 # số đơn đã scan, tiến độ chuyến ĐANG CHẠY (đã giao/tổng).
                 for did, dn, recs, _picks, meta in res:
@@ -393,6 +398,7 @@ async def fetch_live(token):
                 h_gtc = sum(d["gtc"] for d in drivers.values())
                 h_att = sum(d["att"] for d in drivers.values())
                 h_ltc = sum(d["ltc"] for d in drivers.values())
+                h_ltb = sum(d["ltb"] for d in drivers.values())
                 # Đơn TikTok Shop (mã VNGH) — gộp theo mã đơn giao, tiến độ theo bưu cục
                 h_vngh = sum(1 for oc in best if oc.startswith("VNGH"))
                 h_vngh_gtc = sum(1 for oc, v in best.items() if oc.startswith("VNGH") and v[3])
@@ -402,7 +408,7 @@ async def fetch_live(token):
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "backlog_wards": backlog_wards, "giao120h": g120,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
-                        "att": h_att, "total": h_total, "ltc": h_ltc,
+                        "att": h_att, "total": h_total, "ltc": h_ltc, "ltb": h_ltb,
                         "vngh": h_vngh, "vngh_gtc": h_vngh_gtc, "cod_gtb": h_cod_gtb,
                         "kien": h_kien, "kien_gtc": h_kien_gtc,
                         "drivers": list(drivers.values())}
@@ -422,7 +428,7 @@ async def fetch_live(token):
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None):
     now = datetime.now(VN)
-    R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0,
+    R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0}
     prov = {}
     am = {}
@@ -652,6 +658,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"),      "%GTC TikTok",     tt_rgb,  "",   vpct is None),
         ("💰", _codm(R["cod_gtb"]),                       "COD GTB",         AMBER,   "",   False),
         ("🛒", _n(R["ltc"]),                                         "LTC",             NEU,     "",   True),
+        ("📦", _n(R["ltb"]),                                         "LTB (lấy hỏng)",  (RED if R["ltb"] else NEU), "", not R["ltb"]),
+        ("🎯", _n(nv_qual - nv_low),                                 "NV đạt ≥50%",     GREEN,   "",   (nv_qual - nv_low) == 0),
     ]
     P.append("<div class='sectitle'>📊 Chỉ số khác</div>")
     P.append("<section class='strip'>")
@@ -873,7 +881,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "🏃 <b>Đang chạy</b> = số NV còn chuyến chưa kết thúc · 🚛 <b>Còn phải giao</b> = đơn của chuyến đang chạy CHƯA giao xong (đang trên đường)<br>"
              "🔴 <b>Backlog giao 120h</b> = đơn Giao tồn quá 120 giờ toàn vùng (khớp trang Tồn đọng) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
              "🕘 <b>XP muộn &gt;9h30</b> = số NV xuất phát sau 9h30 (kỷ luật ra hàng) · 🛍️ <b>TikTok</b> = đơn mã VNGH<br>"
-             "💰 <b>COD GTB</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công<br>"
+             "💰 <b>COD GTB</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công · 📦 <b>LTB</b> = lấy hàng thất bại (đã thao tác nhưng không lấy được)<br>"
+             "🎯 <b>NV đạt ≥50%</b> = số nhân viên có %GTC ≥50%% (≥20 đơn đã gán)<br>"
              "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
              "<span style='opacity:.7'>Số LIVE gồm cả chuyến đã kết thúc trong ngày · %GTC còn thấp giữa ngày là bình thường (chuyến chưa đóng) · nguồn nhanh.ghn.vn</span></div>")
     P.append("<script>function tgw(tr){tr.classList.toggle('op');"
