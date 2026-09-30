@@ -1012,10 +1012,15 @@ def main():
     # (Trang đơn TikTok vngh.html đã bỏ 24/08 — 3 chỉ số TikTok vẫn giữ ở dải chỉ số index)
 
     # Trang hiệu suất chuyến đi NV — dùng lại rows (giờ XP/đóng, đơn/giờ, scan, đang chạy)
+    # + phiếu thu CHƯA thu tiền theo bưu cục (get-collectable-amount-by-hub; lỗi→ẩn mục).
     try:
         import report_chuyendi
+        try:
+            collectable = report_chuyendi.fetch_collectable(token)
+        except Exception as ce:
+            logger.warning("Phiếu thu treo lỗi (ẩn mục): %s", str(ce)[:120]); collectable = None
         with open(os.path.join(outdir, "chuyendi.html"), "w", encoding="utf-8") as f:
-            f.write(report_chuyendi.gen_html(rows))
+            f.write(report_chuyendi.gen_html(rows, collectable))
     except Exception as e:
         logger.warning("Tạo chuyendi.html lỗi (bỏ qua): %s", str(e)[:150])
 

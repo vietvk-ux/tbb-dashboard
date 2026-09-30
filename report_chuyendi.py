@@ -31,9 +31,72 @@ td.nv .sc{color:var(--mut);font-size:10.5px;font-weight:400}
 table.drv td.win{font-size:11px;color:var(--mut);white-space:nowrap}
 .bc summary .amn{font-weight:800;font-size:14.5px}
 .bc summary .ammet{color:var(--mut);font-size:11.5px;font-weight:500}
+b.warn,.tx.warn{color:var(--warn)}b.good{color:var(--good)}b.bad{color:var(--bad)}
+table.drv td.money{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:700}
 body{background:radial-gradient(130% 100% at 50% -10%,rgba(45,212,191,.10),transparent 65%),#0c2521 !important;background-attachment:fixed}
 .top{background:linear-gradient(180deg,#0c2521 62%,rgba(12,37,33,0)) !important}
 </style>"""
+
+
+def _money(v):
+    """Số tiền đồng KÈM 'đ' (dấu chấm ngăn nghìn): 17900 → '17.900đ'."""
+    return "{:,}".format(int(round(v or 0))).replace(",", ".") + "đ"
+
+
+def _money_short(v):
+    """Rút gọn cho subtotal: ≥1 tỷ '1,23 tỷ' · ≥1tr '12,3tr' · nhỏ hơn full đồng."""
+    v = v or 0
+    if v >= 1e9:
+        return ("%.2f tỷ" % (v / 1e9)).replace(".", ",")
+    if v >= 1e6:
+        return ("%.1ftr" % (v / 1e6)).replace(".", ",")
+    return _money(v)
+
+
+def fetch_collectable(token):
+    """Phiếu thu CHƯA thu tiền (tiền COD nhân viên đã thu nhưng CHƯA nộp về) theo bưu cục.
+    Gọi get-collectable-amount-by-hub cho toàn bộ hub Vùng TBB (nguồn trang Phiếu thu →
+    Thu tiền → 'Chưa thu tiền'). Trả {tên_bưu_cục: [{name, orders, amount}]} gộp theo CBĐP,
+    sort tiền giảm dần; chỉ bưu cục CÓ phiếu treo. Thiếu token/lỗi → None (mục sẽ ẩn)."""
+    if not token:
+        return None
+    try:
+        import asyncio
+        import aiohttp
+        from report import _get_hubs, _post, CONCURRENCY
+
+        async def _run():
+            to = aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=30)
+            async with aiohttp.ClientSession(timeout=to) as s:
+                hubs = await _get_hubs(s, token)
+                sem = asyncio.Semaphore(CONCURRENCY)
+
+                async def one(h):
+                    try:
+                        async with sem:
+                            d = await _post(s, "/lastmile/receipt/get-collectable-amount-by-hub",
+                                            {"hub_id": str(h["locationCode"])}, h["locationCode"], token)
+                        return (h["locationName"], d.get("data") or [])
+                    except Exception:
+                        return (h["locationName"], None)
+                return await asyncio.gather(*[one(h) for h in hubs])
+
+        res = asyncio.run(_run())
+        out = {}
+        for name, data in res:
+            if not data:
+                continue
+            agg = {}
+            for x in data:
+                uid = x.get("paid_user_id") or x.get("paid_user_name") or "?"
+                a = agg.setdefault(uid, {"name": x.get("paid_user_name") or "?", "orders": 0, "amount": 0})
+                a["orders"] += x.get("order_number") or 0
+                a["amount"] += x.get("paid_amount") or 0
+            if agg:
+                out[name] = sorted(agg.values(), key=lambda v: -v["amount"])
+        return out
+    except Exception:
+        return None
 
 
 def _dph_cls(v):
@@ -104,8 +167,11 @@ def _row(i, m, show_gtc=True, show_flags=True):
                dph, win, gcell))
 
 
-def gen_html(rows):
+def gen_html(rows, collectable=None):
     now = datetime.now(VN)
+    # Phiếu thu treo (nếu có): tổng tiền + số CBĐP để hiển thị ở dải chỉ số
+    coll_amt = sum(u["amount"] for us in collectable.values() for u in us) if collectable else None
+    coll_nv = sum(len(us) for us in collectable.values()) if collectable else 0
     # Làm phẳng danh sách nhân viên + tính chỉ số
     drv = []
     for r in rows:
@@ -164,6 +230,9 @@ def gen_html(rows):
     P.append("<div class='st'><div class='sv'>%d</div><div class='sl'>🏃 Đang chạy</div></div>" % len(dang_chay))
     P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🕘 XP muộn >9h30</div></div>" % late_count)
     P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>🚛 Còn phải giao</div></div>" % _n(on_road))
+    if coll_amt is not None:
+        P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>💵 Chưa thu · %d NV</div></div>"
+                 % (_money_short(coll_amt), coll_nv))
     P.append("</section>")
 
     thead = ("<table class='drv'><thead><tr><th class='rk'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
@@ -278,6 +347,47 @@ def gen_html(rows):
     else:
         P.append("<div class='none'>Không có NV xuất phát muộn.</div>")
     P.append("</section>")
+
+    # 💵 Phiếu thu CHƯA thu tiền (tiền COD NV chưa nộp) — AM → bưu cục → nhân viên
+    if collectable is not None:
+        P.append("<div class='sec' style='color:var(--warn)'>💵 Phiếu thu CHƯA thu tiền · AM → bưu cục → nhân viên</div>")
+        P.append("<section class='card' style='padding:2px 10px'>")
+        amg = {}
+        g_amt = g_ord = g_nv = 0
+        for bc, users in collectable.items():
+            amn = AM_OF.get(bc) or "(chưa gán AM)"
+            a = amg.setdefault(amn, {"amt": 0, "ord": 0, "nv": 0, "bcs": {}})
+            b = a["bcs"].setdefault(bc, {"amt": 0, "ord": 0, "users": users})
+            for u in users:
+                a["amt"] += u["amount"]; a["ord"] += u["orders"]; a["nv"] += 1
+                b["amt"] += u["amount"]; b["ord"] += u["orders"]
+                g_amt += u["amount"]; g_ord += u["orders"]; g_nv += 1
+        if amg:
+            P.append("<div class='note'>Tiền COD nhân viên đã thu nhưng <b>CHƯA nộp</b> về "
+                     "(nguồn: Phiếu thu → Thu tiền → 'Chưa thu tiền'). Tổng <b class='warn'>%s</b> · "
+                     "%s ĐH · %d CBĐP · bấm AM để xem bưu cục → nhân viên.</div>"
+                     % (_money(g_amt), _n(g_ord), g_nv))
+            for amn, a in sorted(amg.items(), key=lambda kv: -kv[1]["amt"]):
+                P.append("<details class='bc'><summary><span class='amn'>%s</span>"
+                         "<span class='ammet'>%d CBĐP · %s ĐH · <b class='warn'>%s</b> ▾</span>"
+                         "</summary><div class='dtl'>"
+                         % (_esc(amn), a["nv"], _n(a["ord"]), _money_short(a["amt"])))
+                for bc, b in sorted(a["bcs"].items(), key=lambda kv: -kv[1]["amt"]):
+                    P.append("<details class='bc sub'><summary><span class='amn' style='font-size:13px'>%s</span>"
+                             "<span class='ammet'>%d CBĐP · %s ĐH · <b class='warn'>%s</b></span>"
+                             "</summary><div class='dtl'>"
+                             % (_esc(bc), len(b["users"]), _n(b["ord"]), _money_short(b["amt"])))
+                    P.append("<table class='drv'><thead><tr><th class='lft'>Nhân viên (CBĐP)</th>"
+                             "<th>ĐH cần thu</th><th>Tiền cần thu</th></tr></thead><tbody>")
+                    for u in b["users"]:
+                        P.append("<tr><td class='nv'>%s</td><td>%s</td>"
+                                 "<td class='money'><b class='warn'>%s</b></td></tr>"
+                                 % (_esc(u["name"]), _n(u["orders"]), _money(u["amount"])))
+                    P.append("</tbody></table></div></details>")
+                P.append("</div></details>")
+        else:
+            P.append("<div class='none'>✅ Không còn phiếu thu treo — tất cả đã nộp.</div>")
+        P.append("</section>")
 
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
