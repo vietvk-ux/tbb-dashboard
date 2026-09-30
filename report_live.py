@@ -894,8 +894,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
 _CSS = """<style>
 :root{
- --bg:#070911;--bg2:#0c0f18;--card:rgba(18,23,42,.66);--card2:rgba(26,32,54,.64);--line:rgba(255,255,255,.13);
- --mut:#a2aacb;--txt:#eaeef9;--good:#4ade9a;--warn:#f4b840;--bad:#f47281;--ink:#0a0d18;
+ --bg:#070911;--bg2:#0c0f18;--card:rgba(21,26,47,.6);--card2:rgba(29,35,59,.58);--line:rgba(255,255,255,.13);
+ --mut:#aeb5d4;--txt:#eff3fd;--good:#52e2a2;--warn:#f7bd4d;--bad:#f77c8a;--ink:#0a0d18;
  --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -957,7 +957,7 @@ svg.spk{display:block}
 /* CẦN LÀM NGAY */
 .sectitle{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);margin:14px 3px 8px}
 .prilist{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;background:none;border:none;padding:0}
-.todo{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:15px;text-decoration:none;color:var(--txt);
+.todo{display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:15px;text-decoration:none;color:var(--txt);
  background:var(--card);border:1px solid var(--line)}
 .todo.bd{border-color:rgba(251,113,133,.4)}.todo.wn{border-color:rgba(251,191,36,.34)}.todo.vi{border-color:rgba(167,139,250,.4)}
 .todo.lnk:active{transform:scale(.99)}
@@ -966,9 +966,9 @@ svg.spk{display:block}
 .todo.wn .tic{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.34)}
 .todo.vi .tic{background:rgba(167,139,250,.16);border-color:rgba(167,139,250,.4)}
 .todo .tdt{flex:1;min-width:0}
-.todo .ttn{font-weight:700;font-size:13px}
-.todo .tts{font-size:10.5px;color:var(--mut);margin-top:1px}
-.todo .ttv{font-weight:800;font-size:22px;flex:none;font-variant-numeric:tabular-nums}
+.todo .ttn{font-weight:800;font-size:14.5px;letter-spacing:-.01em}
+.todo .tts{font-size:11px;color:var(--mut);margin-top:2px;font-weight:600}
+.todo .ttv{font-weight:800;font-size:28px;flex:none;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .todo.bd .ttv{color:var(--bad)}.todo.wn .ttv{color:var(--warn)}.todo.vi .ttv{color:var(--txt)}
 .todo svg.spk{width:56px;height:22px;flex:none}
 .diag{background:radial-gradient(120% 100% at 0% 0%,rgba(255,255,255,.06),var(--card) 72%);
