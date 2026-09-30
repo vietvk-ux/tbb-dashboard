@@ -894,22 +894,22 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
 _CSS = """<style>
 :root{
- --bg:#080a16;--bg2:#0e111c;--card:rgba(20,25,46,.52);--card2:rgba(28,34,58,.5);--line:rgba(255,255,255,.13);
- --mut:#aab2e0;--txt:#eef1ff;--good:#34d399;--warn:#fbbf24;--bad:#fb7185;--ink:#0a0d18;
- --vi:#a78bfa;--cy:#22d3ee}
+ --bg:#070911;--bg2:#0c0f18;--card:rgba(15,19,34,.72);--card2:rgba(22,27,46,.7);--line:rgba(255,255,255,.09);
+ --mut:#8f97ba;--txt:#d7dcec;--good:#3fc98a;--warn:#e6ac3f;--bad:#ec6f7d;--ink:#0a0d18;
+ --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
  color:var(--txt);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.4;
  background:
-  radial-gradient(90% 42% at 12% -6%,#4f46e5 0%,transparent 46%),
-  radial-gradient(85% 40% at 96% 3%,#a855f7 0%,transparent 44%),
-  radial-gradient(120% 55% at 60% 104%,#0d9488 0%,transparent 52%),
-  radial-gradient(70% 40% at 84% 66%,#6366f1 0%,transparent 50%),#080a16;
+  radial-gradient(80% 34% at 12% -6%,rgba(79,70,229,.34) 0%,transparent 50%),
+  radial-gradient(76% 32% at 96% 3%,rgba(150,80,220,.28) 0%,transparent 48%),
+  radial-gradient(110% 46% at 60% 105%,rgba(13,148,136,.28) 0%,transparent 56%),
+  radial-gradient(62% 32% at 84% 66%,rgba(99,102,241,.22) 0%,transparent 54%),#070911;
  background-attachment:fixed}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));padding-bottom:calc(30px + env(safe-area-inset-bottom))}
 /* Kính mờ dùng chung — đọc rõ cả nơi nền tối lẫn nơi có ánh sáng */
 .hero,.verdict,.prilist,.diag,.st,.cgbento,.bc,.mtile,.foot{
- backdrop-filter:blur(13px) saturate(1.25);-webkit-backdrop-filter:blur(13px) saturate(1.25)}
+ backdrop-filter:blur(14px) saturate(1.02);-webkit-backdrop-filter:blur(14px) saturate(1.02)}
 .brand,.hpct,.sv,.mbig,.vst,.vpct b,.ttv,.hh,.amn{font-family:'Sora','Manrope',sans-serif}
 
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
@@ -920,12 +920,12 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,208,122,.55)}70%{box-shadow:0 0 0 7px rgba(47,208,122,0)}100%{box-shadow:0 0 0 0 rgba(47,208,122,0)}}
 
 .hero{--h:139,146,171;border-radius:20px;padding:20px 18px 18px;margin:4px 0 12px;position:relative;overflow:hidden;
- background:radial-gradient(130% 100% at 100% 0,rgba(var(--h),.16),transparent 62%),
+ background:radial-gradient(130% 100% at 100% 0,rgba(var(--h),.10),transparent 62%),
   radial-gradient(120% 90% at 0% 0,rgba(var(--h),.08),transparent 55%),var(--card);
- border:1px solid rgba(var(--h),.32)}
-.hero.good{--h:47,208,122;box-shadow:0 10px 34px -14px rgba(47,208,122,.4)}
-.hero.warn{--h:247,185,85;box-shadow:0 10px 34px -14px rgba(247,185,85,.36)}
-.hero.bad{--h:242,88,95;box-shadow:0 10px 34px -14px rgba(242,88,95,.36)}
+ border:1px solid rgba(var(--h),.22)}
+.hero.good{--h:47,208,122;box-shadow:0 8px 26px -16px rgba(47,208,122,.22)}
+.hero.warn{--h:247,185,85;box-shadow:0 8px 26px -16px rgba(247,185,85,.2)}
+.hero.bad{--h:242,88,95;box-shadow:0 8px 26px -16px rgba(242,88,95,.2)}
 .hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 .hpct{font-size:64px;font-weight:850;line-height:1;margin:8px 0 12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
@@ -1000,7 +1000,7 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 
 .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px}
 .st{position:relative;overflow:hidden;text-align:center;padding:11px 6px 10px;border-radius:16px;
- background:radial-gradient(125% 105% at 0% 0%,rgba(var(--h),.16),var(--card) 72%);
+ background:radial-gradient(125% 105% at 0% 0%,rgba(var(--h),.10),var(--card) 74%);
  border:1px solid rgba(var(--h),.24)}
 .st.cg{cursor:pointer}.st.cg:active{transform:scale(.98)}
 .st.neu{background:radial-gradient(125% 105% at 0% 0%,rgba(var(--h),.08),var(--card) 78%);border-color:rgba(var(--h),.15)}
