@@ -231,8 +231,8 @@ def gen_html(rows, collectable=None):
     P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🕘 XP muộn >9h30</div></div>" % late_count)
     P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>🚛 Còn phải giao</div></div>" % _n(on_road))
     if coll_amt is not None:
-        P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>💵 Chưa thu · %d NV</div></div>"
-                 % (_money_short(coll_amt), coll_nv))
+        P.append("<div class='st'><div class='sv warn'>%d</div><div class='sl'>💵 NV chưa thu · %s</div></div>"
+                 % (coll_nv, _money_short(coll_amt)))
     P.append("</section>")
 
     thead = ("<table class='drv'><thead><tr><th class='rk'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
