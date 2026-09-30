@@ -894,8 +894,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
 _CSS = """<style>
 :root{
- --bg:#070911;--bg2:#0c0f18;--card:rgba(15,19,34,.72);--card2:rgba(22,27,46,.7);--line:rgba(255,255,255,.09);
- --mut:#8f97ba;--txt:#d7dcec;--good:#3fc98a;--warn:#e6ac3f;--bad:#ec6f7d;--ink:#0a0d18;
+ --bg:#070911;--bg2:#0c0f18;--card:rgba(18,23,42,.66);--card2:rgba(26,32,54,.64);--line:rgba(255,255,255,.13);
+ --mut:#a2aacb;--txt:#eaeef9;--good:#4ade9a;--warn:#f4b840;--bad:#f47281;--ink:#0a0d18;
  --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -927,7 +927,7 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hero.warn{--h:247,185,85;box-shadow:0 8px 26px -16px rgba(247,185,85,.2)}
 .hero.bad{--h:242,88,95;box-shadow:0 8px 26px -16px rgba(242,88,95,.2)}
 .hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.hpct{font-size:64px;font-weight:850;line-height:1;margin:8px 0 12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.hpct{font-size:64px;font-weight:850;line-height:1;margin:8px 0 12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-shadow:0 0 22px rgba(var(--h),.28)}
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
 .hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
 .hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
@@ -1004,7 +1004,7 @@ details.diag[open] .dcv{transform:rotate(180deg)}
  border:1px solid rgba(var(--h),.24)}
 .st.cg{cursor:pointer}.st.cg:active{transform:scale(.98)}
 .st.neu{background:radial-gradient(125% 105% at 0% 0%,rgba(var(--h),.08),var(--card) 78%);border-color:rgba(var(--h),.15)}
-.st.neu .sv{color:#e9eefc}
+.st.neu .sv{color:#f4f7ff}
 /* Tồn chưa gán · ô feature bento đỏ */
 .cgbento{--h:242,88,95;position:relative;overflow:hidden;display:block;border-radius:18px;margin:2px 0 12px;
  background:linear-gradient(110deg,rgba(var(--h),.32),#150e13 78%);border:1px solid rgba(var(--h),.5)}
