@@ -538,7 +538,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     _open_cg, _open_nvx, _open_g120 = _opendrill('cgd'), _opendrill('nvxuly'), _opendrill('g120d')
     P.append("<div class='sectitle'>⚡ Cần làm ngay · nặng → nhẹ</div><section class='prilist'>")
     P.append("<div class='todo bd' %s><div class='tic'>🔴</div><div class='tdt'>"
-             "<div class='ttn'>Giao quá 120h (đỏ SLA)</div><div class='tts'>bấm mở AM → bưu cục</div></div>"
+             "<div class='ttn'>Backlog giao 120h</div><div class='tts'>bấm mở AM → bưu cục</div></div>"
              "<div class='ttv'>%s</div></div>"
              % (_open_g120, _n(giao_120h) if giao_120h is not None else "—"))
     P.append("<div class='todo wn' %s><div class='tic'>⏳</div><div class='tdt'>"
@@ -713,7 +713,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if g_am:
         P.append("<details id='g120d' class='cgbento'><summary>")
         P.append("<div class='mic'>🔴</div>"
-                 "<div class='mtx'><div class='mn'>Giao quá 120h (đỏ SLA)</div>"
+                 "<div class='mtx'><div class='mn'>Backlog giao 120h</div>"
                  "<div class='ms'>AM → bưu cục · đơn tồn quá 120 giờ · bấm mở</div></div>"
                  "<div class='mbig'>%s</div><span class='cvar'>▾</span></summary>"
                  "<div class='dtl'>" % _n(giao_120h or 0))
@@ -725,7 +725,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      "<div class='bcm'><span>%d bưu cục có đơn đỏ</span></div>"
                      "</summary><div class='dtl'>" % (_esc(amn), _n(am_tot), len(bcs)))
             P.append("<table class='drv'><thead><tr><th>Bưu cục</th>"
-                     "<th>Giao &gt;120h</th></tr></thead><tbody>")
+                     "<th>Backlog 120h</th></tr></thead><tbody>")
             for bcn, g in sorted(bcs, key=lambda x: -x[1]):
                 P.append("<tr><td class='nv'>%s</td><td><b class='w'>%s</b></td></tr>"
                          % (_esc(bcn), _n(g)))
@@ -871,7 +871,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='foot'><b>📖 Giải thích chỉ số</b><br>"
              "📥 <b>Đã gán</b> = đơn đã xếp vào chuyến hôm nay · ⏳ <b>Chưa gán</b> = đơn tồn ở kho chưa xếp chuyến<br>"
              "🏃 <b>Đang chạy</b> = số NV còn chuyến chưa kết thúc · 🚛 <b>Còn phải giao</b> = đơn của chuyến đang chạy CHƯA giao xong (đang trên đường)<br>"
-             "🔴 <b>Giao &gt;120h</b> = đơn Giao tồn quá 120 giờ toàn vùng (đơn đỏ SLA, khớp trang Tồn đọng) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
+             "🔴 <b>Backlog giao 120h</b> = đơn Giao tồn quá 120 giờ toàn vùng (khớp trang Tồn đọng) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
              "🕘 <b>XP muộn &gt;9h30</b> = số NV xuất phát sau 9h30 (kỷ luật ra hàng) · 🛍️ <b>TikTok</b> = đơn mã VNGH<br>"
              "💰 <b>COD GTB</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công<br>"
              "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
