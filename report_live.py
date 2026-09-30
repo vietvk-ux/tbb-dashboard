@@ -451,7 +451,50 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None):
         diag.append("✅ <b>%d%%</b> NV đạt (≥50%%, %d NV)" % (nv_rate, nv_qual))
     if not diag:
         diag.append("✅ Vùng vận hành ổn định")
-    P.append("<div class='diag'>⚡ %s</div>" % " · ".join(diag))
+
+    # ---- Top 5 tệ nhất từng mục (bấm mở dòng chú ý để đọc ngay) ----
+    top_bl5 = sorted([r for r in rows if r.get("backlog", 0) > 0],
+                     key=lambda x: -x["backlog"])[:5]
+    am_worst5 = sorted(am_pcts, key=lambda x: x[1])[:5]
+    bc_low5 = sorted([(r, _pct(r["gtc"], r["total"])) for r in rows
+                      if r["total"] >= 20 and _pct(r["gtc"], r["total"]) is not None
+                      and _pct(r["gtc"], r["total"]) < 50], key=lambda x: x[1])[:5]
+    nv_low5 = sorted([(d, r["name"], _pct(d["gtc"], d["total"])) for r in rows
+                      for d in r.get("drivers", [])
+                      if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
+                      and _pct(d["gtc"], d["total"]) < 50], key=lambda x: x[2])[:5]
+
+    def _dgrp(title, items):
+        if not items:
+            return ""
+        rows_html = "".join(items)
+        return "<div class='dgrp'><div class='dgh'>%s</div>%s</div>" % (title, rows_html)
+
+    grps = []
+    if top_bl5:
+        grps.append(_dgrp("🔴 Top tồn chưa gán giao", [
+            "<div class='drow'><span class='dn'>%s</span><span class='dv w'>%s đơn</span></div>"
+            % (_esc(r["name"]), _n(r["backlog"])) for r in top_bl5]))
+    if am_worst5:
+        grps.append(_dgrp("🟠 AM %GTC thấp nhất", [
+            "<div class='drow'><span class='dn'>%s</span><span class='pill sm %s'>%s%%</span></div>"
+            % (_esc(a), _cls(p), p) for a, p in am_worst5]))
+    if bc_low5:
+        grps.append(_dgrp("🏤 Top bưu cục %GTC thấp (≥20 đơn)", [
+            "<div class='drow'><span class='dn'>%s</span><span class='pill sm %s'>%s%%</span></div>"
+            % (_esc(r["name"]), _cls(p), p) for r, p in bc_low5]))
+    if nv_low5:
+        grps.append(_dgrp("👤 Top NV %GTC thấp (≥20 đơn)", [
+            "<div class='drow'><span class='dn'>%s<i>%s</i></span><span class='pill sm %s'>%s%%</span></div>"
+            % (_esc(d["name"]), _esc(bc), _cls(p), p) for d, bc, p in nv_low5]))
+
+    if grps:
+        P.append("<details class='diag'><summary>⚡ %s<span class='dcv'>▾</span></summary>"
+                 "<div class='ddtl'><div class='dnote'>Top 5 cần chú ý mỗi mục · "
+                 "%%GTC luỹ kế trong ngày (sáng còn thấp là bình thường)</div>%s</div></details>"
+                 % (" · ".join(diag), "".join(grps)))
+    else:
+        P.append("<div class='diag'>⚡ %s</div>" % " · ".join(diag))
 
     # ===== Dải chỉ số · Bento (Mẫu 3) · màu theo từng chỉ số =====
     vpct = _pct(R["vngh_gtc"], R["vngh"])
@@ -723,6 +766,20 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
  border:1px solid var(--line);border-radius:14px;padding:10px 13px;margin:0 0 12px;
  font-size:12.5px;line-height:1.55;color:var(--mut)}
 .diag b{color:var(--txt);font-weight:800}
+details.diag>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px}
+details.diag>summary::-webkit-details-marker{display:none}
+.dcv{position:absolute;right:0;top:0;color:var(--mut);font-size:12px;transition:transform .2s}
+details.diag[open] .dcv{transform:rotate(180deg)}
+.ddtl{margin-top:11px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:12px}
+.dnote{font-size:10.5px;color:#6d7492;line-height:1.5;margin:-2px 0 -2px}
+.dgrp{display:flex;flex-direction:column;gap:5px}
+.dgh{font-size:11px;font-weight:800;letter-spacing:.02em;color:var(--txt)}
+.drow{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.03);border:1px solid var(--line);
+ border-radius:9px;padding:6px 10px}
+.drow .dn{flex:1;min-width:0;font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drow .dn i{font-style:normal;color:var(--mut);font-weight:400;font-size:10.5px;margin-left:6px}
+.drow .dv{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
+.drow .dv.w{color:var(--warn)}
 
 .bar{position:relative;height:7px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
 .tgt{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.65);border-radius:2px;z-index:2}
