@@ -1242,12 +1242,12 @@ def main():
                                  key=lambda x: (x["avg"], -x["yeu"]))
         except Exception as e:
             logger.warning("NV cần xử lý (Supabase) lỗi, dùng bản hôm nay: %s", str(e)[:120])
-        # Xu hướng vùng 8 ngày (Supabase) cho hero + ô "cần làm ngay". Lỗi → None (ẩn spark).
-        trend = _fetch_region_trend(8)
-        g120_trend = _fetch_giao120h_trend(8)          # Giao>120h chốt ngày (bao_cao_ton_dong)
+        # Xu hướng vùng 14 ngày (Supabase) cho hero + ô "cần làm ngay". Lỗi → None (ẩn spark).
+        trend = _fetch_region_trend(14)
+        g120_trend = _fetch_giao120h_trend(14)         # Giao>120h chốt ngày (bao_cao_ton_dong)
         try:
             import report_nvxuly as _rnx
-            cx_trend = _rnx.canxuly_trend(8)           # NV cần xử lý chốt ngày (rolling 14 ngày)
+            cx_trend = _rnx.canxuly_trend(14)          # NV cần xử lý chốt ngày (rolling 14 ngày)
         except Exception:
             cx_trend = None
         # Phiếu thu CHƯA thu tiền (dùng cho ô "cần làm ngay" + trang chuyến đi). Fetch 1 lần.
