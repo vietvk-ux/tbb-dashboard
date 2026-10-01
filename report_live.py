@@ -622,7 +622,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         return ("onclick=\"var d=document.getElementById('%s');if(d){d.open=true;"
                 "d.scrollIntoView({behavior:'smooth',block:'start'});}\"" % _id)
     _open_cg, _open_nvx, _open_g120 = _opendrill('cgd'), _opendrill('nvxuly'), _opendrill('g120d')
-    P.append("<div class='sectitle'>⚡ Cần làm ngay · nặng → nhẹ</div><section class='prilist'>")
+    P.append("<div class='sectitle'>⚡ Tổng Quan Vận Hành Vùng TBB</div><section class='prilist'>")
     P.append("<div class='todo bd' %s><div class='tic'>🔴</div><div class='tdt'>"
              "<div class='ttn'>Backlog giao 120h</div><div class='tts'>bấm mở AM → bưu cục</div></div>"
              "%s<div class='ttv'>%s</div></div>"
