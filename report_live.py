@@ -111,12 +111,18 @@ def _fetch_region_trend(days=8):
     try:
         import requests
         h = {"apikey": key, "Authorization": "Bearer " + key}
-        r = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc,chua_gan"
+        r = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc,chua_gan,don_giao,vngh_don,vngh_gtc"
                          "&order=ngay.desc&limit=%d" % (url, days), headers=h, timeout=20)
         if not r.ok:
             return None
-        out = [{"ngay": x["ngay"], "pct": x.get("pct_gtc"), "chuagan": x.get("chua_gan")}
-               for x in reversed(r.json()) if x.get("pct_gtc") is not None]
+        out = []
+        for x in reversed(r.json()):
+            if x.get("pct_gtc") is None:
+                continue
+            vd, vp = x.get("vngh_don") or 0, x.get("vngh_gtc")   # vngh_gtc lưu dạng % → ra số đơn
+            out.append({"ngay": x["ngay"], "pct": x.get("pct_gtc"), "chuagan": x.get("chua_gan"),
+                        "don_giao": x.get("don_giao"),
+                        "tiktok_gtc": round(vd * vp / 100) if (vd and vp is not None) else None})
         return out or None
     except Exception:
         return None
@@ -632,6 +638,22 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<a class='todo wn lnk' href='chuyendi.html'><div class='tic'>💵</div><div class='tdt'>"
                  "<div class='ttn'>NV chưa nộp tiền</div><div class='tts'>%s đang treo · xem chi tiết →</div></div>"
                  "%s<div class='ttv'>%s</div></a>" % (_codm(coll_amt), pt_spark, _n(coll_nv)))
+    # Sản lượng giao/ngày + TikTok giao TC/ngày — cùng kiểu, ngay dưới NV chưa nộp tiền
+    if trend and len(trend) >= 2:
+        sl_don = [t.get("don_giao") for t in trend]
+        sl_ttg = [t.get("tiktok_gtc") for t in trend]
+        if any(v is not None for v in sl_don):
+            P.append("<div class='todo'><div class='tic'>📦</div><div class='tdt'>"
+                     "<div class='ttn'>Sản lượng giao / ngày</div>"
+                     "<div class='tts'>tổng đơn giao vùng · 14 ngày</div></div>"
+                     "%s<div class='ttv'>%s</div></div>"
+                     % (_spark(sl_don, "#22d3ee", w=60, h=22), _n(R["total"])))
+        if any(v is not None for v in sl_ttg):
+            P.append("<div class='todo'><div class='tic'>🛍️</div><div class='tdt'>"
+                     "<div class='ttn'>TikTok giao TC / ngày</div>"
+                     "<div class='tts'>số đơn VNGH giao thành công · 14 ngày</div></div>"
+                     "%s<div class='ttv'>%s</div></div>"
+                     % (_spark(sl_ttg, "#e879c8", w=60, h=22), _n(R["vngh_gtc"])))
     P.append("</section>")
 
     # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
