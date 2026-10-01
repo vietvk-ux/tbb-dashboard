@@ -736,12 +736,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             % (_esc(d["name"]), _esc(bc), _cls(p), p) for d, bc, p in nv_low5]))
 
     if grps:
-        P.append("<details class='diag'><summary>⚡ %s<span class='dcv'>▾</span></summary>"
+        P.append("<details class='diag'><summary>⚡ <b>Điểm Nóng Chú Ý</b> · %s<span class='dcv'>▾</span></summary>"
                  "<div class='ddtl'><div class='dnote'>Top 5 cần chú ý mỗi mục · "
                  "%%GTC luỹ kế trong ngày (sáng còn thấp là bình thường)</div>%s</div></details>"
                  % (" · ".join(diag), "".join(grps)))
     else:
-        P.append("<div class='diag'>⚡ %s</div>" % " · ".join(diag))
+        P.append("<div class='diag'>⚡ <b>Điểm Nóng Chú Ý</b> · %s</div>" % " · ".join(diag))
 
     # ===== Dải chỉ số · Bento (Mẫu 3) · màu theo từng chỉ số =====
     vpct = _pct(R["vngh_gtc"], R["vngh"])
