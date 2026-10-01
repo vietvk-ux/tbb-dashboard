@@ -123,6 +123,50 @@ def build(rows):
     return out
 
 
+def canxuly_trend(days=8):
+    """Số NV cần xử lý (dai dẳng) theo TỪNG NGÀY chốt — rolling WINDOW ngày, %GTC TB<YEU
+    qua ≥MIN_ACTIVE ngày hoạt động. Trả list số cũ→mới (days ngày gần nhất); None nếu lỗi.
+    Dùng cho sparkline ô 'NV cần xử lý' trang trực tiếp."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return None
+    try:
+        from collections import defaultdict
+        today = datetime.now(VN).date()
+        since = (today - timedelta(days=days + WINDOW + 1)).isoformat()
+        rows = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&ngay=lt.%s"
+                        "&select=ngay,driver_id,buu_cuc,don_giao,gtc&order=id.asc"
+                        % (since, today.isoformat()))
+        if not rows:
+            return None
+        per = defaultdict(dict)   # (driver,bc) -> {ngay: (don,gtc)}
+        dates = set()
+        for r in rows:
+            k = (r.get("driver_id") or "", r.get("buu_cuc") or "")
+            per[k][r.get("ngay")] = (r.get("don_giao") or 0, r.get("gtc") or 0)
+            dates.add(r.get("ngay"))
+        targets = sorted(dates)[-days:]
+        series = []
+        for D in targets:
+            lo = (datetime.fromisoformat(D).date() - timedelta(days=WINDOW - 1)).isoformat()
+            cnt = 0
+            for dd in per.values():
+                act = [(don, g) for ng, (don, g) in dd.items() if lo <= ng <= D and don >= MIN_DON_DAY]
+                if len(act) < MIN_ACTIVE:
+                    continue
+                sd = sum(a[0] for a in act); sg = sum(a[1] for a in act)
+                avg = _pct(sg, sd)
+                if avg is not None and avg < YEU:
+                    cnt += 1
+            series.append(cnt)
+        return series if len(series) >= 2 else None
+    except Exception as e:
+        logger.warning("canxuly_trend lỗi: %s", str(e)[:120])
+        return None
+
+
 # ============================================================================
 #  NHÚNG vào TRANG TRỰC TIẾP (index/live) — toàn bộ nội dung trang này gói gọn
 #  trong 1 ô bento. Class riêng .nvmgr/.q* để KHÔNG đụng CSS/JS trang trực tiếp;
