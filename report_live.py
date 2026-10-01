@@ -499,7 +499,7 @@ async def fetch_live(token):
 
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
-             g120_trend=None, cx_trend=None, pt_trend=None):
+             g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0}
@@ -654,6 +654,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      "<div class='tts'>số đơn Tiktok giao thành công · 14 ngày</div></div>"
                      "%s<div class='ttv'>%s</div></div>"
                      % (_spark(sl_ttg, "#e879c8", w=60, h=22), _n(R["vngh_gtc"])))
+    if nvdat_trend and len(nvdat_trend) >= 2:
+        nv_dat = sum(1 for r in rows for d in r.get("drivers", [])
+                     if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
+                     and _pct(d["gtc"], d["total"]) >= 50)
+        P.append("<div class='todo'><div class='tic'>🎯</div><div class='tdt'>"
+                 "<div class='ttn'>NV đạt GTC ≥50%%</div>"
+                 "<div class='tts'>số NV %%GTC ≥50%% (≥20 đơn) · 14 ngày</div></div>"
+                 "%s<div class='ttv' style='color:var(--good)'>%s</div></div>"
+                 % (_spark(nvdat_trend, "#34d399", w=60, h=22), _n(nv_dat)))
     P.append("</section>")
 
     # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
@@ -1312,8 +1321,9 @@ def main():
         try:
             import report_nvxuly as _rnx
             cx_trend = _rnx.canxuly_trend(14)          # NV cần xử lý chốt ngày (rolling 14 ngày)
+            nvdat_tr = _rnx.nvdat_trend(14)            # NV đạt %GTC≥50% theo ngày
         except Exception:
-            cx_trend = None
+            cx_trend = nvdat_tr = None
         # Phiếu thu CHƯA thu tiền (dùng cho ô "cần làm ngay" + trang chuyến đi). Fetch 1 lần.
         collectable = None
         try:
@@ -1336,7 +1346,7 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend)
+    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)

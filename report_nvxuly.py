@@ -123,6 +123,36 @@ def build(rows):
     return out
 
 
+def nvdat_trend(days=14, thresh=50, min_don=20):
+    """Số NV ĐẠT %GTC ≥thresh theo TỪNG NGÀY chốt (NV giao ≥min_don đơn/ngày). Trả list
+    cũ→mới (days ngày gần nhất); None nếu lỗi. Cho sparkline ô 'NV đạt ≥50%'."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return None
+    try:
+        from collections import defaultdict
+        today = datetime.now(VN).date()
+        since = (today - timedelta(days=days + 1)).isoformat()
+        rows = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&ngay=lt.%s"
+                        "&select=ngay,don_giao,gtc&order=id.asc" % (since, today.isoformat()))
+        if not rows:
+            return None
+        cnt = defaultdict(int)
+        for r in rows:
+            don = r.get("don_giao") or 0
+            if don >= min_don:
+                p = _pct(r.get("gtc") or 0, don)
+                if p is not None and p >= thresh:
+                    cnt[r.get("ngay")] += 1
+        vals = [cnt[d] for d in sorted(cnt)][-days:]
+        return vals if len(vals) >= 2 else None
+    except Exception as e:
+        logger.warning("nvdat_trend lỗi: %s", str(e)[:120])
+        return None
+
+
 def canxuly_trend(days=8):
     """Số NV cần xử lý (dai dẳng) theo TỪNG NGÀY chốt — rolling WINDOW ngày, %GTC TB<YEU
     qua ≥MIN_ACTIVE ngày hoạt động. Trả list số cũ→mới (days ngày gần nhất); None nếu lỗi.
