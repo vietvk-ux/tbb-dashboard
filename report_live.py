@@ -122,6 +122,45 @@ def _fetch_region_trend(days=8):
         return None
 
 
+def _store_phieuthu(so_nv, so_tien):
+    """Ghi phiếu thu treo HÔM NAY vào bao_cao_phieuthu (upsert theo ngay) → lần chạy cuối
+    ngày = bản chốt. Bảng chưa tạo (chưa chạy migration) hoặc lỗi → bỏ qua êm."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key) or so_nv is None:
+        return
+    try:
+        import requests
+        today = datetime.now(VN).date().isoformat()
+        requests.post("%s/rest/v1/bao_cao_phieuthu?on_conflict=ngay" % url,
+                      json=[{"ngay": today, "so_nv": int(so_nv), "so_tien": int(so_tien or 0)}],
+                      headers={"apikey": key, "Authorization": "Bearer " + key,
+                               "Content-Type": "application/json",
+                               "Prefer": "resolution=merge-duplicates,return=minimal"}, timeout=20)
+    except Exception:
+        pass
+
+
+def _fetch_phieuthu_trend(days=14):
+    """Số NV chưa nộp tiền N ngày (chốt cuối ngày) từ bao_cao_phieuthu. List số cũ→mới; None nếu lỗi/thiếu."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return None
+    try:
+        import requests
+        h = {"apikey": key, "Authorization": "Bearer " + key}
+        r = requests.get("%s/rest/v1/bao_cao_phieuthu?select=ngay,so_nv&order=ngay.desc&limit=%d"
+                         % (url, days), headers=h, timeout=20)
+        if not r.ok:
+            return None
+        vals = [x.get("so_nv") for x in reversed(r.json()) if x.get("so_nv") is not None]
+        return vals if len(vals) >= 2 else None
+    except Exception:
+        return None
+
+
 def _fetch_giao120h_trend(days=8):
     """Giao>120h N ngày (chốt cuối ngày) = Σ g_gt120 order_type=DELIVER mỗi ngày từ
     bao_cao_ton_dong. Trả list số cũ→mới (các ngày gần nhất); None nếu thiếu creds/lỗi."""
@@ -454,7 +493,7 @@ async def fetch_live(token):
 
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
-             g120_trend=None, cx_trend=None):
+             g120_trend=None, cx_trend=None, pt_trend=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0}
@@ -570,6 +609,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         g120_spark = _spark(g120_trend, "#fb7185", w=60, h=22)
     if cx_trend and len(cx_trend) >= 2:
         cx_spark = _spark(cx_trend, "#a78bfa", w=60, h=22)
+    pt_spark = ""
+    if pt_trend and len(pt_trend) >= 2:
+        pt_spark = _spark(pt_trend, "#fbbf24", w=60, h=22)
     def _opendrill(_id):
         return ("onclick=\"var d=document.getElementById('%s');if(d){d.open=true;"
                 "d.scrollIntoView({behavior:'smooth',block:'start'});}\"" % _id)
@@ -589,7 +631,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if coll_nv is not None:
         P.append("<a class='todo wn lnk' href='chuyendi.html'><div class='tic'>💵</div><div class='tdt'>"
                  "<div class='ttn'>NV chưa nộp tiền</div><div class='tts'>%s đang treo · xem chi tiết →</div></div>"
-                 "<div class='ttv'>%s</div></a>" % (_codm(coll_amt), _n(coll_nv)))
+                 "%s<div class='ttv'>%s</div></a>" % (_codm(coll_amt), pt_spark, _n(coll_nv)))
     P.append("</section>")
 
     # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
@@ -1257,6 +1299,13 @@ def main():
             collectable = report_chuyendi.fetch_collectable(token)
         except Exception as ce:
             logger.warning("Phiếu thu treo lỗi (ẩn): %s", str(ce)[:120])
+        # Lưu phiếu thu treo hôm nay (chốt dần) + đọc trend 14 ngày để vẽ đồ thị.
+        pt_trend = None
+        if collectable is not None:
+            _pt_nv = sum(len(us) for us in collectable.values())
+            _pt_amt = sum(u["amount"] for us in collectable.values() for u in us)
+            _store_phieuthu(_pt_nv, _pt_amt)
+        pt_trend = _fetch_phieuthu_trend(14)
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
@@ -1265,7 +1314,7 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend)
+    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
