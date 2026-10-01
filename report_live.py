@@ -1008,22 +1008,22 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
 _CSS = """<style>
 :root{
- --bg:#0a0e1a;--bg2:#10131f;--card:rgba(27,33,56,.56);--card2:rgba(35,42,68,.55);--line:rgba(255,255,255,.16);
- --mut:#b9c0dc;--txt:#f5f8ff;--good:#5ee7ab;--warn:#f9c559;--bad:#f98795;--ink:#0a0d18;
+ --bg:#0a0e1a;--bg2:#10131f;--card:rgba(28,34,58,.82);--card2:rgba(37,45,72,.82);--line:rgba(255,255,255,.22);
+ --mut:#c6cde6;--txt:#fbfcff;--good:#67eab0;--warn:#fbca60;--bad:#fb8e9c;--ink:#0a0d18;
  --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
  color:var(--txt);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.4;
  background:
-  radial-gradient(80% 34% at 12% -6%,rgba(90,82,236,.4) 0%,transparent 50%),
+  radial-gradient(80% 34% at 12% -6%,rgba(96,88,240,.46) 0%,transparent 50%),
   radial-gradient(76% 32% at 96% 3%,rgba(160,92,228,.33) 0%,transparent 48%),
   radial-gradient(110% 46% at 60% 105%,rgba(16,160,146,.33) 0%,transparent 56%),
-  radial-gradient(62% 32% at 84% 66%,rgba(110,113,245,.26) 0%,transparent 54%),#0a0e1a;
+  radial-gradient(62% 32% at 84% 66%,rgba(116,120,248,.3) 0%,transparent 54%),#0b0f1c;
  background-attachment:fixed}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));padding-bottom:calc(30px + env(safe-area-inset-bottom))}
 /* Kính mờ dùng chung — đọc rõ cả nơi nền tối lẫn nơi có ánh sáng */
 .hero,.verdict,.prilist,.diag,.st,.cgbento,.bc,.mtile,.foot{
- backdrop-filter:blur(14px) saturate(1.02);-webkit-backdrop-filter:blur(14px) saturate(1.02)}
+ backdrop-filter:blur(8px) saturate(1.12) contrast(1.04);-webkit-backdrop-filter:blur(8px) saturate(1.12) contrast(1.04)}
 .brand,.hpct,.sv,.mbig,.vst,.vpct b,.ttv,.hh,.amn{font-family:'Sora','Manrope',sans-serif}
 
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
@@ -1041,7 +1041,7 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hero.warn{--h:247,185,85;box-shadow:0 8px 26px -16px rgba(247,185,85,.2)}
 .hero.bad{--h:242,88,95;box-shadow:0 8px 26px -16px rgba(242,88,95,.2)}
 .hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.hpct{font-size:64px;font-weight:850;line-height:1;margin:8px 0 12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-shadow:0 0 22px rgba(var(--h),.28)}
+.hpct{font-size:64px;font-weight:850;line-height:1;margin:8px 0 12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-shadow:0 0 14px rgba(var(--h),.16)}
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
 .hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
 .hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
