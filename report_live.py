@@ -42,6 +42,14 @@ def _codm(v):
     return ("%.1ftr" % (v / 1e6)).replace(".", ",")
 
 
+def _kgfmt(kg):
+    """Khối lượng kg → '12,3 tấn' nếu ≥1000kg, ngược lại '845 kg'."""
+    kg = kg or 0
+    if kg >= 1000:
+        return ("%.1f tấn" % (kg / 1000.0)).replace(".", ",")
+    return "%s kg" % _n(round(kg))
+
+
 def _prov(name):
     return name[name.find("(") + 1:name.find(")")] if "(" in name else "?"
 
@@ -111,7 +119,7 @@ def _fetch_region_trend(days=8):
     try:
         import requests
         h = {"apikey": key, "Authorization": "Bearer " + key}
-        r = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc,chua_gan,don_giao,vngh_don,vngh_gtc"
+        r = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc,chua_gan,don_giao,vngh_don,vngh_gtc,weight_kg"
                          "&order=ngay.desc&limit=%d" % (url, days), headers=h, timeout=20)
         if not r.ok:
             return None
@@ -121,7 +129,7 @@ def _fetch_region_trend(days=8):
                 continue
             vd, vp = x.get("vngh_don") or 0, x.get("vngh_gtc")   # vngh_gtc lưu dạng % → ra số đơn
             out.append({"ngay": x["ngay"], "pct": x.get("pct_gtc"), "chuagan": x.get("chua_gan"),
-                        "don_giao": x.get("don_giao"),
+                        "don_giao": x.get("don_giao"), "weight_kg": x.get("weight_kg"),
                         "tiktok_gtc": round(vd * vp / 100) if (vd and vp is not None) else None})
         return out or None
     except Exception:
@@ -140,6 +148,25 @@ def _store_phieuthu(so_nv, so_tien):
         today = datetime.now(VN).date().isoformat()
         requests.post("%s/rest/v1/bao_cao_phieuthu?on_conflict=ngay" % url,
                       json=[{"ngay": today, "so_nv": int(so_nv), "so_tien": int(so_tien or 0)}],
+                      headers={"apikey": key, "Authorization": "Bearer " + key,
+                               "Content-Type": "application/json",
+                               "Prefer": "resolution=merge-duplicates,return=minimal"}, timeout=20)
+    except Exception:
+        pass
+
+
+def _store_weight(kg):
+    """Ghi khối lượng đơn giao đã gán HÔM NAY (kg) vào bao_cao_vung (partial upsert theo ngay)
+    → lần chạy cuối ngày = chốt. Cột thiếu (chưa migration) → bỏ qua êm."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key) or kg is None:
+        return
+    try:
+        import requests
+        today = datetime.now(VN).date().isoformat()
+        requests.post("%s/rest/v1/bao_cao_vung?on_conflict=ngay" % url,
+                      json=[{"ngay": today, "weight_kg": round(kg, 1)}],
                       headers={"apikey": key, "Authorization": "Bearer " + key,
                                "Content-Type": "application/json",
                                "Prefer": "resolution=merge-duplicates,return=minimal"}, timeout=20)
@@ -351,7 +378,7 @@ async def fetch_live(token):
                             "ltc": 0, "ltb": 0, "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0,
                             # hiệu suất chuyến đi: giờ xuất phát/kết thúc, scan, tiến độ chuyến đang chạy
                             "st": None, "en": None, "scan_ok": 0, "scan_tot": 0,
-                            "ot_done": 0, "ot_tot": 0,
+                            "ot_done": 0, "ot_tot": 0, "weight_g": 0,   # khối lượng đơn giao đã gán (gram)
                             "wards": {}}   # %GTC theo xã/phường: {tên xã: [gán, gtc]}
 
                 def _dk(did, dn):
@@ -368,13 +395,15 @@ async def fetch_live(token):
                     try:
                         async with sem:
                             items = await _fetch_all_items(session, token, hid, t["tripCode"])
-                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?, COD, số kiện, xã)
+                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?, COD, số kiện, xã, cân-nặng-g)
                         def _wd(x):
                             info = x.get("deliverInfo") or x.get("receiverContact") or {}
                             return (info.get("wardName") or "").strip() or None
+                        def _wg(x):
+                            return sum((p.get("weight") or 0) for p in (x.get("items") or []))  # gram
                         recs = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True,
                                  x.get("isUpdated") is True, is_ontrip, float(x.get("collectAmount") or 0),
-                                 len(x.get("items") or []) or 1, _wd(x))
+                                 len(x.get("items") or []) or 1, _wd(x), _wg(x))
                                 for x in items if x.get("type") == "DELIVER"]
                         # PICK: (mã đơn, tài xế, đã lấy thành công?, đã thao tác?) → LTC + LTB
                         picks = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True,
@@ -400,17 +429,18 @@ async def fetch_live(token):
                 # tính cho chuyến hiện tại). GTC=đơn giao xong ở BẤT KỲ chuyến nào.
                 best = {}
                 for did, dn, recs, _picks, _meta in res:
-                    for oc, rdid, rdn, succ, att, ot, cod, kien, ward in recs:
+                    for oc, rdid, rdn, succ, att, ot, cod, kien, ward, wg in recs:
                         if not oc:
                             continue
                         score = (4 if succ else 0) + (2 if att else 0) + (1 if ot else 0)
                         cur = best.get(oc)
                         if cur is None or score > cur[0]:
-                            best[oc] = (score, rdid, rdn, succ, att, cod, kien, ward)
-                for oc, (score, rdid, rdn, succ, att, cod, kien, ward) in best.items():
+                            best[oc] = (score, rdid, rdn, succ, att, cod, kien, ward, wg)
+                for oc, (score, rdid, rdn, succ, att, cod, kien, ward, wg) in best.items():
                     d = drivers.setdefault(_dk(rdid, rdn), _drv0(rdid, rdn))
                     d["total"] += 1
-                    d["kien"] += kien              # số kiện của đơn giao (khối lượng)
+                    d["kien"] += kien              # số kiện của đơn giao
+                    d["weight_g"] += wg            # khối lượng (gram) của đơn giao đã gán
                     w = d["wards"].setdefault(ward or "— (không rõ xã)", [0, 0])
                     w[0] += 1                       # đơn gán ở xã này
                     if succ:
@@ -455,7 +485,7 @@ async def fetch_live(token):
                     if en and (d["en"] is None or en > d["en"]):
                         d["en"] = en
                     if meta["ot"]:
-                        for oc, rdid, rdn, succ, att, ot, cod, kien, _ward in recs:
+                        for oc, rdid, rdn, succ, att, ot, cod, kien, _ward, _wg in recs:
                             if not oc:
                                 continue
                             d["ot_tot"] += 1
@@ -471,6 +501,7 @@ async def fetch_live(token):
                 h_att = sum(d["att"] for d in drivers.values())
                 h_ltc = sum(d["ltc"] for d in drivers.values())
                 h_ltb = sum(d["ltb"] for d in drivers.values())
+                h_weight = sum(d["weight_g"] for d in drivers.values())   # gram
                 # Đơn TikTok Shop (mã VNGH) — gộp theo mã đơn giao, tiến độ theo bưu cục
                 h_vngh = sum(1 for oc in best if oc.startswith("VNGH"))
                 h_vngh_gtc = sum(1 for oc, v in best.items() if oc.startswith("VNGH") and v[3])
@@ -481,6 +512,7 @@ async def fetch_live(token):
                         "backlog_wards": backlog_wards, "giao120h": g120,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc, "ltb": h_ltb,
+                        "weight_g": h_weight,
                         "vngh": h_vngh, "vngh_gtc": h_vngh_gtc, "cod_gtb": h_cod_gtb,
                         "kien": h_kien, "kien_gtc": h_kien_gtc,
                         "drivers": list(drivers.values())}
@@ -502,7 +534,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
-         "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0}
+         "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
     prov = {}
     am = {}
     for r in rows:
@@ -654,6 +686,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      "<div class='tts'>số đơn Tiktok giao thành công · 14 ngày</div></div>"
                      "%s<div class='ttv'>%s</div></div>"
                      % (_spark(sl_ttg, "#e879c8", w=60, h=22), _n(R["vngh_gtc"])))
+    # Khối lượng (kg thực) đơn giao đã gán — hiện ngay khi có khối lượng live; đồ thị khi đủ ≥2 ngày lưu
+    if R["weight_g"] > 0:
+        sl_kg = [t.get("weight_kg") for t in trend] if trend else []
+        kg_spark = _spark(sl_kg, "#38bdf8", w=60, h=22) if sl_kg and any(v is not None for v in sl_kg) else ""
+        P.append("<div class='todo'><div class='tic'>⚖️</div><div class='tdt'>"
+                 "<div class='ttn'>Khối lượng giao / ngày</div>"
+                 "<div class='tts'>kg thực đơn giao đã gán · 14 ngày</div></div>"
+                 "%s<div class='ttv'>%s</div></div>"
+                 % (kg_spark, _kgfmt(R["weight_g"] / 1000.0)))
     if nvdat_trend and len(nvdat_trend) >= 2:
         nv_dat = sum(1 for r in rows for d in r.get("drivers", [])
                      if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
@@ -1338,6 +1379,8 @@ def main():
             _pt_amt = sum(u["amount"] for us in collectable.values() for u in us)
             _store_phieuthu(_pt_nv, _pt_amt)
         pt_trend = _fetch_phieuthu_trend(14)
+        # Lưu khối lượng đơn giao đã gán hôm nay (kg) → đồ thị (đọc lại trong _fetch_region_trend)
+        _store_weight(sum(r.get("weight_g", 0) for r in rows) / 1000.0)
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
