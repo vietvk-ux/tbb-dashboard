@@ -76,6 +76,14 @@ def _dmy(iso):
         return iso or "—"
 
 
+def _kgfmt(kg):
+    """kg → '12,3 tấn' nếu ≥1000kg, ngược lại '845 kg'."""
+    kg = kg or 0
+    if kg >= 1000:
+        return ("%.1f tấn" % (kg / 1000.0)).replace(".", ",")
+    return "%s kg" % _n(round(kg))
+
+
 def _fmt(v, kind="n"):
     if v is None:
         return "—"
@@ -83,6 +91,8 @@ def _fmt(v, kind="n"):
         return ("%s%%" % v)
     if kind == "money":
         return _codm(v)
+    if kind == "kg":
+        return _kgfmt(v)
     return _n(v)
 
 
@@ -425,6 +435,9 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
             rg_days[_ng] = rg_days.get(_ng, 0) + _v
         region_giao_hq = rg_days.get(hist[0]["ngay"])
         region_giao_tb7 = round(sum(rg_days.values()) / len(rg_days)) if rg_days else None
+        # Khối lượng (kg thực) vùng: đã gán + chưa gán (từ backlog per-BC qua fetch_chua_gan)
+        region_kg_dagan = sum(v.get("dagan_weight", 0) for v in backlog.values()) / 1000.0
+        region_kg_chuagan = sum(v.get("deliver_weight", 0) for v in backlog.values()) / 1000.0
         rmetrics = [
             ("📦 Đơn giao", g["total"], y.get("don_giao"), _avg("don_giao"), "n", None),
             ("✅ Giao TC", g["success"], y.get("gtc"), _avg("gtc"), "n", True),
@@ -438,6 +451,8 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
             ("🛍️ %GTC TikTok", g.get("vngh_gtc"), y.get("vngh_gtc"), _avg("vngh_gtc", 1), "pct", True),
             ("🕐 NV muộn (>9h30)", region_late, y.get("so_nv_muon"), _avg("so_nv_muon"), "n", False),
             ("🔴 Giao >120h", region_giao_now, region_giao_hq, region_giao_tb7, "n", False),
+            ("⚖️ KL đã gán", region_kg_dagan, None, None, "kg", None),
+            ("⚖️ KL chưa gán", region_kg_chuagan, None, None, "kg", False),
         ]
         P.append("<section class='card'><table class='drv'><thead><tr><th class='lft'>Chỉ số vùng</th>"
                  "<th>Hôm nay</th><th>Hôm qua</th><th>TB 7 ngày</th></tr></thead><tbody>")
@@ -457,10 +472,14 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                 if not a:
                     continue
                 x = amn_now.setdefault(a, {"don": 0, "gtc": 0, "gtb": 0, "cg": 0, "ltc": 0, "ltb": 0,
-                                           "cod": 0, "vd": 0, "vs": 0, "late": 0, "g120": 0})
+                                           "cod": 0, "vd": 0, "vs": 0, "late": 0, "g120": 0,
+                                           "kg_dagan": 0, "kg_cg": 0})
                 x["don"] += b["total"]; x["gtc"] += b["success"]
                 x["gtb"] += b["total"] - b["success"]; x["ltc"] += b.get("ltc", 0); x["ltb"] += b.get("ltb", 0)
-                x["cg"] += backlog.get(b["bc"], {}).get("deliver", 0)
+                _blb = backlog.get(b["bc"], {})
+                x["cg"] += _blb.get("deliver", 0)
+                x["kg_dagan"] += _blb.get("dagan_weight", 0) / 1000.0    # kg đã gán
+                x["kg_cg"] += _blb.get("deliver_weight", 0) / 1000.0     # kg chưa gán
                 x["cod"] += b.get("gtb_cod", 0)
                 x["vd"] += b.get("vngh_total", 0); x["vs"] += b.get("vngh_success", 0)
                 x["late"] += bc_late.get(b["bc"], 0)
@@ -537,6 +556,8 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                     ("🛍️ %GTC TikTok", _vp(n), _vp(hq), tb.get("vpc"), "pct", True),
                     ("🕐 NV muộn (>9h30)", n["late"], hq["late"], tb.get("late"), "n", False),
                     ("🔴 Giao >120h", n["g120"], hq["g120"], tb.get("g120"), "n", False),
+                    ("⚖️ KL đã gán", n.get("kg_dagan", 0), None, None, "kg", None),
+                    ("⚖️ KL chưa gán", n.get("kg_cg", 0), None, None, "kg", False),
                 ]
                 for lbl, cur, hqv, tbv, kind, hg in amrows:
                     P.append("<tr><td class='nv'>%s</td><td>%s</td><td class='mut'>%s</td><td class='mut'>%s</td></tr>"
