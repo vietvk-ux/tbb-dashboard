@@ -680,21 +680,21 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      "<div class='tts'>tổng đơn giao vùng · 14 ngày</div></div>"
                      "%s<div class='ttv'>%s</div></div>"
                      % (_spark(sl_don, "#22d3ee", w=60, h=22), _n(R["total"])))
+        # Khối lượng (kg thực) đơn giao đã gán — ngay dưới Sản lượng
+        if R["weight_g"] > 0:
+            sl_kg = [t.get("weight_kg") for t in trend]
+            kg_spark = _spark(sl_kg, "#38bdf8", w=60, h=22) if any(v is not None for v in sl_kg) else ""
+            P.append("<div class='todo'><div class='tic'>⚖️</div><div class='tdt'>"
+                     "<div class='ttn'>Khối lượng giao / ngày</div>"
+                     "<div class='tts'>kg thực đơn giao đã gán · 14 ngày</div></div>"
+                     "%s<div class='ttv'>%s</div></div>"
+                     % (kg_spark, _kgfmt(R["weight_g"] / 1000.0)))
         if any(v is not None for v in sl_ttg):
             P.append("<div class='todo'><div class='tic'>🛍️</div><div class='tdt'>"
                      "<div class='ttn'>TikTok giao TC / ngày</div>"
                      "<div class='tts'>số đơn Tiktok giao thành công · 14 ngày</div></div>"
                      "%s<div class='ttv'>%s</div></div>"
                      % (_spark(sl_ttg, "#e879c8", w=60, h=22), _n(R["vngh_gtc"])))
-    # Khối lượng (kg thực) đơn giao đã gán — hiện ngay khi có khối lượng live; đồ thị khi đủ ≥2 ngày lưu
-    if R["weight_g"] > 0:
-        sl_kg = [t.get("weight_kg") for t in trend] if trend else []
-        kg_spark = _spark(sl_kg, "#38bdf8", w=60, h=22) if sl_kg and any(v is not None for v in sl_kg) else ""
-        P.append("<div class='todo'><div class='tic'>⚖️</div><div class='tdt'>"
-                 "<div class='ttn'>Khối lượng giao / ngày</div>"
-                 "<div class='tts'>kg thực đơn giao đã gán · 14 ngày</div></div>"
-                 "%s<div class='ttv'>%s</div></div>"
-                 % (kg_spark, _kgfmt(R["weight_g"] / 1000.0)))
     if nvdat_trend and len(nvdat_trend) >= 2:
         nv_dat = sum(1 for r in rows for d in r.get("drivers", [])
                      if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
