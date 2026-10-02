@@ -453,7 +453,6 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
             ("🛍️ %GTC TikTok", g.get("vngh_gtc"), y.get("vngh_gtc"), _avg("vngh_gtc", 1), "pct", True),
             ("🕐 NV muộn (>9h30)", region_late, y.get("so_nv_muon"), _avg("so_nv_muon"), "n", False),
             ("🔴 Giao >120h", region_giao_now, region_giao_hq, region_giao_tb7, "n", False),
-            ("⚖️ KL đã gán", region_kg_dagan, None, None, "kg", None),
             ("⚖️ KL chưa gán", region_kg_chuagan, None, None, "kg", False),
         ]
         P.append("<section class='card'><table class='drv'><thead><tr><th class='lft'>Chỉ số vùng</th>"
@@ -558,7 +557,6 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
                     ("🛍️ %GTC TikTok", _vp(n), _vp(hq), tb.get("vpc"), "pct", True),
                     ("🕐 NV muộn (>9h30)", n["late"], hq["late"], tb.get("late"), "n", False),
                     ("🔴 Giao >120h", n["g120"], hq["g120"], tb.get("g120"), "n", False),
-                    ("⚖️ KL đã gán", n.get("kg_dagan", 0), None, None, "kg", None),
                     ("⚖️ KL chưa gán", n.get("kg_cg", 0), None, None, "kg", False),
                 ]
                 for lbl, cur, hqv, tbv, kind, hg in amrows:
