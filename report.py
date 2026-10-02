@@ -92,36 +92,47 @@ async def _get_hubs(session, token):
     return [h for h in (d.get("data") or []) if any(p in (h.get("locationName") or "") for p in TBB_PREFIXES)]
 
 
+async def _detail_by_status(session, hub_id, token, order_type):
+    """get-detail-by-status (view phường/xã) 1 call → (tot theo loại, wards Giao, deliver_weight_gram).
+    deliver_weight = Σ total_weight (kg THỰC, gram) của DELIVER. order_type: DAILY_TRIP_NONE (chưa gán)
+    hoặc ALL (đã gán + chưa gán)."""
+    d = await _post(session, "/core/oss/v1/report/get-detail-by-status",
+                    {"hub_id": str(hub_id), "order_type": order_type, "view_mode": "WARD",
+                     "status": ["PICK", "DELIVER", "DELIVER_PRIORITY", "RETURN"]}, hub_id, token)
+    bts = ((d.get("data") or {}).get("detail_backlog_types")) or []
+    tot, wards, dw = {}, [], 0
+    for bt in bts:
+        ot = bt.get("backlog_type")
+        s = 0
+        for w in (bt.get("details") or []):
+            wn = sum(i.get("total_order") or 0 for i in (w.get("order_inventories") or []))
+            s += wn
+            # Khối lượng GIAO = DELIVER + DELIVER_PRIORITY (ưu tiên giao); kg thực = total_weight
+            if ot in ("DELIVER", "DELIVER_PRIORITY"):
+                dw += sum(i.get("total_weight") or 0 for i in (w.get("order_inventories") or []))
+            if ot == "DELIVER" and wn > 0:
+                wards.append((w.get("name") or "?", wn))
+        tot[ot] = s
+    wards.sort(key=lambda x: -x[1])
+    return tot, wards, dw
+
+
 async def fetch_chua_gan(session, hub_id, token):
-    """Đơn tồn CHƯA GÁN CHUYẾN trong ngày theo bưu cục (view Tồn LGT 'Chưa có chuyến đi trong ngày').
-    Dùng get-detail-by-status (view 'Theo phường/xã') → vừa có TỔNG theo loại, vừa TÁCH THEO XÃ,
-    chỉ 1 call/bưu cục (khớp 100% get-general-info; VD Âu Lâu DELIVER 551). Trả
-    {'deliver','pick','return','deliver_priority','wards'} với wards=[(tên xã, số đơn Giao)] giảm dần."""
+    """Tồn CHƯA GÁN + KHỐI LƯỢNG (kg thực) đã gán/chưa gán theo bưu cục. 2 call get-detail-by-status:
+    NONE (chưa gán) + ALL (tất cả) → đã gán = ALL − NONE (khớp GHN backlog-lgt 'kg thực').
+    Trả {deliver(chưa gán sl), pick, return, deliver_priority, wards, deliver_weight(chưa gán g),
+         dagan_weight(đã gán g)}."""
     try:
-        d = await _post(session, "/core/oss/v1/report/get-detail-by-status",
-                        {"hub_id": str(hub_id), "order_type": "DAILY_TRIP_NONE",
-                         "view_mode": "WARD",
-                         "status": ["PICK", "DELIVER", "DELIVER_PRIORITY", "RETURN"]}, hub_id, token)
-        bts = ((d.get("data") or {}).get("detail_backlog_types")) or []
-        tot, wards = {}, []
-        dw = 0   # khối lượng (gram) đơn GIAO chưa gán (total_weight = kg thực)
-        for bt in bts:
-            ot = bt.get("backlog_type")
-            s = 0
-            for w in (bt.get("details") or []):
-                wn = sum(i.get("total_order") or 0 for i in (w.get("order_inventories") or []))
-                s += wn
-                if ot == "DELIVER":
-                    dw += sum(i.get("total_weight") or 0 for i in (w.get("order_inventories") or []))
-                    if wn > 0:
-                        wards.append((w.get("name") or "?", wn))
-            tot[ot] = s
-        wards.sort(key=lambda x: -x[1])
-        return {"deliver": tot.get("DELIVER", 0), "pick": tot.get("PICK", 0),
-                "return": tot.get("RETURN", 0), "deliver_priority": tot.get("DELIVER_PRIORITY", 0),
-                "deliver_weight": dw, "wards": wards[:20]}
+        tn, wards, dw_none = await _detail_by_status(session, hub_id, token, "DAILY_TRIP_NONE")
+        _, _, dw_all = await _detail_by_status(session, hub_id, token, "ALL")
+        return {"deliver": tn.get("DELIVER", 0), "pick": tn.get("PICK", 0),
+                "return": tn.get("RETURN", 0), "deliver_priority": tn.get("DELIVER_PRIORITY", 0),
+                "deliver_weight": dw_none,                        # chưa gán (gram, kg thực)
+                "dagan_weight": max(dw_all - dw_none, 0),         # đã gán = ALL − NONE (gram)
+                "wards": wards[:20]}
     except Exception:
-        return {"deliver": 0, "pick": 0, "return": 0, "deliver_priority": 0, "wards": []}
+        return {"deliver": 0, "pick": 0, "return": 0, "deliver_priority": 0,
+                "deliver_weight": 0, "dagan_weight": 0, "wards": []}
 
 
 async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem, next_ymd=None):

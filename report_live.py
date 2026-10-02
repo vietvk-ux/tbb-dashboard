@@ -356,7 +356,8 @@ async def fetch_live(token):
                 async with sem:
                     bl = await fetch_chua_gan(session, hid, token)
                 backlog = bl.get("deliver", 0)   # Giao "chưa có chuyến đi trong ngày" (chuẩn Tồn LGT)
-                backlog_weight = bl.get("deliver_weight", 0)   # khối lượng (gram) đơn Giao chưa gán
+                backlog_weight = bl.get("deliver_weight", 0)   # kg thực (gram) Giao chưa gán (gồm ưu tiên)
+                dagan_weight = bl.get("dagan_weight", 0)       # kg thực (gram) Giao ĐÃ GÁN (ALL−NONE, gồm ưu tiên)
                 backlog_wards = bl.get("wards", [])   # [(tên xã, số đơn Giao chưa gán)] giảm dần
                 async with sem:
                     g120 = await _giao120h_one(session, hid, token)   # Giao>120h bưu cục này (drill)
@@ -379,7 +380,7 @@ async def fetch_live(token):
                             "ltc": 0, "ltb": 0, "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0,
                             # hiệu suất chuyến đi: giờ xuất phát/kết thúc, scan, tiến độ chuyến đang chạy
                             "st": None, "en": None, "scan_ok": 0, "scan_tot": 0,
-                            "ot_done": 0, "ot_tot": 0, "weight_g": 0,   # khối lượng đơn giao đã gán (gram)
+                            "ot_done": 0, "ot_tot": 0,
                             "wards": {}}   # %GTC theo xã/phường: {tên xã: [gán, gtc]}
 
                 def _dk(did, dn):
@@ -396,15 +397,13 @@ async def fetch_live(token):
                     try:
                         async with sem:
                             items = await _fetch_all_items(session, token, hid, t["tripCode"])
-                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?, COD, số kiện, xã, cân-nặng-g)
+                        # DELIVER: (mã đơn, tài xế, đã giao?, đã xử lý?, đang chạy?, COD, số kiện, xã)
                         def _wd(x):
                             info = x.get("deliverInfo") or x.get("receiverContact") or {}
                             return (info.get("wardName") or "").strip() or None
-                        def _wg(x):
-                            return sum((p.get("weight") or 0) for p in (x.get("items") or []))  # gram
                         recs = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True,
                                  x.get("isUpdated") is True, is_ontrip, float(x.get("collectAmount") or 0),
-                                 len(x.get("items") or []) or 1, _wd(x), _wg(x))
+                                 len(x.get("items") or []) or 1, _wd(x))
                                 for x in items if x.get("type") == "DELIVER"]
                         # PICK: (mã đơn, tài xế, đã lấy thành công?, đã thao tác?) → LTC + LTB
                         picks = [(x.get("orderCode"), did, dn, x.get("isSucceeded") is True,
@@ -430,18 +429,17 @@ async def fetch_live(token):
                 # tính cho chuyến hiện tại). GTC=đơn giao xong ở BẤT KỲ chuyến nào.
                 best = {}
                 for did, dn, recs, _picks, _meta in res:
-                    for oc, rdid, rdn, succ, att, ot, cod, kien, ward, wg in recs:
+                    for oc, rdid, rdn, succ, att, ot, cod, kien, ward in recs:
                         if not oc:
                             continue
                         score = (4 if succ else 0) + (2 if att else 0) + (1 if ot else 0)
                         cur = best.get(oc)
                         if cur is None or score > cur[0]:
-                            best[oc] = (score, rdid, rdn, succ, att, cod, kien, ward, wg)
-                for oc, (score, rdid, rdn, succ, att, cod, kien, ward, wg) in best.items():
+                            best[oc] = (score, rdid, rdn, succ, att, cod, kien, ward)
+                for oc, (score, rdid, rdn, succ, att, cod, kien, ward) in best.items():
                     d = drivers.setdefault(_dk(rdid, rdn), _drv0(rdid, rdn))
                     d["total"] += 1
                     d["kien"] += kien              # số kiện của đơn giao
-                    d["weight_g"] += wg            # khối lượng (gram) của đơn giao đã gán
                     w = d["wards"].setdefault(ward or "— (không rõ xã)", [0, 0])
                     w[0] += 1                       # đơn gán ở xã này
                     if succ:
@@ -486,7 +484,7 @@ async def fetch_live(token):
                     if en and (d["en"] is None or en > d["en"]):
                         d["en"] = en
                     if meta["ot"]:
-                        for oc, rdid, rdn, succ, att, ot, cod, kien, _ward, _wg in recs:
+                        for oc, rdid, rdn, succ, att, ot, cod, kien, _ward in recs:
                             if not oc:
                                 continue
                             d["ot_tot"] += 1
@@ -502,7 +500,6 @@ async def fetch_live(token):
                 h_att = sum(d["att"] for d in drivers.values())
                 h_ltc = sum(d["ltc"] for d in drivers.values())
                 h_ltb = sum(d["ltb"] for d in drivers.values())
-                h_weight = sum(d["weight_g"] for d in drivers.values())   # gram
                 # Đơn TikTok Shop (mã VNGH) — gộp theo mã đơn giao, tiến độ theo bưu cục
                 h_vngh = sum(1 for oc in best if oc.startswith("VNGH"))
                 h_vngh_gtc = sum(1 for oc, v in best.items() if oc.startswith("VNGH") and v[3])
@@ -514,7 +511,7 @@ async def fetch_live(token):
                         "backlog_wards": backlog_wards, "giao120h": g120,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc, "ltb": h_ltb,
-                        "weight_g": h_weight,
+                        "weight_g": dagan_weight,   # kg thực đơn giao ĐÃ GÁN (get-detail-by-status)
                         "vngh": h_vngh, "vngh_gtc": h_vngh_gtc, "cod_gtb": h_cod_gtb,
                         "kien": h_kien, "kien_gtc": h_kien_gtc,
                         "drivers": list(drivers.values())}
