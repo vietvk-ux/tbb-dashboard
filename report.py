@@ -104,19 +104,22 @@ async def fetch_chua_gan(session, hub_id, token):
                          "status": ["PICK", "DELIVER", "DELIVER_PRIORITY", "RETURN"]}, hub_id, token)
         bts = ((d.get("data") or {}).get("detail_backlog_types")) or []
         tot, wards = {}, []
+        dw = 0   # khối lượng (gram) đơn GIAO chưa gán (total_weight = kg thực)
         for bt in bts:
             ot = bt.get("backlog_type")
             s = 0
             for w in (bt.get("details") or []):
                 wn = sum(i.get("total_order") or 0 for i in (w.get("order_inventories") or []))
                 s += wn
-                if ot == "DELIVER" and wn > 0:
-                    wards.append((w.get("name") or "?", wn))
+                if ot == "DELIVER":
+                    dw += sum(i.get("total_weight") or 0 for i in (w.get("order_inventories") or []))
+                    if wn > 0:
+                        wards.append((w.get("name") or "?", wn))
             tot[ot] = s
         wards.sort(key=lambda x: -x[1])
         return {"deliver": tot.get("DELIVER", 0), "pick": tot.get("PICK", 0),
                 "return": tot.get("RETURN", 0), "deliver_priority": tot.get("DELIVER_PRIORITY", 0),
-                "wards": wards[:20]}
+                "deliver_weight": dw, "wards": wards[:20]}
     except Exception:
         return {"deliver": 0, "pick": 0, "return": 0, "deliver_priority": 0, "wards": []}
 

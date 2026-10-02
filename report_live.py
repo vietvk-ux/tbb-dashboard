@@ -356,6 +356,7 @@ async def fetch_live(token):
                 async with sem:
                     bl = await fetch_chua_gan(session, hid, token)
                 backlog = bl.get("deliver", 0)   # Giao "chưa có chuyến đi trong ngày" (chuẩn Tồn LGT)
+                backlog_weight = bl.get("deliver_weight", 0)   # khối lượng (gram) đơn Giao chưa gán
                 backlog_wards = bl.get("wards", [])   # [(tên xã, số đơn Giao chưa gán)] giảm dần
                 async with sem:
                     g120 = await _giao120h_one(session, hid, token)   # Giao>120h bưu cục này (drill)
@@ -509,6 +510,7 @@ async def fetch_live(token):
                 h_kien = sum(d["kien"] for d in drivers.values())
                 h_kien_gtc = sum(d["kien_gtc"] for d in drivers.values())
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
+                        "backlog_weight_g": backlog_weight,
                         "backlog_wards": backlog_wards, "giao120h": g120,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc, "ltb": h_ltb,
@@ -680,15 +682,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      "<div class='tts'>tổng đơn giao vùng · 14 ngày</div></div>"
                      "%s<div class='ttv'>%s</div></div>"
                      % (_spark(sl_don, "#22d3ee", w=60, h=22), _n(R["total"])))
-        # Khối lượng (kg thực) đơn giao đã gán — ngay dưới Sản lượng
+        # Khối lượng (kg thực) đơn giao đã gán — ngay dưới Sản lượng · bấm mở drill AM→BC
         if R["weight_g"] > 0:
             sl_kg = [t.get("weight_kg") for t in trend]
             kg_spark = _spark(sl_kg, "#38bdf8", w=60, h=22) if any(v is not None for v in sl_kg) else ""
-            P.append("<div class='todo'><div class='tic'>⚖️</div><div class='tdt'>"
+            P.append("<div class='todo' %s><div class='tic'>⚖️</div><div class='tdt'>"
                      "<div class='ttn'>Khối lượng giao / ngày</div>"
-                     "<div class='tts'>kg thực đơn giao đã gán · 14 ngày</div></div>"
+                     "<div class='tts'>kg thực · đã gán + chưa gán · bấm mở AM → bưu cục</div></div>"
                      "%s<div class='ttv'>%s</div></div>"
-                     % (kg_spark, _kgfmt(R["weight_g"] / 1000.0)))
+                     % (_opendrill('kgd'), kg_spark, _kgfmt(R["weight_g"] / 1000.0)))
         if any(v is not None for v in sl_ttg):
             P.append("<div class='todo'><div class='tic'>🛍️</div><div class='tdt'>"
                      "<div class='ttn'>TikTok giao TC / ngày</div>"
@@ -883,6 +885,41 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             for bcn, g in sorted(bcs, key=lambda x: -x[1]):
                 P.append("<tr><td class='nv'>%s</td><td><b class='w'>%s</b></td></tr>"
                          % (_esc(bcn), _n(g)))
+            P.append("</tbody></table></div></details>")
+        P.append("</div></details>")
+
+    # ===== ⚖️ Khối lượng drill — AM → bưu cục (ĐÃ GÁN + CHƯA GÁN, kg thực) =====
+    kg_am = {}
+    for r in rows:
+        dg = (r.get("weight_g", 0) or 0) / 1000.0           # đã gán kg
+        cg = (r.get("backlog_weight_g", 0) or 0) / 1000.0   # chưa gán kg
+        if dg <= 0 and cg <= 0:
+            continue
+        amn = AM_OF.get(r["name"]) or "(chưa phân AM)"
+        kg_am.setdefault(amn, []).append((r["name"], dg, cg))
+    if kg_am:
+        tot_dg = sum((r.get("weight_g", 0) or 0) for r in rows) / 1000.0
+        tot_cg = sum((r.get("backlog_weight_g", 0) or 0) for r in rows) / 1000.0
+        P.append("<details id='kgd' class='cgbento' style='--h:56,189,248'><summary>")
+        P.append("<div class='mic'>⚖️</div>"
+                 "<div class='mtx'><div class='mn'>Khối lượng giao (kg thực)</div>"
+                 "<div class='ms'>đã gán %s · chưa gán %s · AM → bưu cục</div></div>"
+                 "<div class='mbig'>%s</div><span class='cvar'>▾</span></summary>"
+                 "<div class='dtl'>" % (_kgfmt(tot_dg), _kgfmt(tot_cg), _kgfmt(tot_dg)))
+        for amn, bcs in sorted(kg_am.items(), key=lambda kv: -sum(x[1] + x[2] for x in kv[1])):
+            a_dg = sum(x[1] for x in bcs); a_cg = sum(x[2] for x in bcs)
+            P.append("<details class='bc'><summary>")
+            P.append("<div class='bch'><span class='dot' style='background:#38bdf8'></span>"
+                     "<span class='bcn'>🧑‍💼 %s</span></div>"
+                     "<div class='bcm'><span>📦 đã gán <b class='ltc'>%s</b></span>"
+                     "<span>⏳ chưa gán <b class='w'>%s</b></span></div>"
+                     "</summary><div class='dtl'>" % (_esc(amn), _kgfmt(a_dg), _kgfmt(a_cg)))
+            P.append("<table class='drv'><thead><tr><th class='lft'>Bưu cục</th>"
+                     "<th>Đã gán</th><th>Chưa gán</th></tr></thead><tbody>")
+            for bcn, dg, cg in sorted(bcs, key=lambda x: -(x[1] + x[2])):
+                P.append("<tr><td class='nv'>%s</td><td><b class='ltc'>%s</b></td>"
+                         "<td><b class='w'>%s</b></td></tr>"
+                         % (_esc(bcn), _kgfmt(dg), _kgfmt(cg)))
             P.append("</tbody></table></div></details>")
         P.append("</div></details>")
 
