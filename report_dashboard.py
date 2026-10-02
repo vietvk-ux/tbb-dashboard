@@ -112,6 +112,8 @@ async def fetch_backlog(token):
             return (h["locationName"], {"deliver": g.get("deliver", 0),
                                         "pick": g.get("pick", 0),
                                         "return": g.get("return", 0),
+                                        "deliver_weight": g.get("deliver_weight", 0),   # kg chưa gán (gram)
+                                        "dagan_weight": g.get("dagan_weight", 0),        # kg đã gán (gram)
                                         "wards": g.get("wards", [])})
 
         rows = await asyncio.gather(*[one(h) for h in hubs])
