@@ -1040,6 +1040,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
     #        href, icon, tên, phụ đề, màu RGB, [7 cột mini-nhịp]
     _menu = [
+        ("buucuc.html", "🏤", "Bảng điều khiển Bưu cục", "mọi chỉ số · AM → bưu cục", "99,179,237", [52, 64, 58, 76, 68, 84, 90]),
         ("eod.html", "📊", "%GTC cuối ngày", "chi tiết nhân viên", "47,208,122", [45, 60, 52, 74, 66, 88, 80]),
         ("backlog.html", "📦", "Tồn Lấy·Giao·Trả", "theo khung giờ", "247,185,85", [70, 55, 80, 48, 66, 40, 58]),
         ("trend.html", "📈", "Xu hướng theo ngày", "biểu đồ %GTC", "55,211,232", [30, 42, 50, 62, 58, 76, 90]),
@@ -1539,6 +1540,14 @@ def main():
             f.write(report_chuyendi.gen_html(rows, collectable))
     except Exception as e:
         logger.warning("Tạo chuyendi.html lỗi (bỏ qua): %s", str(e)[:150])
+
+    # Trang BẢNG ĐIỀU KHIỂN BƯU CỤC — scorecard đủ chỉ số AM→BC (dùng lại rows+collectable, 0 call).
+    try:
+        import report_buucuc
+        with open(os.path.join(outdir, "buucuc.html"), "w", encoding="utf-8") as f:
+            f.write(report_buucuc.gen_html(rows, collectable))
+    except Exception as e:
+        logger.warning("Tạo buucuc.html lỗi (bỏ qua): %s", str(e)[:150])
 
     # (Trang TỔNG QUAN tongquan.html đã BỎ 03/10 theo yêu cầu — tự biến mất ở lần deploy tới)
 
