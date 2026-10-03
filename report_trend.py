@@ -562,7 +562,9 @@ def gen_html(data):
         P.append("</div></body></html>")
         return "\n".join(P)
 
-    vung = data["vung"]
+    # BỎ dòng ngày CHƯA chốt EOD (don_giao null) — trong ngày _store_weight tạo sẵn
+    # dòng hôm nay chỉ có weight_kg → nếu không lọc, hero/biểu đồ lấy phải dòng rỗng.
+    vung = [v for v in data["vung"] if v.get("don_giao") is not None]
     if not vung:
         P.append("<div class='empty'>⏳ Database đã kết nối nhưng <b>chưa có dữ liệu</b>.<br>"
                  "Số liệu được lưu mỗi tối 23h — quay lại sau vài ngày để xem xu hướng.</div>")
