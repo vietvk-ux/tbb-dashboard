@@ -981,7 +981,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
     #        href, icon, tên, phụ đề, màu RGB, [7 cột mini-nhịp]
     _menu = [
-        ("buucuc.html", "🏤", "Bảng điều khiển Bưu cục", "mọi chỉ số · AM → bưu cục", "99,179,237", [52, 64, 58, 76, 68, 84, 90]),
         ("eod.html", "📊", "%GTC cuối ngày", "chi tiết nhân viên", "47,208,122", [45, 60, 52, 74, 66, 88, 80]),
         ("backlog.html", "📦", "Tồn Lấy·Giao·Trả", "theo khung giờ", "247,185,85", [70, 55, 80, 48, 66, 40, 58]),
         ("trend.html", "📈", "Xu hướng theo ngày", "biểu đồ %GTC", "55,211,232", [30, 42, 50, 62, 58, 76, 90]),
