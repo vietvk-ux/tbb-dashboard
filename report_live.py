@@ -676,7 +676,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "<div class='ttv'>%s</div></div>" % (_opendrill('ttd'), _n(_ton_tra)))
     P.append("<div class='todo vi' %s><div class='tic'>👤</div><div class='tdt'>"
              "<div class='ttn'>NV cần xử lý</div><div class='tts'>%%GTC kém dai dẳng · bấm mở</div></div>"
-             "%s<div class='ttv'>%s</div></div>" % (_open_nvx, cx_spark, _n(nvx_n)))
+             "%s<div class='ttv' style='color:var(--bad)'>%s</div></div>" % (_open_nvx, cx_spark, _n(nvx_n)))
     if coll_nv is not None:
         P.append("<a class='todo wn lnk' href='chuyendi.html'><div class='tic'>💵</div><div class='tdt'>"
                  "<div class='ttn'>NV chưa nộp tiền</div><div class='tts'>%s đang treo · xem chi tiết →</div></div>"
