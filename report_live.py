@@ -691,11 +691,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     pt_spark = ""
     if pt_trend and len(pt_trend) >= 2:
         pt_spark = _spark(pt_trend, "#fbbf24", w=60, h=22)
-    def _opendrill(_id):
-        return ("onclick=\"var d=document.getElementById('%s');if(d){d.open=true;"
-                "d.scrollIntoView({behavior:'smooth',block:'start'});}\"" % _id)
-    _open_nvx = _opendrill('nvxuly')
-
     # ----- Nội dung chi tiết (inner) của từng dòng — bung NGAY TẠI CHỖ khi bấm -----
     def _row(cls, icon, title, sub, spark, value, vstyle, inner, onclick=""):
         """1 dòng ưu tiên. inner != '' → <details> bung tại chỗ; onclick → dòng nhảy (NV cần xử lý)."""
@@ -782,8 +777,33 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                   _n(_ton_lay), "", _in_tld))
     P.append(_row("wn", "↩️", "Tồn Trả", "đơn trả tồn · bấm xem AM → bưu cục", "",
                   _n(_ton_tra), "", _in_ttd))
-    P.append(_row("vi", "👤", "NV cần xử lý", "%GTC kém dai dẳng · bấm mở", cx_spark,
-                  _n(nvx_n), " style='color:var(--bad)'", "", _open_nvx))
+    # NV cần xử lý — bung TOÀN BỘ embed NGAY TẠI CHỖ (Supabase; lỗi → fallback NV<50% hôm nay)
+    if nvm is not None:
+        _in_nvx = nvm["html"]
+    else:
+        _lown = sorted([(d, r["name"]) for r in rows for d in r.get("drivers", [])
+                        if d.get("total", 0) >= 30 and _pct(d["gtc"], d["total"]) is not None
+                        and _pct(d["gtc"], d["total"]) < 50],
+                       key=lambda x: (_pct(x[0]["gtc"], x[0]["total"]), -x[0].get("total", 0)))
+        if _lown:
+            T = ["<table class='drv'><thead><tr><th>Nhân viên · bưu cục</th><th>Đơn</th>"
+                 "<th>Hỏng</th><th>%GTC</th></tr></thead><tbody>"]
+            for d, bc in _lown[:20]:
+                pc = _pct(d["gtc"], d["total"])
+                T.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td>"
+                         "<td><b class='w'>%s</b></td><td><span class='pill sm %s'>%s%%</span></td></tr>"
+                         % (_esc(d["name"]), _esc(bc), _n(d["total"]),
+                            _n(d["total"] - d["gtc"]), _cls(pc), pc))
+            T.append("</tbody></table>")
+            _in_nvx = "".join(T)
+        else:
+            _in_nvx = ""
+    P.append(_row("vi", "👤", "NV cần xử lý", "%GTC kém dai dẳng · bấm xem", cx_spark,
+                  _n(nvx_n), " style='color:var(--bad)'", _in_nvx))
+    # 🏤 Bảng điều khiển Bưu cục — dòng NGAY DƯỚI NV cần xử lý (bung scorecard AM→bưu cục)
+    if bcm is not None:
+        P.append(_row("", "🏤", "Bảng điều khiển Bưu cục", "mọi chỉ số từng bưu cục · AM → bưu cục",
+                      "", _n(bcm["n"]), "", bcm["html"]))
     if coll_nv is not None:
         P.append("<a class='todo wn lnk' href='chuyendi.html'><div class='tic'>💵</div><div class='tdt'>"
                  "<div class='ttn'>NV chưa nộp tiền</div><div class='tts'>%s đang treo · xem chi tiết →</div></div>"
@@ -957,47 +977,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  "<div class='sl'>%s %s</div></div>" % (cls, rgb, oc, val, ic, lab))
     P.append("</section>")
 
-    # ===== 👤 NV cần xử lý — NHÚNG TOÀN BỘ TRANG QUẢN LÝ NHÂN VIÊN (tra cứu hồ sơ +
-    #        đủ danh sách + streak 14 ngày). Supabase (creds có trong step live);
-    #        Supabase lỗi → fallback NV %GTC<50% HÔM NAY.
-    if nvm is not None:
-        P.append("<details id='nvxuly' class='cgbento'><summary>"
-                 "<div class='mic'>👤</div>"
-                 "<div class='mtx'><div class='mn'>NV cần xử lý · kém dai dẳng</div>"
-                 "<div class='ms'>tra cứu hồ sơ + toàn bộ danh sách · %%GTC TB &lt;40%% qua ≥5/14 ngày</div></div>"
-                 "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
-                 "</summary><div class='dtl'>%s</div></details>" % (nvm["n"], nvm["html"]))
-    else:
-        # Fallback (không có Supabase/lỗi): NV %GTC <50% HÔM NAY (≥30 đơn)
-        low_nv = sorted([(d, r["name"]) for r in rows for d in r.get("drivers", [])
-                         if d.get("total", 0) >= 30 and _pct(d["gtc"], d["total"]) is not None
-                         and _pct(d["gtc"], d["total"]) < 50],
-                        key=lambda x: (_pct(x[0]["gtc"], x[0]["total"]), -x[0].get("total", 0)))
-        if low_nv:
-            P.append("<details class='cgbento'><summary>"
-                     "<div class='mic'>👤</div>"
-                     "<div class='mtx'><div class='mn'>NV GTC &lt; mục tiêu 50%% (hôm nay)</div>"
-                     "<div class='ms'>≥30 đơn · %%GTC thấp → cao · bấm mở danh sách</div></div>"
-                     "<div class='mbig'>%d<span class='u'>NV</span></div><span class='cvar'>▾</span>"
-                     "</summary><div class='dtl'>" % len(low_nv))
-            P.append("<table class='drv'><thead><tr><th>Nhân viên · bưu cục</th><th>Đơn</th>"
-                     "<th>Hỏng</th><th>%GTC</th></tr></thead><tbody>")
-            for d, bc in low_nv[:20]:
-                pc = _pct(d["gtc"], d["total"])
-                P.append("<tr><td class='nv'>%s<div class='sc'>%s</div></td><td>%s</td>"
-                         "<td><b class='w'>%s</b></td><td><span class='pill sm %s'>%s%%</span></td></tr>"
-                         % (_esc(d["name"]), _esc(bc), _n(d["total"]),
-                            _n(d["total"] - d["gtc"]), _cls(pc), pc))
-            P.append("</tbody></table></div></details>")
-
-    # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — nhúng NGAY DƯỚI 'NV cần xử lý' (scorecard đủ chỉ số AM→BC) =====
-    if bcm is not None:
-        P.append("<details class='cgbento'><summary>"
-                 "<div class='mic'>🏤</div>"
-                 "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
-                 "<div class='ms'>mọi chỉ số từng bưu cục · AM → bưu cục → scorecard</div></div>"
-                 "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
-                 "</summary><div class='dtl'>%s</div></details>" % (bcm["n"], bcm["html"]))
 
     # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
     #        href, icon, tên, phụ đề, màu RGB, [7 cột mini-nhịp]

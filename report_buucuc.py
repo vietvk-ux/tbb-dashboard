@@ -3,14 +3,13 @@
 vào 1 scorecard, điều hướng AM → Bưu cục. Dùng lại rows=fetch_live + collectable (phiếu
 thu treo) ĐÃ fetch ở report_live.main → 0 call API thêm. Tái dùng helper report_live.
 """
-from datetime import datetime
-import pytz
+from datetime import datetime, timezone, timedelta
 
 from am_map import AM_OF
 from report_live import (_CSS, _n, _esc, _codm, _kgfmt, _pct, _cls, _bar, _tt_chip,
                          _drv_table, _late_cnt, _low_cnt, PROV_NAME)
 
-VN = pytz.timezone("Asia/Ho_Chi_Minh")
+VN = timezone(timedelta(hours=7))   # dùng stdlib (requirements KHÔNG có pytz) — khớp report_live
 
 
 def _late_badge(n):
