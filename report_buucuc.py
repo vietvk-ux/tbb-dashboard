@@ -50,9 +50,10 @@ def _unslim_row(r):
     return r
 
 
-def save_chot(rows, collectable, outdir, ngay, label):
-    """Ghi snapshot CHỐT ra outdir/buucuc_chot.json (sẽ deploy lên Pages)."""
-    data = {"ngay": ngay, "label": label,
+def save_chot(rows, collectable, outdir, ngay, label, cmin=None):
+    """Ghi snapshot CHỐT ra outdir/buucuc_chot.json (sẽ deploy lên Pages).
+    cmin = phút trong ngày lúc chụp (để phân biệt chốt trong cửa sổ 23h15 vs chụp giữa ngày)."""
+    data = {"ngay": ngay, "label": label, "min": cmin,
             "rows": [_slim_row(r) for r in rows], "coll": collectable or {}}
     with open(os.path.join(outdir, CHOT_NAME), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)

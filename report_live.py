@@ -1503,10 +1503,13 @@ def main():
         vn_min = now_vn.hour * 60 + now_vn.minute
         force_chot = os.environ.get("BUUCUC_CHOT", "").strip() == "1"
         chot = report_buucuc.load_chot_http(slug)
-        if force_chot or ((23 * 60 + 10) <= vn_min <= (23 * 60 + 40)
-                          and (not chot or chot.get("ngay") != today)):
+        in_window = (23 * 60 + 10) <= vn_min <= (23 * 60 + 40)      # cửa sổ chốt ~23h15
+        # Đã có bản chốt CHÍNH THỨC (chụp trong cửa sổ) của HÔM NAY chưa? (min >= 23:10)
+        has_window_chot = bool(chot and chot.get("ngay") == today
+                               and (chot.get("min") or 0) >= (23 * 60 + 10))
+        if force_chot or (in_window and not has_window_chot):
             _bc_label = now_vn.strftime("%H:%M · %d/%m")
-            report_buucuc.save_chot(rows, collectable, outdir, today, _bc_label)
+            report_buucuc.save_chot(rows, collectable, outdir, today, _bc_label, vn_min)
         elif chot:
             _bc_rows, _bc_coll, _bc_label = chot["rows"], chot.get("coll"), chot.get("label")
         bcm = report_buucuc.embed(_bc_rows, _bc_coll, label=_bc_label)
