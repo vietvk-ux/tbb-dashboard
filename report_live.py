@@ -1151,6 +1151,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "💰 <b>COD GTB</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công · 📦 <b>LTB</b> = lấy hàng thất bại (đã thao tác nhưng không lấy được)<br>"
              "🎯 <b>NV đạt ≥50%</b> = số nhân viên có %GTC ≥50% (≥20 đơn đã gán)<br>"
              "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
+             "🕘 <b>cạnh tên NV / chip 🕘 N</b> = nhân viên xuất phát sau 9h30 (số trên thẻ Bưu cục·AM·Tỉnh = tổng NV muộn của đơn vị đó)<br>"
+             "📉 <b>cạnh tên NV / chip 📉 N</b> = nhân viên %GTC &lt;50% (≥20 đơn) — nhóm yếu cần chú ý · <span style='opacity:.7'>buổi sáng %GTC luỹ kế còn thấp nên số 📉 cao, phản ánh đúng dần về chiều/tối</span><br>"
              "<span style='opacity:.7'>Số LIVE gồm cả chuyến đã kết thúc trong ngày · %GTC còn thấp giữa ngày là bình thường (chuyến chưa đóng) · nguồn nhanh.ghn.vn</span></div>")
     P.append("<script>function tgw(tr){tr.classList.toggle('op');"
              "var s=tr.nextElementSibling;if(s&&s.classList.contains('wsub'))s.classList.toggle('show');}</script>")
