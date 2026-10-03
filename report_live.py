@@ -301,11 +301,11 @@ def _drv_table(drv):
         late = st is not None and (st.hour * 60 + st.minute) > 570   # xuất phát sau 9h30
         lb = (" <span class='lb' title='Xuất phát %02d:%02d · muộn (sau 9h30)'>🕘</span>"
               % (st.hour, st.minute)) if late else ""
-        low = d["total"] >= 20 and pc2 is not None and pc2 < 50       # NV yếu %GTC <50%
-        lw = " <span class='lw' title='%GTC &lt;50% (≥20 đơn) · nhóm yếu'>📉</span>" if low else ""
-        P.append("<tr%s><td class='nv'>%s%s%s%s</td><td>%s</td><td>%s</td><td>%s</td>"
+        # TÊN NV tô màu theo %GTC (giống bưu cục): đỏ<60 · vàng<70 · xanh≥70
+        nmc = "nmc " + _cls(pc2)
+        P.append("<tr%s><td class='nv'>%s<span class='%s'>%s</span>%s</td><td>%s</td><td>%s</td><td>%s</td>"
                  "<td><span class='pill sm %s'>%s%%</span></td><td>%s</td></tr>"
-                 % (attr, cx, _esc(d["name"]), lb, lw, _n(d["total"]), _n(d["gtc"]),
+                 % (attr, cx, nmc, _esc(d["name"]), lb, _n(d["total"]), _n(d["gtc"]),
                     ltc_cell, _cls(pc2), pc2 if pc2 is not None else "—",
                     _tt_cell(d.get("vngh_gtc", 0), d.get("vngh", 0))))
         if has:
@@ -328,8 +328,8 @@ def _bc_drv_details(r):
     pc = _pct(r["gtc"], r["total"])
     cls = _cls(pc)
     P = ["<details class='bc sub %s'><summary>" % cls]
-    P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
-             "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
+    P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
+             "<span class='pill %s'>%s%%</span></div>" % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
     P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
              "<span class='ltc'>LTC %s</span>%s%s%s</div>"
              % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]),
@@ -1072,8 +1072,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         cls = _cls(pc)
         P.append("<details class='bc %s'>" % cls)
         P.append("<summary>")
-        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
-                 "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
+                 "<span class='pill %s'>%s%%</span></div>" % (cls, cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         _am_late = sum(_late_cnt(r) for r in am_rows.get(amn, []))
         _am_low = sum(_low_cnt(r) for r in am_rows.get(amn, []))
@@ -1098,8 +1098,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         cls = _cls(pc)
         P.append("<details class='bc %s'>" % cls)
         P.append("<summary>")
-        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
-                 "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
+                 "<span class='pill %s'>%s%%</span></div>" % (cls, cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         _pv_late = sum(_late_cnt(r) for r in prov_rows.get(pv, []))
         _pv_low = sum(_low_cnt(r) for r in prov_rows.get(pv, []))
@@ -1126,9 +1126,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         keys = (r["name"] + " " + " ".join(d["name"] for d in r["drivers"])).lower()
         P.append("<details class='bc %s' data-k=\"%s\">" % (cls, _esc(keys)))
         P.append("<summary>")
-        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
+        P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>"
-                 % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
+                 % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
                  "<span class='w'>⏳ %s</span><span>✅ %s</span>"
@@ -1152,7 +1152,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "🎯 <b>NV đạt ≥50%</b> = số nhân viên có %GTC ≥50% (≥20 đơn đã gán)<br>"
              "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
              "🕘 <b>cạnh tên NV / chip 🕘 N</b> = nhân viên xuất phát sau 9h30 (số trên thẻ Bưu cục·AM·Tỉnh = tổng NV muộn của đơn vị đó)<br>"
-             "📉 <b>cạnh tên NV / chip 📉 N</b> = nhân viên %GTC &lt;50% (≥20 đơn) — nhóm yếu cần chú ý · <span style='opacity:.7'>buổi sáng %GTC luỹ kế còn thấp nên số 📉 cao, phản ánh đúng dần về chiều/tối</span><br>"
+             "🎨 <b>Màu tên NV · Bưu cục · AM · Tỉnh</b> = theo %GTC: <span style='color:var(--bad)'>đỏ &lt;60%</span> · <span style='color:var(--warn)'>vàng 60–70%</span> · <span style='color:var(--good)'>xanh ≥70%</span> · <span style='opacity:.7'>buổi sáng %GTC luỹ kế còn thấp nên đa số đỏ, phản ánh đúng dần về chiều/tối</span><br>"
+             "📉 <b>chip 📉 N</b> ở thẻ Bưu cục·AM·Tỉnh = số NV %GTC &lt;50% (≥20 đơn) — nhóm yếu cần chú ý của đơn vị đó<br>"
              "<span style='opacity:.7'>Số LIVE gồm cả chuyến đã kết thúc trong ngày · %GTC còn thấp giữa ngày là bình thường (chuyến chưa đóng) · nguồn nhanh.ghn.vn</span></div>")
     P.append("<script>function tgw(tr){tr.classList.toggle('op');"
              "var s=tr.nextElementSibling;if(s&&s.classList.contains('wsub'))s.classList.toggle('show');}</script>")
@@ -1403,7 +1404,11 @@ tr.dnv{cursor:pointer}
 tr.dnv .cx{display:inline-block;color:var(--mut);font-size:8px;margin-right:5px;transition:transform .18s;vertical-align:middle}
 tr.dnv.op .cx{transform:rotate(90deg);color:var(--txt)}
 .lb{font-size:12px;vertical-align:middle;filter:drop-shadow(0 0 2px rgba(245,170,23,.6))}
-.lw{font-size:12px;vertical-align:middle;filter:drop-shadow(0 0 2px rgba(245,69,92,.7))}
+/* Tên NV/BC/AM/tỉnh tô màu theo %GTC (đỏ<60 · vàng<70 · xanh≥70) */
+.nmc.bad,.bcn.bad{color:var(--bad)!important}
+.nmc.warn,.bcn.warn{color:var(--warn)!important}
+.nmc.good,.bcn.good{color:var(--good)!important}
+.nmc.na,.bcn.na{color:var(--mut)!important}
 .lbc{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:800;color:#ffd9a0;
  background:rgba(245,170,23,.18);border:1px solid rgba(245,170,23,.5);border-radius:999px;padding:1px 7px;white-space:nowrap}
 .lwc{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:800;color:#ffc2cc;
