@@ -38,7 +38,7 @@ def _bc_scorecard(r, collectable, dkattr="data-k"):
     """1 bưu cục = 1 scorecard đầy đủ (dạng <details> bấm mở).
     dkattr: tên attribute khoá tìm kiếm (data-k ở trang riêng, data-kb khi NHÚNG để
     không đụng ô tìm kiếm chính của trang trực tiếp)."""
-    pc = _pct(r["gtc"], r["att"])
+    pc = _pct(r["gtc"], r["total"])     # %GTC = GTC / đã gán (khớp toàn dashboard)
     cls = _cls(pc)
     nv = len(r.get("drivers", []))
     late = _late_cnt(r)
@@ -123,10 +123,10 @@ def _am_blocks(rows, collectable, dkattr="data-k", am_open=True):
         am_rows.setdefault(amn, []).append(r)
 
     def am_pct(bcs):
-        return _pct(sum(x["gtc"] for x in bcs), sum(x["att"] for x in bcs))
+        return _pct(sum(x["gtc"] for x in bcs), sum(x["total"] for x in bcs))
 
     P = []
-    for amn, bcs in sorted(am_rows.items(), key=lambda kv: (am_pct(kv[1]) if any(x["att"] for x in kv[1]) else 999)):
+    for amn, bcs in sorted(am_rows.items(), key=lambda kv: (am_pct(kv[1]) if any(x["total"] for x in kv[1]) else 999)):
         apc = am_pct(bcs)
         acls = _cls(apc)
         a_tot = sum(x["total"] for x in bcs)
@@ -145,7 +145,7 @@ def _am_blocks(rows, collectable, dkattr="data-k", am_open=True):
                     ("·" + _late_badge(a_late)) if a_late else "",
                     ("·" + _low_badge(a_low)) if a_low else ""))
         P.append("</summary><div class='dtl'>")
-        for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["att"]) if x["att"] else 999)):
+        for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
             P.append(_bc_scorecard(r, collectable, dkattr))
         P.append("</div></details>")
     return "".join(P)
