@@ -692,15 +692,19 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if pt_trend and len(pt_trend) >= 2:
         pt_spark = _spark(pt_trend, "#fbbf24", w=60, h=22)
     # ----- Nội dung chi tiết (inner) của từng dòng — bung NGAY TẠI CHỖ khi bấm -----
-    def _row(cls, icon, title, sub, spark, value, vstyle, inner, onclick=""):
-        """1 dòng ưu tiên. inner != '' → <details> bung tại chỗ; onclick → dòng nhảy (NV cần xử lý)."""
-        summ = ("<div class='tic'>%s</div><div class='tdt'><div class='ttn'>%s</div>"
-                "<div class='tts'>%s</div></div>%s<div class='ttv'%s>%s</div>"
-                % (icon, title, sub, spark, vstyle, value))
+    def _row(cls, icon, title, sub, spark, value, vstyle, inner, onclick="", href=""):
+        """1 Ô LƯỚI (Phương án A). inner != '' → <details> bung full-chiều-ngang tại chỗ;
+        href → ô dạng link. sub bỏ (ô gọn). spark co giãn đáy ô."""
+        car = ("<span class='gtcar'>▸</span>" if inner
+               else ("<span class='gtcar'>›</span>" if href else ""))
+        body = ("<div class='gth'><span class='gti'>%s</span><span class='gtl'>%s</span>%s</div>"
+                "<div class='gtv'%s>%s</div>%s" % (icon, title, car, vstyle, value, spark))
         if inner:
-            return ("<details class='todo exp %s'><summary>%s<span class='tcar'>▾</span></summary>"
-                    "<div class='tdtl'>%s</div></details>" % (cls, summ, inner))
-        return "<div class='todo %s' %s>%s</div>" % (cls, onclick, summ)
+            return ("<details class='gt exp %s'><summary>%s</summary>"
+                    "<div class='gtd'>%s</div></details>" % (cls, body, inner))
+        if href:
+            return "<a class='gt lnk %s' href='%s'>%s</a>" % (cls, href, body)
+        return "<div class='gt %s' %s>%s</div>" % (cls, onclick, body)
 
     def _drill_am_bc(items_by_am, dotcls, pillcls, am_sub, col_header):
         """Dựng AM → bảng bưu cục (số đơn). items_by_am: {AM:[(bc,val)]}. Trả inner html."""
@@ -801,29 +805,22 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append(_row("vi", "👤", "NV cần xử lý", "%GTC kém dai dẳng · bấm xem", cx_spark,
                   _n(nvx_n), " style='color:var(--bad)'", _in_nvx))
     if coll_nv is not None:
-        P.append("<a class='todo wn lnk' href='chuyendi.html'><div class='tic'>💵</div><div class='tdt'>"
-                 "<div class='ttn'>NV chưa nộp tiền</div><div class='tts'>%s đang treo · xem chi tiết →</div></div>"
-                 "%s<div class='ttv'>%s</div></a>" % (_codm(coll_amt), pt_spark, _n(coll_nv)))
-    # NV đạt GTC ≥50% — ngay dưới NV chưa nộp tiền (sức khỏe đội ngũ)
+        P.append(_row("wn", "💵", "NV chưa nộp tiền", "", pt_spark, _n(coll_nv), "", "",
+                      href="chuyendi.html"))
+    # NV đạt GTC ≥50% — (sức khỏe đội ngũ)
     if nvdat_trend and len(nvdat_trend) >= 2:
         nv_dat = sum(1 for r in rows for d in r.get("drivers", [])
                      if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
                      and _pct(d["gtc"], d["total"]) >= 50)
-        P.append("<div class='todo'><div class='tic'>🎯</div><div class='tdt'>"
-                 "<div class='ttn'>NV đạt GTC ≥50%%</div>"
-                 "<div class='tts'>số NV %%GTC ≥50%% (≥20 đơn) · 14 ngày</div></div>"
-                 "%s<div class='ttv' style='color:var(--good)'>%s</div></div>"
-                 % (_spark(nvdat_trend, "#34d399", w=60, h=22), _n(nv_dat)))
-    # Sản lượng giao/ngày + TikTok giao TC/ngày — cùng kiểu, phía dưới
+        P.append(_row("", "🎯", "NV đạt GTC ≥50%", "", _spark(nvdat_trend, "#34d399", w=60, h=22),
+                      _n(nv_dat), " style='color:var(--good)'", ""))
+    # Sản lượng giao/ngày + TikTok giao TC/ngày
     if trend and len(trend) >= 2:
         sl_don = [t.get("don_giao") for t in trend]
         sl_ttg = [t.get("tiktok_gtc") for t in trend]
         if any(v is not None for v in sl_don):
-            P.append("<div class='todo'><div class='tic'>📦</div><div class='tdt'>"
-                     "<div class='ttn'>Sản lượng giao / ngày</div>"
-                     "<div class='tts'>tổng đơn giao vùng · 14 ngày</div></div>"
-                     "%s<div class='ttv'>%s</div></div>"
-                     % (_spark(sl_don, "#22d3ee", w=60, h=22), _n(R["total"])))
+            P.append(_row("", "📦", "Sản lượng giao / ngày", "", _spark(sl_don, "#22d3ee", w=60, h=22),
+                          _n(R["total"]), "", ""))
         # Khối lượng (kg thực) đơn giao đã gán — ngay dưới Sản lượng · bung chi tiết AM→BC tại chỗ
         if R["weight_g"] > 0:
             sl_kg = [t.get("weight_kg") for t in trend]
@@ -856,11 +853,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                           "kg thực · đã gán + chưa gán · bấm xem AM → bưu cục",
                           kg_spark, _kgfmt(R["weight_g"] / 1000.0), "", _in_kgd))
         if any(v is not None for v in sl_ttg):
-            P.append("<div class='todo'><div class='tic'>🛍️</div><div class='tdt'>"
-                     "<div class='ttn'>TikTok giao TC / ngày</div>"
-                     "<div class='tts'>số đơn Tiktok giao thành công · 14 ngày</div></div>"
-                     "%s<div class='ttv'>%s</div></div>"
-                     % (_spark(sl_ttg, "#e879c8", w=60, h=22), _n(R["vngh_gtc"])))
+            P.append(_row("", "🛍️", "TikTok giao TC / ngày", "", _spark(sl_ttg, "#e879c8", w=60, h=22),
+                          _n(R["vngh_gtc"]), "", ""))
     P.append("</section>")
 
     # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
@@ -1183,30 +1177,32 @@ svg.spk{display:block}
 .vpct i{display:block;font-style:normal;font-size:8.5px;color:var(--mut);font-weight:600}
 /* CẦN LÀM NGAY */
 .sectitle{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);margin:14px 3px 8px}
-.prilist{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;background:none;border:none;padding:0}
-.todo{display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:15px;text-decoration:none;color:var(--txt);
- background:var(--card);border:1px solid var(--line)}
-.todo.bd{border-color:rgba(251,113,133,.4)}.todo.wn{border-color:rgba(251,191,36,.34)}.todo.vi{border-color:rgba(167,139,250,.4)}
-.todo.lnk:active{transform:scale(.99)}
-.todo .tic{width:34px;height:34px;border-radius:11px;flex:none;display:grid;place-items:center;font-size:17px;background:rgba(255,255,255,.06);border:1px solid var(--line)}
-.todo.bd .tic{background:rgba(251,113,133,.16);border-color:rgba(251,113,133,.38)}
-.todo.wn .tic{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.34)}
-.todo.vi .tic{background:rgba(167,139,250,.16);border-color:rgba(167,139,250,.4)}
-.todo .tdt{flex:1;min-width:0}
-.todo .ttn{font-weight:800;font-size:14.5px;letter-spacing:-.01em}
-.todo .tts{font-size:11px;color:var(--mut);margin-top:2px;font-weight:600}
-.todo .ttv{font-weight:800;font-size:28px;flex:none;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.todo.bd .ttv{color:var(--bad)}.todo.wn .ttv{color:var(--warn)}.todo.vi .ttv{color:var(--txt)}
-.todo svg.spk{width:56px;height:22px;flex:none}
-/* Dòng ưu tiên BUNG CHI TIẾT tại chỗ (details) */
-details.todo{display:block;padding:0;overflow:hidden}
-details.todo>summary{display:flex;align-items:center;gap:11px;padding:13px 14px;cursor:pointer;list-style:none}
-details.todo>summary::-webkit-details-marker{display:none}
-details.todo>summary:active{transform:scale(.995)}
-.todo .tcar{flex:none;color:var(--mut);font-size:13px;transition:transform .2s;margin-left:2px}
-details.todo[open]>summary .tcar{transform:rotate(180deg);color:var(--txt)}
-.todo .tdtl{padding:2px 12px 12px;border-top:1px solid var(--line)}
-.todo .tdtl .bc{margin:8px 0 0}
+/* ===== LƯỚI CHỈ SỐ (Phương án A) — ô gọn 2 cột, bấm bung full-width ===== */
+.prilist{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px;background:none;border:none;padding:0}
+.gt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px 10px;
+ text-decoration:none;color:var(--txt);overflow:hidden;min-height:84px;
+ display:flex;flex-direction:column;gap:5px}
+.gt.bd{border-color:rgba(251,113,133,.42)} .gt.wn{border-color:rgba(251,191,36,.36)} .gt.vi{border-color:rgba(167,139,250,.4)}
+.gt .gth{display:flex;align-items:center;gap:7px}
+.gt .gti{width:26px;height:26px;border-radius:9px;flex:none;display:grid;place-items:center;font-size:14px;
+ background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.gt.bd .gti{background:rgba(251,113,133,.16);border-color:rgba(251,113,133,.4)}
+.gt.wn .gti{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.34)}
+.gt.vi .gti{background:rgba(167,139,250,.16);border-color:rgba(167,139,250,.4)}
+.gt .gtl{font-size:11.5px;font-weight:700;color:var(--mut);line-height:1.2}
+.gt .gtcar{margin-left:auto;color:var(--mut);font-size:11px;flex:none;transition:transform .2s}
+.gt .gtv{font-family:Sora,sans-serif;font-weight:800;font-size:24px;letter-spacing:-.01em;line-height:1;
+ font-variant-numeric:tabular-nums}
+.gt.bd .gtv{color:var(--bad)} .gt.wn .gtv{color:var(--warn)}
+.gt svg.spk{width:100%;height:20px;display:block;margin-top:auto}
+.gt .gtd{padding-top:8px;margin-top:4px;border-top:1px solid var(--line)}
+.gt .gtd .bc{margin:8px 0 0}
+details.gt{padding:11px 12px 10px}
+details.gt>summary{display:flex;flex-direction:column;gap:5px;cursor:pointer;list-style:none}
+details.gt>summary::-webkit-details-marker{display:none}
+details.gt>summary:active{transform:scale(.997)}
+details.gt[open]{grid-column:1/-1}          /* bung → chiếm cả 2 cột */
+details.gt[open] .gtcar{transform:rotate(90deg);color:var(--txt)}
 .diag{background:radial-gradient(120% 100% at 0% 0%,rgba(255,255,255,.06),var(--card) 72%);
  border:1px solid var(--line);border-radius:14px;padding:10px 13px;margin:0 0 12px;
  font-size:12.5px;line-height:1.55;color:var(--mut)}
