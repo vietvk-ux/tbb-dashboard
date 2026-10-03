@@ -252,6 +252,21 @@ def _spark(vals, color, w=240, h=46, target=None, pad=6):
             % (w, h, h, tline, pts, color, lx, ly, color))
 
 
+def _late_cnt(r):
+    """Số NV của 1 bưu cục xuất phát SAU 9h30 (st > 570 phút)."""
+    c = 0
+    for d in r.get("drivers", []):
+        st = d.get("st")
+        if st is not None and (st.hour * 60 + st.minute) > 570:
+            c += 1
+    return c
+
+
+def _late_badge(n):
+    """Chip '🕘 N' cảnh báo xuất phát muộn, rỗng nếu n=0."""
+    return ("<span class='lbc' title='%d NV xuất phát sau 9h30'>🕘 %s</span>" % (n, _n(n))) if n else ""
+
+
 def _drv_table(drv):
     """Bảng nhân viên của 1 bưu cục. Mỗi NV BẤM MỞ được → hàng con %GTC theo xã/phường
     (từ d['wards'] gộp lúc bóc chuyến, 0 call thêm). NV không có đơn giao → không mở."""
@@ -299,9 +314,10 @@ def _bc_drv_details(r):
     P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
              "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
     P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
-             "<span class='ltc'>LTC %s</span>%s</div>"
+             "<span class='ltc'>LTC %s</span>%s%s</div>"
              % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]),
-                _n(r.get("ltc", 0)), _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0))))
+                _n(r.get("ltc", 0)), _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0)),
+                _late_badge(_late_cnt(r))))
     P.append("</summary><div class='dtl'>")
     P.append(_drv_table(r.get("drivers", [])))
     P.append("</div></details>")
@@ -1042,9 +1058,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(amn), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='ltc'>LTC %s</span>%s</div>"
+        _am_late = sum(_late_cnt(r) for r in am_rows.get(amn, []))
+        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='ltc'>LTC %s</span>%s%s</div>"
                  % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["ltc"]),
-                    ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else ""))
+                    ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else "",
+                    ("·" + _late_badge(_am_late)) if _am_late else ""))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
@@ -1064,10 +1082,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn'>%s</span>"
                  "<span class='pill %s'>%s%%</span></div>" % (cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
-        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='ltc'>LTC %s</span>%s</div>"
+        _pv_late = sum(_late_cnt(r) for r in prov_rows.get(pv, []))
+        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='ltc'>LTC %s</span>%s%s</div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _n(v["ltc"]),
-                    ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else ""))
+                    ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else "",
+                    ("·" + _late_badge(_pv_late)) if _pv_late else ""))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(prov_rows.get(pv, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
@@ -1091,10 +1111,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
                  "<span class='w'>⏳ %s</span><span>✅ %s</span>"
-                 "<span class='ltc'>LTC %s</span>%s</div>"
+                 "<span class='ltc'>LTC %s</span>%s%s</div>"
                  % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
                     _n(r.get("ltc", 0)),
-                    _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0))))
+                    _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0)),
+                    _late_badge(_late_cnt(r))))
         P.append("</summary>")
         # TẤT CẢ tài xế có chuyến hôm nay (kể cả chưa có đơn giao); bấm NV → %GTC theo xã
         P.append("<div class='dtl'>")
@@ -1359,6 +1380,8 @@ tr.dnv{cursor:pointer}
 tr.dnv .cx{display:inline-block;color:var(--mut);font-size:8px;margin-right:5px;transition:transform .18s;vertical-align:middle}
 tr.dnv.op .cx{transform:rotate(90deg);color:var(--txt)}
 .lb{font-size:12px;vertical-align:middle;filter:drop-shadow(0 0 2px rgba(245,69,92,.6))}
+.lbc{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:800;color:#ffd9a0;
+ background:rgba(245,170,23,.18);border:1px solid rgba(245,170,23,.5);border-radius:999px;padding:1px 7px;white-space:nowrap}
 tr.dnv.op>td{border-bottom:none}
 tr.wsub{display:none}tr.wsub.show{display:table-row}
 tr.wsub>td{padding:2px 6px 10px !important;text-align:left}
