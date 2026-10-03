@@ -301,9 +301,11 @@ def _drv_table(drv):
         late = st is not None and (st.hour * 60 + st.minute) > 570   # xuất phát sau 9h30
         lb = (" <span class='lb' title='Xuất phát %02d:%02d · muộn (sau 9h30)'>🕘</span>"
               % (st.hour, st.minute)) if late else ""
-        P.append("<tr%s><td class='nv'>%s%s%s</td><td>%s</td><td>%s</td><td>%s</td>"
+        low = d["total"] >= 20 and pc2 is not None and pc2 < 50       # NV yếu %GTC <50%
+        lw = " <span class='lw' title='%GTC &lt;50% (≥20 đơn) · nhóm yếu'>📉</span>" if low else ""
+        P.append("<tr%s><td class='nv'>%s%s%s%s</td><td>%s</td><td>%s</td><td>%s</td>"
                  "<td><span class='pill sm %s'>%s%%</span></td><td>%s</td></tr>"
-                 % (attr, cx, _esc(d["name"]), lb, _n(d["total"]), _n(d["gtc"]),
+                 % (attr, cx, _esc(d["name"]), lb, lw, _n(d["total"]), _n(d["gtc"]),
                     ltc_cell, _cls(pc2), pc2 if pc2 is not None else "—",
                     _tt_cell(d.get("vngh_gtc", 0), d.get("vngh", 0))))
         if has:
@@ -1398,7 +1400,8 @@ td.nv .sc{font-size:9.5px;color:var(--mut);font-weight:400;margin-top:1px;overfl
 tr.dnv{cursor:pointer}
 tr.dnv .cx{display:inline-block;color:var(--mut);font-size:8px;margin-right:5px;transition:transform .18s;vertical-align:middle}
 tr.dnv.op .cx{transform:rotate(90deg);color:var(--txt)}
-.lb{font-size:12px;vertical-align:middle;filter:drop-shadow(0 0 2px rgba(245,69,92,.6))}
+.lb{font-size:12px;vertical-align:middle;filter:drop-shadow(0 0 2px rgba(245,170,23,.6))}
+.lw{font-size:12px;vertical-align:middle;filter:drop-shadow(0 0 2px rgba(245,69,92,.7))}
 .lbc{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:800;color:#ffd9a0;
  background:rgba(245,170,23,.18);border:1px solid rgba(245,170,23,.5);border-radius:999px;padding:1px 7px;white-space:nowrap}
 .lwc{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:800;color:#ffc2cc;
