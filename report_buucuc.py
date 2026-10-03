@@ -3,6 +3,9 @@
 vào 1 scorecard, điều hướng AM → Bưu cục. Dùng lại rows=fetch_live + collectable (phiếu
 thu treo) ĐÃ fetch ở report_live.main → 0 call API thêm. Tái dùng helper report_live.
 """
+import os
+import json
+import logging
 from datetime import datetime, timezone, timedelta
 
 from am_map import AM_OF
@@ -10,6 +13,66 @@ from report_live import (_CSS, _n, _esc, _codm, _kgfmt, _pct, _cls, _bar, _tt_ch
                          _drv_table, _late_cnt, _low_cnt, PROV_NAME)
 
 VN = timezone(timedelta(hours=7))   # dùng stdlib (requirements KHÔNG có pytz) — khớp report_live
+logger = logging.getLogger("buucuc")
+
+CHOT_NAME = "buucuc_chot.json"      # file chốt (ngày) trên Pages — giữ qua các slot như eod.html
+
+
+# ===== SNAPSHOT "CHỐT SỐ 23h15" — đóng băng số liệu cuối ngày =====
+_ROW_KEYS = ("name", "prov", "total", "gtc", "att", "backlog", "ontrip", "fin", "ltc", "ltb",
+             "vngh", "vngh_gtc", "cod_gtb", "kien", "kien_gtc", "giao120h",
+             "weight_g", "backlog_weight_g", "ton_lay", "ton_tra")
+
+
+def _slim_drv(d):
+    st = d.get("st")
+    return {"did": d.get("did"), "name": d.get("name"), "total": d.get("total", 0),
+            "gtc": d.get("gtc", 0), "att": d.get("att", 0), "ltc": d.get("ltc", 0),
+            "vngh": d.get("vngh", 0), "vngh_gtc": d.get("vngh_gtc", 0),
+            "wards": d.get("wards", {}), "ot_tot": d.get("ot_tot", 0), "ot_done": d.get("ot_done", 0),
+            "stmin": (st.hour * 60 + st.minute) if st else None}
+
+
+def _slim_row(r):
+    o = {k: r.get(k, 0) for k in _ROW_KEYS}
+    o["drivers"] = [_slim_drv(d) for d in r.get("drivers", [])]
+    return o
+
+
+def _unslim_drv(d):
+    m = d.get("stmin")
+    d["st"] = datetime(2000, 1, 1, m // 60, m % 60) if m is not None else None
+    return d
+
+
+def _unslim_row(r):
+    r["drivers"] = [_unslim_drv(d) for d in r.get("drivers", [])]
+    return r
+
+
+def save_chot(rows, collectable, outdir, ngay, label):
+    """Ghi snapshot CHỐT ra outdir/buucuc_chot.json (sẽ deploy lên Pages)."""
+    data = {"ngay": ngay, "label": label,
+            "rows": [_slim_row(r) for r in rows], "coll": collectable or {}}
+    with open(os.path.join(outdir, CHOT_NAME), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    logger.info("Đã ghi chốt bưu cục %s (%d BC).", label, len(rows))
+
+
+def load_chot_http(slug, timeout=15):
+    """Đọc bản chốt ĐÃ DEPLOY trên Pages (giữ qua các slot). None nếu chưa có/lỗi."""
+    try:
+        import requests
+        url = "https://vietvk-ux.github.io/tbb-dashboard/%s/%s?t=%d" % (
+            slug, CHOT_NAME, int(datetime.now().timestamp()))
+        r = requests.get(url, timeout=timeout)
+        if not r.ok:
+            return None
+        d = r.json()
+        d["rows"] = [_unslim_row(x) for x in d.get("rows", [])]
+        return d
+    except Exception:
+        return None
 
 
 def _late_badge(n):
@@ -151,11 +214,13 @@ def _am_blocks(rows, collectable, dkattr="data-k", am_open=True):
     return "".join(P)
 
 
-def embed(rows, collectable=None):
-    """Khối NHÚNG cho trang trực tiếp (giống report_nvxuly.embed). Trả {n, html, css}.
-    html = ô tìm kiếm riêng (id qb/filtb, data-kb — không đụng tìm kiếm chính) + AM→BC."""
+def embed(rows, collectable=None, label=None):
+    """Khối NHÚNG cho trang trực tiếp (giống report_nvxuly.embed). Trả {n, html, css, label}.
+    html = (banner chốt) + ô tìm kiếm riêng (id qb/filtb, data-kb) + AM→BC."""
     n = len([r for r in rows if r.get("total") or r.get("backlog") or r.get("ontrip")])
     P = ["<div id='bcmwrap'>"]
+    if label:
+        P.append("<div class='chotbn'>📌 Số CHỐT cuối ngày · <b>%s</b> · giữ nguyên cả ngày hôm sau</div>" % _esc(label))
     P.append("<div class='sbar'><input class='search' id='qb' placeholder='🔎 Tìm bưu cục / nhân viên trong vùng...' oninput='filtb()'></div>")
     P.append("<div id='emptyb' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
     P.append(_am_blocks(rows, collectable, dkattr="data-kb", am_open=False))
@@ -165,10 +230,10 @@ def embed(rows, collectable=None):
              "var s=(!q||k.indexOf(q)>=0);e.style.display=s?'':'none';if(s)n++;"
              "if(s&&q){var p=e.closest('details.am');if(p)p.open=true;e.open=true;}});"
              "document.getElementById('emptyb').style.display=(q&&!n)?'block':'none';}</script>")
-    return {"n": n, "html": "".join(P), "css": _EXTRA_CSS_INNER}
+    return {"n": n, "html": "".join(P), "css": _EXTRA_CSS_INNER, "label": label}
 
 
-def gen_html(rows, collectable=None):
+def gen_html(rows, collectable=None, label=None):
     now = datetime.now(VN)
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
@@ -188,6 +253,8 @@ def gen_html(rows, collectable=None):
              "BẢNG ĐIỀU KHIỂN BƯU CỤC</div><div class='ts'>%s · %s</div></header>"
              % (now.strftime("%H:%M"), now.strftime("%d/%m")))
     P.append("<a class='backlnk' href='index.html'>← Trang trực tiếp</a>")
+    if label:
+        P.append("<div class='chotbn'>📌 Số CHỐT cuối ngày · <b>%s</b> · giữ nguyên cả ngày hôm sau</div>" % _esc(label))
     P.append("<div class='sec'>🧑‍💼 Theo AM · %GTC thấp → cao · bấm mở bưu cục → mở scorecard</div>")
     P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'></div>")
     P.append("<div id='empty' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
@@ -227,5 +294,8 @@ details.bc.am>summary{padding:12px 14px}
 .scv{font-size:17px;font-weight:800;color:var(--txt);font-family:Sora,sans-serif}
 .scv.good{color:var(--good)}.scv.warn{color:var(--warn)}.scv.bad{color:var(--bad)}.scv.na{color:var(--mut)}
 @media(max-width:430px){.scgrid{grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px}.scv{font-size:15px}}
+.chotbn{margin:2px 0 10px;padding:9px 12px;border-radius:11px;font-size:12px;font-weight:600;color:#cfe0ff;
+ background:rgba(99,179,237,.14);border:1px solid rgba(99,179,237,.4)}
+.chotbn b{color:#fff;font-weight:800}
 """
 _EXTRA_CSS = "<style>" + _EXTRA_CSS_INNER + "</style>"

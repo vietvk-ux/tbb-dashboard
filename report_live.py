@@ -679,12 +679,14 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
     # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — ô NỔI BẬT ngay sau hero (bung scorecard AM→bưu cục) =====
     if bcm is not None:
+        _bc_sub = (("📌 Số chốt cuối ngày %s · AM → bưu cục · bấm mở" % _esc(bcm["label"]))
+                   if bcm.get("label") else "mọi chỉ số từng bưu cục · AM → bưu cục · bấm mở")
         P.append("<details class='cgbento bcfeat' style='--h:99,179,237'><summary>"
                  "<div class='mic'>🏤</div>"
                  "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
-                 "<div class='ms'>mọi chỉ số từng bưu cục · AM → bưu cục → scorecard · bấm mở</div></div>"
+                 "<div class='ms'>%s</div></div>"
                  "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
-                 "</summary><div class='dtl'>%s</div></details>" % (bcm["n"], bcm["html"]))
+                 "</summary><div class='dtl'>%s</div></details>" % (_bc_sub, bcm["n"], bcm["html"]))
 
     # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
     nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
@@ -1491,11 +1493,27 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    # Khối nhúng Bảng điều khiển Bưu cục (scorecard AM→BC) — ngay dưới 'NV cần xử lý'.
+    # Khối nhúng Bảng điều khiển Bưu cục — ĐÓNG BĂNG BẢN CHỐT 23h15 (giữ nguyên cả ngày).
+    #   • Cửa sổ VN 23:10–23:40 (lần chạy đầu, nếu chốt chưa phải hôm nay) → CHỤP số hiện tại,
+    #     ghi buucuc_chot.json vào docs/ (deploy lên Pages). ENV BUUCUC_CHOT=1 để ép chụp.
+    #   • Các slot khác → ĐỌC bản chốt đã deploy (giữ qua slot như eod.html) → đóng băng.
+    #   • Chưa có chốt (ngày đầu) → tạm hiện live.
     bcm = None
+    _bc_rows, _bc_coll, _bc_label = rows, collectable, None
     try:
         import report_buucuc
-        bcm = report_buucuc.embed(rows, collectable)
+        now_vn = datetime.now(VN)
+        today = now_vn.strftime("%Y-%m-%d")
+        vn_min = now_vn.hour * 60 + now_vn.minute
+        force_chot = os.environ.get("BUUCUC_CHOT", "").strip() == "1"
+        chot = report_buucuc.load_chot_http(slug)
+        if force_chot or ((23 * 60 + 10) <= vn_min <= (23 * 60 + 40)
+                          and (not chot or chot.get("ngay") != today)):
+            _bc_label = now_vn.strftime("%H:%M · %d/%m")
+            report_buucuc.save_chot(rows, collectable, outdir, today, _bc_label)
+        elif chot:
+            _bc_rows, _bc_coll, _bc_label = chot["rows"], chot.get("coll"), chot.get("label")
+        bcm = report_buucuc.embed(_bc_rows, _bc_coll, label=_bc_label)
     except Exception as e:
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm)
@@ -1515,11 +1533,11 @@ def main():
     except Exception as e:
         logger.warning("Tạo chuyendi.html lỗi (bỏ qua): %s", str(e)[:150])
 
-    # Trang BẢNG ĐIỀU KHIỂN BƯU CỤC — scorecard đủ chỉ số AM→BC (dùng lại rows+collectable, 0 call).
+    # Trang BẢNG ĐIỀU KHIỂN BƯU CỤC riêng — DÙNG CÙNG BẢN CHỐT 23h15 như ô nhúng.
     try:
         import report_buucuc
         with open(os.path.join(outdir, "buucuc.html"), "w", encoding="utf-8") as f:
-            f.write(report_buucuc.gen_html(rows, collectable))
+            f.write(report_buucuc.gen_html(_bc_rows, _bc_coll, label=_bc_label))
     except Exception as e:
         logger.warning("Tạo buucuc.html lỗi (bỏ qua): %s", str(e)[:150])
 

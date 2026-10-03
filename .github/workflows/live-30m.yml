@@ -19,6 +19,10 @@ on:
         description: 'Ngày vận hành 10h→10h (gộp chuyến đóng sau nửa đêm)? 1=có. Chỉ dùng khi chốt ngày cũ (sáng hôm sau)'
         required: false
         default: ''
+      buucuc_chot:
+        description: 'Ép CHỤP bản chốt Bảng điều khiển Bưu cục ngay bây giờ? 1=có (bình thường tự chụp ~23:15)'
+        required: false
+        default: ''
   schedule:
     # Mỗi 15' trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h).
     # Đây chỉ là BACKUP — lịch chính do cron-job.org kích (GitHub schedule hay bỏ lượt).
@@ -54,6 +58,7 @@ jobs:
           DASH_SLUG: 9c7e4b21a6f0
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BUUCUC_CHOT: ${{ github.event.inputs.buucuc_chot }}
         run: python report_live.py
       - name: Tạo trang tồn đọng (backlog.html)
         env:
@@ -107,6 +112,15 @@ jobs:
         env:
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_khuvuc.py render
+      - name: Giữ bản CHỐT Bảng điều khiển Bưu cục (buucuc_chot.json — như eod.html; slot 23:15 đã tự ghi mới)
+        run: |
+          F=docs/9c7e4b21a6f0/buucuc_chot.json
+          if [ ! -f "$F" ]; then
+            curl -sf "https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/buucuc_chot.json" -o "$F" \
+              || echo "chưa có bản chốt (sẽ có sau slot 23:15 đầu tiên)"
+          else
+            echo "slot 23:15 vừa ghi bản chốt mới — giữ nguyên"
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
