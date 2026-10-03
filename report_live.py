@@ -966,13 +966,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("khochuyentiep.html", "📦", "Kho Chuyển Tiếp", "tồn luân chuyển", "255,110,169", [48, 62, 54, 70, 60, 78, 66]),
     ]
     P.append("<div class='menu'>")
-    # Ô nổi bật (span 2): Báo cáo tổng quan + %GTC vùng lớn
-    P.append("<a class='mtile feat' href='tongquan.html' style='--h:91,140,255'>"
-             "<div class='mic'>📋</div>"
-             "<div class='mtx'><div class='mn'>Báo cáo tổng quan</div>"
-             "<div class='ms'>số chính cần theo dõi</div></div>"
-             "<div class='mbig'>%s<span>%%</span></div></a>"
-             % (reg_pct if reg_pct is not None else "—"))
+    # (Ô 'Báo cáo tổng quan' đã BỎ 03/10 theo yêu cầu — trang tongquan.html cũng ngưng tạo)
     for href, ic, nm, sub, rgb, bars in _menu:
         spark = "".join("<i style='height:%d%%'></i>" % b for b in bars)
         P.append("<a class='mtile' href='%s' style='--h:%s'>"
@@ -1440,13 +1434,7 @@ def main():
     except Exception as e:
         logger.warning("Tạo chuyendi.html lỗi (bỏ qua): %s", str(e)[:150])
 
-    # Trang TỔNG QUAN — gom số chính từ trực tiếp + 30 ngày (dùng lại rows, 0 call thêm)
-    try:
-        import report_tongquan
-        with open(os.path.join(outdir, "tongquan.html"), "w", encoding="utf-8") as f:
-            f.write(report_tongquan.build_html(rows))
-    except Exception as e:
-        logger.warning("Tạo tongquan.html lỗi (bỏ qua): %s", str(e)[:150])
+    # (Trang TỔNG QUAN tongquan.html đã BỎ 03/10 theo yêu cầu — tự biến mất ở lần deploy tới)
 
     # JSON dữ liệu cho BOT đọc trực tiếp (khớp 100% trang) — cạnh dashboard
     payload = {
