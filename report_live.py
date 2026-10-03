@@ -267,9 +267,13 @@ def _drv_table(drv):
         has = bool(wards) and d["total"] > 0
         cx = "<span class='cx'>▸</span>" if has else ""
         attr = " class='dnv' onclick='tgw(this)'" if has else ""
-        P.append("<tr%s><td class='nv'>%s%s</td><td>%s</td><td>%s</td><td>%s</td>"
+        st = d.get("st")
+        late = st is not None and (st.hour * 60 + st.minute) > 570   # xuất phát sau 9h30
+        lb = (" <span class='lb' title='Xuất phát %02d:%02d · muộn (sau 9h30)'>🕘</span>"
+              % (st.hour, st.minute)) if late else ""
+        P.append("<tr%s><td class='nv'>%s%s%s</td><td>%s</td><td>%s</td><td>%s</td>"
                  "<td><span class='pill sm %s'>%s%%</span></td><td>%s</td></tr>"
-                 % (attr, cx, _esc(d["name"]), _n(d["total"]), _n(d["gtc"]),
+                 % (attr, cx, _esc(d["name"]), lb, _n(d["total"]), _n(d["gtc"]),
                     ltc_cell, _cls(pc2), pc2 if pc2 is not None else "—",
                     _tt_cell(d.get("vngh_gtc", 0), d.get("vngh", 0))))
         if has:
@@ -1354,6 +1358,7 @@ td.nv .sc{font-size:9.5px;color:var(--mut);font-weight:400;margin-top:1px;overfl
 tr.dnv{cursor:pointer}
 tr.dnv .cx{display:inline-block;color:var(--mut);font-size:8px;margin-right:5px;transition:transform .18s;vertical-align:middle}
 tr.dnv.op .cx{transform:rotate(90deg);color:var(--txt)}
+.lb{font-size:12px;vertical-align:middle;filter:drop-shadow(0 0 2px rgba(245,69,92,.6))}
 tr.dnv.op>td{border-bottom:none}
 tr.wsub{display:none}tr.wsub.show{display:table-row}
 tr.wsub>td{padding:2px 6px 10px !important;text-align:left}
