@@ -681,7 +681,17 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<a class='todo wn lnk' href='chuyendi.html'><div class='tic'>💵</div><div class='tdt'>"
                  "<div class='ttn'>NV chưa nộp tiền</div><div class='tts'>%s đang treo · xem chi tiết →</div></div>"
                  "%s<div class='ttv'>%s</div></a>" % (_codm(coll_amt), pt_spark, _n(coll_nv)))
-    # Sản lượng giao/ngày + TikTok giao TC/ngày — cùng kiểu, ngay dưới NV chưa nộp tiền
+    # NV đạt GTC ≥50% — ngay dưới NV chưa nộp tiền (sức khỏe đội ngũ)
+    if nvdat_trend and len(nvdat_trend) >= 2:
+        nv_dat = sum(1 for r in rows for d in r.get("drivers", [])
+                     if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
+                     and _pct(d["gtc"], d["total"]) >= 50)
+        P.append("<div class='todo'><div class='tic'>🎯</div><div class='tdt'>"
+                 "<div class='ttn'>NV đạt GTC ≥50%%</div>"
+                 "<div class='tts'>số NV %%GTC ≥50%% (≥20 đơn) · 14 ngày</div></div>"
+                 "%s<div class='ttv' style='color:var(--good)'>%s</div></div>"
+                 % (_spark(nvdat_trend, "#34d399", w=60, h=22), _n(nv_dat)))
+    # Sản lượng giao/ngày + TikTok giao TC/ngày — cùng kiểu, phía dưới
     if trend and len(trend) >= 2:
         sl_don = [t.get("don_giao") for t in trend]
         sl_ttg = [t.get("tiktok_gtc") for t in trend]
@@ -706,15 +716,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      "<div class='tts'>số đơn Tiktok giao thành công · 14 ngày</div></div>"
                      "%s<div class='ttv'>%s</div></div>"
                      % (_spark(sl_ttg, "#e879c8", w=60, h=22), _n(R["vngh_gtc"])))
-    if nvdat_trend and len(nvdat_trend) >= 2:
-        nv_dat = sum(1 for r in rows for d in r.get("drivers", [])
-                     if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
-                     and _pct(d["gtc"], d["total"]) >= 50)
-        P.append("<div class='todo'><div class='tic'>🎯</div><div class='tdt'>"
-                 "<div class='ttn'>NV đạt GTC ≥50%%</div>"
-                 "<div class='tts'>số NV %%GTC ≥50%% (≥20 đơn) · 14 ngày</div></div>"
-                 "%s<div class='ttv' style='color:var(--good)'>%s</div></div>"
-                 % (_spark(nvdat_trend, "#34d399", w=60, h=22), _n(nv_dat)))
     P.append("</section>")
 
     # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
