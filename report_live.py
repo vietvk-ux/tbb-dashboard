@@ -570,7 +570,7 @@ async def fetch_live(token):
 
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
-             g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None):
+             g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
@@ -617,6 +617,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append(_CSS)
     if nvm is not None:
         P.append("<style>%s</style>" % nvm["css"])
+    if bcm is not None:
+        P.append("<style>%s</style>" % bcm["css"])
     P.append("<div class='wrap'>")
 
     # ===== Header dính =====
@@ -1036,6 +1038,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                          % (_esc(d["name"]), _esc(bc), _n(d["total"]),
                             _n(d["total"] - d["gtc"]), _cls(pc), pc))
             P.append("</tbody></table></div></details>")
+
+    # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — nhúng NGAY DƯỚI 'NV cần xử lý' (scorecard đủ chỉ số AM→BC) =====
+    if bcm is not None:
+        P.append("<details class='cgbento'><summary>"
+                 "<div class='mic'>🏤</div>"
+                 "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
+                 "<div class='ms'>mọi chỉ số từng bưu cục · AM → bưu cục → scorecard</div></div>"
+                 "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
+                 "</summary><div class='dtl'>%s</div></details>" % (bcm["n"], bcm["html"]))
 
     # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
     #        href, icon, tên, phụ đề, màu RGB, [7 cột mini-nhịp]
@@ -1524,7 +1535,14 @@ def main():
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
-    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr)
+    # Khối nhúng Bảng điều khiển Bưu cục (scorecard AM→BC) — ngay dưới 'NV cần xử lý'.
+    bcm = None
+    try:
+        import report_buucuc
+        bcm = report_buucuc.embed(rows, collectable)
+    except Exception as e:
+        logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
+    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)

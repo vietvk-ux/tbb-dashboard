@@ -35,8 +35,10 @@ def _on_road(r):
     return max(sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", [])), 0)
 
 
-def _bc_scorecard(r, collectable):
-    """1 bưu cục = 1 scorecard đầy đủ (dạng <details> bấm mở)."""
+def _bc_scorecard(r, collectable, dkattr="data-k"):
+    """1 bưu cục = 1 scorecard đầy đủ (dạng <details> bấm mở).
+    dkattr: tên attribute khoá tìm kiếm (data-k ở trang riêng, data-kb khi NHÚNG để
+    không đụng ô tìm kiếm chính của trang trực tiếp)."""
     pc = _pct(r["gtc"], r["att"])
     cls = _cls(pc)
     nv = len(r.get("drivers", []))
@@ -51,7 +53,7 @@ def _bc_scorecard(r, collectable):
     kg_cg = (r.get("backlog_weight_g", 0) or 0) / 1000.0
 
     keys = (r["name"] + " " + " ".join(d["name"] for d in r.get("drivers", []))).lower()
-    P = ["<details class='bc %s' data-k=\"%s\"><summary>" % (cls, _esc(keys))]
+    P = ["<details class='bc %s' %s=\"%s\"><summary>" % (cls, dkattr, _esc(keys))]
     P.append("<div class='bch'><span class='dot %s'></span>"
              "<span class='bcn %s'>%s</span><span class='pill %s'>%s%%</span></div>"
              % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
@@ -113,19 +115,62 @@ def _bc_scorecard(r, collectable):
     return "".join(P)
 
 
-def gen_html(rows, collectable=None):
-    now = datetime.now(VN)
-    # gộp theo AM
+def _am_blocks(rows, collectable, dkattr="data-k", am_open=True):
+    """Dựng các khối AM → bưu cục (scorecard). Trả chuỗi HTML. Dùng chung trang riêng +
+    nhúng trên trang trực tiếp (dkattr='data-kb', am_open=False để gọn)."""
     am_rows = {}
     for r in rows:
         amn = AM_OF.get(r["name"]) or "(chưa phân AM)"
         am_rows.setdefault(amn, []).append(r)
 
     def am_pct(bcs):
-        g = sum(x["gtc"] for x in bcs)
-        a = sum(x["att"] for x in bcs)
-        return _pct(g, a)
+        return _pct(sum(x["gtc"] for x in bcs), sum(x["att"] for x in bcs))
 
+    P = []
+    for amn, bcs in sorted(am_rows.items(), key=lambda kv: (am_pct(kv[1]) if any(x["att"] for x in kv[1]) else 999)):
+        apc = am_pct(bcs)
+        acls = _cls(apc)
+        a_tot = sum(x["total"] for x in bcs)
+        a_gtc = sum(x["gtc"] for x in bcs)
+        a_bl = sum(x["backlog"] for x in bcs)
+        a_late = sum(_late_cnt(x) for x in bcs)
+        a_low = sum(_low_cnt(x) for x in bcs)
+        a_nv = sum(len(x.get("drivers", [])) for x in bcs)
+        P.append("<details class='bc am %s'%s><summary>" % (acls, " open" if am_open else ""))
+        P.append("<div class='bch'><span class='dot %s'></span>"
+                 "<span class='bcn %s'>🧑‍💼 %s</span><span class='pill %s'>%s%%</span></div>"
+                 % (acls, acls, _esc(amn), acls, apc if apc is not None else "—"))
+        P.append(_bar(apc, acls))
+        P.append("<div class='pmeta'>🏤 %d BC·👤 %s NV·📥 %s·<span class='w'>⏳ %s</span>·✅ %s%s%s</div>"
+                 % (len(bcs), _n(a_nv), _n(a_tot), _n(a_bl), _n(a_gtc),
+                    ("·" + _late_badge(a_late)) if a_late else "",
+                    ("·" + _low_badge(a_low)) if a_low else ""))
+        P.append("</summary><div class='dtl'>")
+        for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["att"]) if x["att"] else 999)):
+            P.append(_bc_scorecard(r, collectable, dkattr))
+        P.append("</div></details>")
+    return "".join(P)
+
+
+def embed(rows, collectable=None):
+    """Khối NHÚNG cho trang trực tiếp (giống report_nvxuly.embed). Trả {n, html, css}.
+    html = ô tìm kiếm riêng (id qb/filtb, data-kb — không đụng tìm kiếm chính) + AM→BC."""
+    n = len([r for r in rows if r.get("total") or r.get("backlog") or r.get("ontrip")])
+    P = ["<div id='bcmwrap'>"]
+    P.append("<div class='sbar'><input class='search' id='qb' placeholder='🔎 Tìm bưu cục / nhân viên trong vùng...' oninput='filtb()'></div>")
+    P.append("<div id='emptyb' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
+    P.append(_am_blocks(rows, collectable, dkattr="data-kb", am_open=False))
+    P.append("</div>")
+    P.append("<script>function filtb(){var q=document.getElementById('qb').value.toLowerCase().trim(),n=0;"
+             "document.querySelectorAll('#bcmwrap .bc[data-kb]').forEach(function(e){var k=e.getAttribute('data-kb')||'';"
+             "var s=(!q||k.indexOf(q)>=0);e.style.display=s?'':'none';if(s)n++;"
+             "if(s&&q){var p=e.closest('details.am');if(p)p.open=true;e.open=true;}});"
+             "document.getElementById('emptyb').style.display=(q&&!n)?'block':'none';}</script>")
+    return {"n": n, "html": "".join(P), "css": _EXTRA_CSS_INNER}
+
+
+def gen_html(rows, collectable=None):
+    now = datetime.now(VN)
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
     P.append("<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>")
@@ -148,28 +193,7 @@ def gen_html(rows, collectable=None):
     P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'></div>")
     P.append("<div id='empty' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
 
-    for amn, bcs in sorted(am_rows.items(), key=lambda kv: (am_pct(kv[1]) if any(x["att"] for x in kv[1]) else 999)):
-        apc = am_pct(bcs)
-        acls = _cls(apc)
-        a_tot = sum(x["total"] for x in bcs)
-        a_gtc = sum(x["gtc"] for x in bcs)
-        a_bl = sum(x["backlog"] for x in bcs)
-        a_late = sum(_late_cnt(x) for x in bcs)
-        a_low = sum(_low_cnt(x) for x in bcs)
-        a_nv = sum(len(x.get("drivers", [])) for x in bcs)
-        P.append("<details class='bc am %s' open><summary>" % acls)
-        P.append("<div class='bch'><span class='dot %s'></span>"
-                 "<span class='bcn %s'>🧑‍💼 %s</span><span class='pill %s'>%s%%</span></div>"
-                 % (acls, acls, _esc(amn), acls, apc if apc is not None else "—"))
-        P.append(_bar(apc, acls))
-        P.append("<div class='pmeta'>🏤 %d BC·👤 %s NV·📥 %s·<span class='w'>⏳ %s</span>·✅ %s%s%s</div>"
-                 % (len(bcs), _n(a_nv), _n(a_tot), _n(a_bl), _n(a_gtc),
-                    ("·" + _late_badge(a_late)) if a_late else "",
-                    ("·" + _low_badge(a_low)) if a_low else ""))
-        P.append("</summary><div class='dtl'>")
-        for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["att"]) if x["att"] else 999)):
-            P.append(_bc_scorecard(r, collectable))
-        P.append("</div></details>")
+    P.append(_am_blocks(rows, collectable, dkattr="data-k", am_open=True))
 
     P.append("<div class='foot'><b>📖 Bảng điều khiển bưu cục</b><br>"
              "Gom TẤT CẢ chỉ số live của từng bưu cục (giao·tồn·khối lượng·TikTok·tiền·nhân sự) vào 1 scorecard. "
@@ -191,7 +215,7 @@ def gen_html(rows, collectable=None):
     return "\n".join(P)
 
 
-_EXTRA_CSS = """<style>
+_EXTRA_CSS_INNER = """
 .backlnk{display:inline-block;margin:0 0 10px;color:var(--mut);text-decoration:none;font-weight:700;font-size:13px}
 .backlnk:hover{color:var(--txt)}
 details.bc.am>summary{padding:12px 14px}
@@ -204,4 +228,5 @@ details.bc.am>summary{padding:12px 14px}
 .scv{font-size:17px;font-weight:800;color:var(--txt);font-family:Sora,sans-serif}
 .scv.good{color:var(--good)}.scv.warn{color:var(--warn)}.scv.bad{color:var(--bad)}.scv.na{color:var(--mut)}
 @media(max-width:430px){.scgrid{grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px}.scv{font-size:15px}}
-</style>"""
+"""
+_EXTRA_CSS = "<style>" + _EXTRA_CSS_INNER + "</style>"
