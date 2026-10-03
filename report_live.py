@@ -358,6 +358,8 @@ async def fetch_live(token):
                 backlog = bl.get("deliver", 0)   # Giao "chưa có chuyến đi trong ngày" (chuẩn Tồn LGT)
                 backlog_weight = bl.get("deliver_weight", 0)   # kg thực (gram) Giao chưa gán (gồm ưu tiên)
                 dagan_weight = bl.get("dagan_weight", 0)       # kg thực (gram) Giao ĐÃ GÁN (ALL−NONE, gồm ưu tiên)
+                ton_lay = bl.get("pick", 0)       # đơn LẤY chưa có chuyến
+                ton_tra = bl.get("return", 0)     # đơn TRẢ tồn
                 backlog_wards = bl.get("wards", [])   # [(tên xã, số đơn Giao chưa gán)] giảm dần
                 async with sem:
                     g120 = await _giao120h_one(session, hid, token)   # Giao>120h bưu cục này (drill)
@@ -508,6 +510,7 @@ async def fetch_live(token):
                 h_kien_gtc = sum(d["kien_gtc"] for d in drivers.values())
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "backlog_weight_g": backlog_weight,
+                        "ton_lay": ton_lay, "ton_tra": ton_tra,
                         "backlog_wards": backlog_wards, "giao120h": g120,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc, "ltb": h_ltb,
@@ -662,6 +665,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "<div class='ttn'>Tồn chưa gán giao</div><div class='tts'>bấm mở AM → bưu cục → xã</div></div>"
              "%s<div class='ttv'>%s</div></div>"
              % (_open_cg, cg_spark, _n(R["backlog"])))
+    # Tồn Lấy + Tồn Trả (chưa gán) — ngay dưới Tồn chưa gán giao, bấm mở AM → bưu cục
+    _ton_lay = sum(r.get("ton_lay", 0) for r in rows)
+    _ton_tra = sum(r.get("ton_tra", 0) for r in rows)
+    P.append("<div class='todo wn' %s><div class='tic'>🛒</div><div class='tdt'>"
+             "<div class='ttn'>Tồn Lấy chưa gán</div><div class='tts'>đơn lấy chưa có chuyến · bấm mở AM → bưu cục</div></div>"
+             "<div class='ttv'>%s</div></div>" % (_opendrill('tld'), _n(_ton_lay)))
+    P.append("<div class='todo wn' %s><div class='tic'>↩️</div><div class='tdt'>"
+             "<div class='ttn'>Tồn Trả</div><div class='tts'>đơn trả tồn · bấm mở AM → bưu cục</div></div>"
+             "<div class='ttv'>%s</div></div>" % (_opendrill('ttd'), _n(_ton_tra)))
     P.append("<div class='todo vi' %s><div class='tic'>👤</div><div class='tdt'>"
              "<div class='ttn'>NV cần xử lý</div><div class='tts'>%%GTC kém dai dẳng · bấm mở</div></div>"
              "%s<div class='ttv'>%s</div></div>" % (_open_nvx, cx_spark, _n(nvx_n)))
@@ -919,6 +931,40 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                          % (_esc(bcn), _kgfmt(dg), _kgfmt(cg)))
             P.append("</tbody></table></div></details>")
         P.append("</div></details>")
+
+    # ===== 🛒/↩️ Drill Tồn Lấy + Tồn Trả — AM → bưu cục =====
+    def _ton_drill(_id, icon, title, key):
+        am = {}
+        for r in rows:
+            v = r.get(key, 0)
+            if v <= 0:
+                continue
+            amn = AM_OF.get(r["name"]) or "(chưa phân AM)"
+            am.setdefault(amn, []).append((r["name"], v))
+        if not am:
+            return
+        tot = sum(v for bcs in am.values() for _, v in bcs)
+        P.append("<details id='%s' class='cgbento' style='--h:247,185,85'><summary>"
+                 "<div class='mic'>%s</div>"
+                 "<div class='mtx'><div class='mn'>%s</div>"
+                 "<div class='ms'>AM → bưu cục · bấm mở</div></div>"
+                 "<div class='mbig'>%s</div><span class='cvar'>▾</span></summary>"
+                 "<div class='dtl'>" % (_id, icon, title, _n(tot)))
+        for amn, bcs in sorted(am.items(), key=lambda kv: -sum(v for _, v in kv[1])):
+            a_tot = sum(v for _, v in bcs)
+            P.append("<details class='bc warn'><summary>"
+                     "<div class='bch'><span class='dot warn'></span><span class='bcn'>🧑‍💼 %s</span>"
+                     "<span class='pill warn'>%s</span></div>"
+                     "<div class='bcm'><span>%d bưu cục</span></div>"
+                     "</summary><div class='dtl'>" % (_esc(amn), _n(a_tot), len(bcs)))
+            P.append("<table class='drv'><thead><tr><th class='lft'>Bưu cục</th><th>Số đơn</th></tr></thead><tbody>")
+            for bcn, v in sorted(bcs, key=lambda x: -x[1]):
+                P.append("<tr><td class='nv'>%s</td><td><b class='w'>%s</b></td></tr>" % (_esc(bcn), _n(v)))
+            P.append("</tbody></table></div></details>")
+        P.append("</div></details>")
+
+    _ton_drill("tld", "🛒", "Tồn Lấy chưa gán", "ton_lay")
+    _ton_drill("ttd", "↩️", "Tồn Trả", "ton_tra")
 
     # ===== 👤 NV cần xử lý — NHÚNG TOÀN BỘ TRANG QUẢN LÝ NHÂN VIÊN (tra cứu hồ sơ +
     #        đủ danh sách + streak 14 ngày). Supabase (creds có trong step live);
