@@ -182,7 +182,9 @@ def _am_blocks(rows, collectable, dkattr="data-k", am_open=True):
     nhúng trên trang trực tiếp (dkattr='data-kb', am_open=False để gọn)."""
     am_rows = {}
     for r in rows:
-        amn = AM_OF.get(r["name"]) or "(chưa phân AM)"
+        amn = AM_OF.get(r["name"])
+        if not amn:          # bỏ BC chưa phân AM (điểm giao phụ) theo yêu cầu
+            continue
         am_rows.setdefault(amn, []).append(r)
 
     def am_pct(bcs):
@@ -217,19 +219,13 @@ def _am_blocks(rows, collectable, dkattr="data-k", am_open=True):
 def embed(rows, collectable=None, label=None):
     """Khối NHÚNG cho trang trực tiếp (giống report_nvxuly.embed). Trả {n, html, css, label}.
     html = (banner chốt) + ô tìm kiếm riêng (id qb/filtb, data-kb) + AM→BC."""
-    n = len([r for r in rows if r.get("total") or r.get("backlog") or r.get("ontrip")])
+    n = len([r for r in rows if AM_OF.get(r["name"])
+             and (r.get("total") or r.get("backlog") or r.get("ontrip"))])
     P = ["<div id='bcmwrap'>"]
     if label:
         P.append("<div class='chotbn'>📌 Số CHỐT cuối ngày · <b>%s</b> · giữ nguyên cả ngày hôm sau</div>" % _esc(label))
-    P.append("<div class='sbar'><input class='search' id='qb' placeholder='🔎 Tìm bưu cục / nhân viên trong vùng...' oninput='filtb()'></div>")
-    P.append("<div id='emptyb' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
     P.append(_am_blocks(rows, collectable, dkattr="data-kb", am_open=False))
     P.append("</div>")
-    P.append("<script>function filtb(){var q=document.getElementById('qb').value.toLowerCase().trim(),n=0;"
-             "document.querySelectorAll('#bcmwrap .bc[data-kb]').forEach(function(e){var k=e.getAttribute('data-kb')||'';"
-             "var s=(!q||k.indexOf(q)>=0);e.style.display=s?'':'none';if(s)n++;"
-             "if(s&&q){var p=e.closest('details.am');if(p)p.open=true;e.open=true;}});"
-             "document.getElementById('emptyb').style.display=(q&&!n)?'block':'none';}</script>")
     return {"n": n, "html": "".join(P), "css": _EXTRA_CSS_INNER, "label": label}
 
 
@@ -256,8 +252,6 @@ def gen_html(rows, collectable=None, label=None):
     if label:
         P.append("<div class='chotbn'>📌 Số CHỐT cuối ngày · <b>%s</b> · giữ nguyên cả ngày hôm sau</div>" % _esc(label))
     P.append("<div class='sec'>🧑‍💼 Theo AM · %GTC thấp → cao · bấm mở bưu cục → mở scorecard</div>")
-    P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'></div>")
-    P.append("<div id='empty' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
 
     P.append(_am_blocks(rows, collectable, dkattr="data-k", am_open=True))
 
@@ -269,11 +263,6 @@ def gen_html(rows, collectable=None, label=None):
     P.append("</div>")
     P.append("<script>function tgw(tr){tr.classList.toggle('op');"
              "var s=tr.nextElementSibling;if(s&&s.classList.contains('wsub'))s.classList.toggle('show');}</script>")
-    P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
-             "document.querySelectorAll('.bc[data-k]').forEach(function(e){var k=e.dataset.k||'';"
-             "var s=(!q||k.indexOf(q)>=0);e.style.display=s?'':'none';if(s)n++;"
-             "if(s&&q){var p=e.closest('details.am');if(p)p.open=true;e.open=true;}});"
-             "document.getElementById('empty').style.display=(q&&!n)?'block':'none';}</script>")
     P.append("<button id='rf' class='fab' onclick='rf()' aria-label='Làm mới'><span class='rfi'>⟳</span></button>")
     P.append("<script>function rf(){var b=document.getElementById('rf');"
              "b.classList.add('spin');location.replace(location.pathname+'?t='+Date.now());}</script>")
