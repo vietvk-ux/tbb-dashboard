@@ -120,7 +120,7 @@ def _fetch_region_trend(days=8):
         import requests
         h = {"apikey": key, "Authorization": "Bearer " + key}
         r = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc,chua_gan,don_giao,vngh_don,vngh_gtc,weight_kg"
-                         "&order=ngay.desc&limit=%d" % (url, days), headers=h, timeout=20)
+                         "&order=ngay.desc&limit=%d" % (url, days + 1), headers=h, timeout=20)
         if not r.ok:
             return None
         out = []
@@ -131,7 +131,7 @@ def _fetch_region_trend(days=8):
             out.append({"ngay": x["ngay"], "pct": x.get("pct_gtc"), "chuagan": x.get("chua_gan"),
                         "don_giao": x.get("don_giao"), "weight_kg": x.get("weight_kg"),
                         "tiktok_gtc": round(vd * vp / 100) if (vd and vp is not None) else None})
-        return out or None
+        return out[-days:] or None
     except Exception:
         return None
 

@@ -49,7 +49,9 @@ def _n(x):
 
 
 def build(url, key, dash_url=""):
-    vung = _get(url, key, "bao_cao_vung?order=ngay.desc&limit=2&select=*")
+    # don_giao=not.is.null: bỏ dòng ngày CHƯA chốt (live-30m tạo sẵn dòng hôm nay
+    # chỉ có weight_kg) → luôn lấy ngày đã chốt EOD gần nhất.
+    vung = _get(url, key, "bao_cao_vung?don_giao=not.is.null&order=ngay.desc&limit=2&select=*")
     if not vung:
         return None
     d0 = vung[0]

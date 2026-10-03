@@ -48,7 +48,7 @@ def _momentum(min_don=100):
         return None
     try:
         import snapshot as SNAP
-        days = SNAP._sb_get(url, key, "bao_cao_vung?select=ngay&order=ngay.desc&limit=2")
+        days = SNAP._sb_get(url, key, "bao_cao_vung?don_giao=not.is.null&select=ngay&order=ngay.desc&limit=2")
         if len(days) < 2:
             return None
         d_cur, d_prev = days[0]["ngay"], days[1]["ngay"]

@@ -42,7 +42,9 @@ def load_snapshot():
     if not (url and key):
         return None
     try:
-        vung = _sb_get(url, key, "bao_cao_vung?order=ngay.desc&limit=1&select=*")
+        # don_giao=not.is.null: bỏ dòng ngày CHƯA chốt EOD (live-30m tạo sẵn dòng
+        # hôm nay chỉ có weight_kg) → lấy ngày đã chốt gần nhất.
+        vung = _sb_get(url, key, "bao_cao_vung?don_giao=not.is.null&order=ngay.desc&limit=1&select=*")
         if not vung:
             return None
         day = vung[0]["ngay"]
