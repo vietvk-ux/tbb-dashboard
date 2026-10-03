@@ -677,17 +677,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  % (ref["yp"], ref["ndays"], ref["avg7p"], gap))
     P.append("</section>")
 
-    # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — ô NỔI BẬT ngay sau hero (bung scorecard AM→bưu cục) =====
-    if bcm is not None:
-        _bc_sub = (("📌 Số chốt cuối ngày %s · AM → bưu cục · bấm mở" % _esc(bcm["label"]))
-                   if bcm.get("label") else "mọi chỉ số từng bưu cục · AM → bưu cục · bấm mở")
-        P.append("<details class='cgbento bcfeat' style='--h:99,179,237'><summary>"
-                 "<div class='mic'>🏤</div>"
-                 "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
-                 "<div class='ms'>%s</div></div>"
-                 "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
-                 "</summary><div class='dtl'>%s</div></details>" % (_bc_sub, bcm["n"], bcm["html"]))
-
     # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
     nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
     coll_nv = sum(len(us) for us in collectable.values()) if collectable else None
@@ -951,6 +940,17 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  % (" · ".join(diag), "".join(grps)))
     else:
         P.append("<div class='diag'>⚡ <b>Điểm Nóng Chú Ý</b> · %s</div>" % " · ".join(diag))
+
+    # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — ô NỔI BẬT ngay SAU 'Điểm Nóng Chú Ý' (bung scorecard AM→BC) =====
+    if bcm is not None:
+        _bc_sub = (("📌 Số chốt cuối ngày %s · AM → bưu cục · bấm mở" % _esc(bcm["label"]))
+                   if bcm.get("label") else "mọi chỉ số từng bưu cục · AM → bưu cục · bấm mở")
+        P.append("<details class='cgbento bcfeat' style='--h:99,179,237'><summary>"
+                 "<div class='mic'>🏤</div>"
+                 "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
+                 "<div class='ms'>%s</div></div>"
+                 "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
+                 "</summary><div class='dtl'>%s</div></details>" % (_bc_sub, bcm["n"], bcm["html"]))
 
     # ===== Dải chỉ số · Bento (Mẫu 3) · màu theo từng chỉ số =====
     vpct = _pct(R["vngh_gtc"], R["vngh"])
