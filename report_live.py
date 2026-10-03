@@ -677,6 +677,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  % (ref["yp"], ref["ndays"], ref["avg7p"], gap))
     P.append("</section>")
 
+    # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — ô NỔI BẬT ngay sau hero (bung scorecard AM→bưu cục) =====
+    if bcm is not None:
+        P.append("<details class='cgbento bcfeat' style='--h:99,179,237'><summary>"
+                 "<div class='mic'>🏤</div>"
+                 "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
+                 "<div class='ms'>mọi chỉ số từng bưu cục · AM → bưu cục → scorecard · bấm mở</div></div>"
+                 "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
+                 "</summary><div class='dtl'>%s</div></details>" % (bcm["n"], bcm["html"]))
+
     # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
     nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
     coll_nv = sum(len(us) for us in collectable.values()) if collectable else None
@@ -800,10 +809,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             _in_nvx = ""
     P.append(_row("vi", "👤", "NV cần xử lý", "%GTC kém dai dẳng · bấm xem", cx_spark,
                   _n(nvx_n), " style='color:var(--bad)'", _in_nvx))
-    # 🏤 Bảng điều khiển Bưu cục — dòng NGAY DƯỚI NV cần xử lý (bung scorecard AM→bưu cục)
-    if bcm is not None:
-        P.append(_row("", "🏤", "Bảng điều khiển Bưu cục", "mọi chỉ số từng bưu cục · AM → bưu cục",
-                      "", _n(bcm["n"]), "", bcm["html"]))
     if coll_nv is not None:
         P.append("<a class='todo wn lnk' href='chuyendi.html'><div class='tic'>💵</div><div class='tdt'>"
                  "<div class='ttn'>NV chưa nộp tiền</div><div class='tts'>%s đang treo · xem chi tiết →</div></div>"
@@ -1250,6 +1255,19 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .cgbento .cvar{flex:none;color:rgb(var(--h));font-size:14px;transition:transform .2s}
 .cgbento[open] .cvar{transform:rotate(180deg)}
 .cgbento .dtl{padding:0 12px 12px}
+/* 🏤 Bảng điều khiển Bưu cục — ô NỔI BẬT, to & cân bằng (ngay sau hero) */
+.bcfeat{margin:6px 0 16px;border-width:1.5px;border-color:rgba(var(--h),.7);
+ background:linear-gradient(120deg,rgba(var(--h),.30),#0d1526 70%);
+ box-shadow:0 10px 34px rgba(var(--h),.20),inset 0 1px 0 rgba(255,255,255,.05)}
+.bcfeat>summary{padding:18px 18px;gap:16px}
+.bcfeat .mic{width:58px;height:58px;border-radius:17px;font-size:30px;background:rgba(var(--h),.32);border-color:rgba(var(--h),.6)}
+.bcfeat .mn{font-size:21px}
+.bcfeat .ms{font-size:12.5px;margin-top:4px}
+.bcfeat .mbig{font-size:38px;text-shadow:0 0 18px rgba(var(--h),.4)}
+.bcfeat .mbig .u{font-size:15px;margin-left:4px}
+.bcfeat .cvar{font-size:18px}
+@media(max-width:430px){.bcfeat>summary{padding:15px 14px;gap:12px}.bcfeat .mic{width:50px;height:50px;font-size:26px}
+ .bcfeat .mn{font-size:18px}.bcfeat .mbig{font-size:32px}}
 /* NV cần xử lý — thẻ NV + streak 14 ngày */
 .nvx{padding:9px 0;border-top:1px solid rgba(255,255,255,.06)}
 .nvx:first-child{border-top:none}
