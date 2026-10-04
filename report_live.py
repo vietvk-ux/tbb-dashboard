@@ -119,7 +119,7 @@ def _fetch_region_trend(days=8):
     try:
         import requests
         h = {"apikey": key, "Authorization": "Bearer " + key}
-        r = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc,chua_gan,don_giao,vngh_don,vngh_gtc,weight_kg"
+        r = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc,chua_gan,don_giao,vngh_don,vngh_gtc,weight_kg,ton_lay,ton_tra"
                          "&order=ngay.desc&limit=%d" % (url, days + 1), headers=h, timeout=20)
         if not r.ok:
             return None
@@ -130,6 +130,7 @@ def _fetch_region_trend(days=8):
             vd, vp = x.get("vngh_don") or 0, x.get("vngh_gtc")   # vngh_gtc lưu dạng % → ra số đơn
             out.append({"ngay": x["ngay"], "pct": x.get("pct_gtc"), "chuagan": x.get("chua_gan"),
                         "don_giao": x.get("don_giao"), "weight_kg": x.get("weight_kg"),
+                        "ton_lay": x.get("ton_lay"), "ton_tra": x.get("ton_tra"),
                         "tiktok_gtc": round(vd * vp / 100) if (vd and vp is not None) else None})
         return out[-days:] or None
     except Exception:
@@ -167,6 +168,25 @@ def _store_weight(kg):
         today = datetime.now(VN).date().isoformat()
         requests.post("%s/rest/v1/bao_cao_vung?on_conflict=ngay" % url,
                       json=[{"ngay": today, "weight_kg": round(kg, 1)}],
+                      headers={"apikey": key, "Authorization": "Bearer " + key,
+                               "Content-Type": "application/json",
+                               "Prefer": "resolution=merge-duplicates,return=minimal"}, timeout=20)
+    except Exception:
+        pass
+
+
+def _store_ton(ton_lay, ton_tra):
+    """Ghi Tồn Lấy/Tồn Trả (CHƯA GÁN) HÔM NAY vào bao_cao_vung (partial upsert theo ngay)
+    → lần chạy cuối ngày = chốt → vẽ biểu đồ 14 ngày. Cột thiếu (chưa migration) → bỏ qua êm."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key):
+        return
+    try:
+        import requests
+        today = datetime.now(VN).date().isoformat()
+        requests.post("%s/rest/v1/bao_cao_vung?on_conflict=ngay" % url,
+                      json=[{"ngay": today, "ton_lay": int(ton_lay or 0), "ton_tra": int(ton_tra or 0)}],
                       headers={"apikey": key, "Authorization": "Bearer " + key,
                                "Content-Type": "application/json",
                                "Prefer": "resolution=merge-duplicates,return=minimal"}, timeout=20)
@@ -681,9 +701,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
     coll_nv = sum(len(us) for us in collectable.values()) if collectable else None
     coll_amt = sum(u["amount"] for us in collectable.values() for u in us) if collectable else 0
-    cg_spark = g120_spark = cx_spark = ""
+    cg_spark = g120_spark = cx_spark = tl_spark = tt_spark = ""
     if trend and len(trend) >= 2:
         cg_spark = _spark([t["chuagan"] for t in trend], "#34d399", w=60, h=22)
+        _tl = [t.get("ton_lay") for t in trend]
+        _tt = [t.get("ton_tra") for t in trend]
+        if any(v is not None for v in _tl):
+            tl_spark = _spark(_tl, "#f5aa17", w=60, h=22)
+        if any(v is not None for v in _tt):
+            tt_spark = _spark(_tt, "#f5aa17", w=60, h=22)
     if g120_trend and len(g120_trend) >= 2:
         g120_spark = _spark(g120_trend, "#fb7185", w=60, h=22)
     if cx_trend and len(cx_trend) >= 2:
@@ -777,9 +803,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                   _n(giao_120h) if giao_120h is not None else "—", "", _in_g120))
     P.append(_row("wn", "⏳", "Tồn chưa gán giao", "bấm xem AM → bưu cục → xã", cg_spark,
                   _n(R["backlog"]), "", _in_cgd))
-    P.append(_row("wn", "🛒", "Tồn Lấy chưa gán", "đơn lấy chưa có chuyến · bấm xem AM → bưu cục", "",
+    P.append(_row("wn", "🛒", "Tồn Lấy chưa gán", "đơn lấy chưa có chuyến · bấm xem AM → bưu cục", tl_spark,
                   _n(_ton_lay), "", _in_tld))
-    P.append(_row("wn", "↩️", "Tồn Trả", "đơn trả tồn · bấm xem AM → bưu cục", "",
+    P.append(_row("wn", "↩️", "Tồn Trả", "đơn trả tồn · bấm xem AM → bưu cục", tt_spark,
                   _n(_ton_tra), "", _in_ttd))
     # NV cần xử lý — bung TOÀN BỘ embed NGAY TẠI CHỖ (Supabase; lỗi → fallback NV<50% hôm nay)
     if nvm is not None:
@@ -1481,6 +1507,8 @@ def main():
         pt_trend = _fetch_phieuthu_trend(14)
         # Lưu khối lượng đơn giao đã gán hôm nay (kg) → đồ thị (đọc lại trong _fetch_region_trend)
         _store_weight(sum(r.get("weight_g", 0) for r in rows) / 1000.0)
+        # Lưu Tồn Lấy / Tồn Trả (chưa gán) hôm nay → đồ thị 14 ngày (builds dần)
+        _store_ton(sum(r.get("ton_lay", 0) for r in rows), sum(r.get("ton_tra", 0) for r in rows))
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
