@@ -1057,10 +1057,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
     # ===== 🏤 BẢNG TỔNG QUÁT BƯU CỤC — ô NỔI BẬT, DƯỚI dải 'Chỉ số quan trọng' (bung scorecard AM→BC) =====
     if bcm is not None:
-        # Số NV đi làm trong ngày = NV có chuyến/đơn gán hôm nay (live, gộp theo driverId)
+        # Số AM thực (có bưu cục trong vùng) + số NV đi làm trong ngày (có chuyến/đơn gán, gộp driverId)
+        _am_lv = len({AM_OF.get(r["name"]) for r in rows if AM_OF.get(r["name"])})
         _nv_lv = len({(d.get("id") or ("~" + d.get("name", "")))
                       for r in rows for d in r.get("drivers", [])})
-        _bc_sub = "Vùng TBB · 7 AM · <b class='ld'>%s</b> NV đi làm trong ngày" % _n(_nv_lv)
+        _bc_sub = ("Vùng TBB · <b class='ld'>%d</b> AM · <b class='ld'>%s</b> NV đi làm trong ngày"
+                   % (_am_lv, _n(_nv_lv)))
         P.append("<details class='cgbento bcfeat' style='--h:99,179,237'><summary>"
                  "<div class='mic'>🏤</div>"
                  "<div class='mtx'><div class='mn'>BẢNG TỔNG QUÁT BƯU CỤC</div>"
