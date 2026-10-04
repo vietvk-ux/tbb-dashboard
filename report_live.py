@@ -779,6 +779,31 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     pt_spark = ""
     if pt_trend and len(pt_trend) >= 2:
         pt_spark = _spark(pt_trend, "#fbbf24", w=60, h=22)
+
+    # ----- Delta ▲/▼ so NGÀY CHỐT TRƯỚC (2 điểm cuối trend: hôm qua vs hôm kia) -----
+    def _dchip(vals, up_good):
+        xs = [v for v in (vals or []) if v is not None]
+        if len(xs) < 2 or not xs[-2]:
+            return ""
+        d = round((xs[-1] - xs[-2]) / abs(xs[-2]) * 100)
+        if d == 0:
+            return " <span class='dl fl'>▬</span>"
+        up = d > 0
+        cls = "up" if (up == up_good) else "dn"   # thay đổi TỐT = xanh · XẤU = đỏ
+        return " <span class='dl %s'>%s%d%%</span>" % (cls, "▲" if up else "▼", abs(d))
+
+    _tr = trend or []
+    _dc_g120 = _dchip(g120_trend, False)
+    _dc_cg = _dchip([t.get("chuagan") for t in _tr], False)
+    _dc_tl = _dchip([t.get("ton_lay") for t in _tr], False)
+    _dc_tt = _dchip([t.get("ton_tra") for t in _tr], False)
+    _dc_cx = _dchip(cx_trend, False)
+    _dc_pt = _dchip(pt_trend, False)
+    _dc_nvd = _dchip(nvdat_trend, True)
+    _dc_sl = _dchip([t.get("don_giao") for t in _tr], True)
+    _dc_kg = _dchip([t.get("weight_kg") for t in _tr], True)
+    _dc_ttk = _dchip([t.get("tiktok_gtc") for t in _tr], True)
+
     # ----- Nội dung chi tiết (inner) của từng dòng — bung NGAY TẠI CHỖ khi bấm -----
     def _row(cls, icon, title, sub, spark, value, vstyle, inner, onclick="", href=""):
         """1 Ô LƯỚI (Phương án A). inner != '' → <details> bung full-chiều-ngang tại chỗ;
@@ -862,13 +887,13 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
     P.append("<div class='sectitle'>⚡ Tổng Quan Vận Hành Vùng TBB</div><section class='prilist'>")
     P.append(_row("bd", "🔴", "Backlog giao 120h", "bấm xem AM → bưu cục", g120_spark,
-                  _n(giao_120h) if giao_120h is not None else "—", "", _in_g120))
+                  (_n(giao_120h) if giao_120h is not None else "—") + _dc_g120, "", _in_g120))
     P.append(_row("wn", "⏳", "Tồn chưa gán giao", "bấm xem AM → bưu cục → xã", cg_spark,
-                  _n(R["backlog"]), "", _in_cgd))
+                  _n(R["backlog"]) + _dc_cg, "", _in_cgd))
     P.append(_row("wn", "🛒", "Tồn Lấy chưa gán", "đơn lấy chưa có chuyến · bấm xem AM → bưu cục", tl_spark,
-                  _n(_ton_lay), "", _in_tld))
+                  _n(_ton_lay) + _dc_tl, "", _in_tld))
     P.append(_row("wn", "↩️", "Tồn Trả", "đơn trả tồn · bấm xem AM → bưu cục", tt_spark,
-                  _n(_ton_tra), "", _in_ttd))
+                  _n(_ton_tra) + _dc_tt, "", _in_ttd))
     # NV cần xử lý — bung TOÀN BỘ embed NGAY TẠI CHỖ (Supabase; lỗi → fallback NV<50% hôm nay)
     if nvm is not None:
         _in_nvx = nvm["html"]
@@ -891,9 +916,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         else:
             _in_nvx = ""
     P.append(_row("vi", "👤", "NV cần xử lý", "%GTC kém dai dẳng · bấm xem", cx_spark,
-                  _n(nvx_n), " style='color:var(--bad)'", _in_nvx))
+                  _n(nvx_n) + _dc_cx, " style='color:var(--bad)'", _in_nvx))
     if coll_nv is not None:
-        P.append(_row("wn", "💵", "NV chưa nộp tiền", "", pt_spark, _n(coll_nv), "", "",
+        P.append(_row("wn", "💵", "NV chưa nộp tiền", "", pt_spark, _n(coll_nv) + _dc_pt, "", "",
                       href="chuyendi.html"))
     # NV đạt GTC ≥50% — (sức khỏe đội ngũ)
     if nvdat_trend and len(nvdat_trend) >= 2:
@@ -901,14 +926,14 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
                      and _pct(d["gtc"], d["total"]) >= 50)
         P.append(_row("", "🎯", "NV đạt GTC ≥50%", "", _spark(nvdat_trend, "#34d399", w=60, h=22),
-                      _n(nv_dat), " style='color:var(--good)'", ""))
+                      _n(nv_dat) + _dc_nvd, " style='color:var(--good)'", ""))
     # Sản lượng giao/ngày + TikTok giao TC/ngày
     if trend and len(trend) >= 2:
         sl_don = [t.get("don_giao") for t in trend]
         sl_ttg = [t.get("tiktok_gtc") for t in trend]
         if any(v is not None for v in sl_don):
             P.append(_row("", "📦", "Sản lượng giao / ngày", "", _spark(sl_don, "#22d3ee", w=60, h=22),
-                          _n(R["total"]), "", ""))
+                          _n(R["total"]) + _dc_sl, "", ""))
         # Khối lượng (kg thực) đơn giao đã gán — ngay dưới Sản lượng · bung chi tiết AM→BC tại chỗ
         if R["weight_g"] > 0:
             sl_kg = [t.get("weight_kg") for t in trend]
@@ -939,10 +964,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                 _in_kgd = "".join(K)
             P.append(_row("", "⚖️", "Khối lượng giao / ngày",
                           "kg thực · đã gán + chưa gán · bấm xem AM → bưu cục",
-                          kg_spark, _kgfmt(R["weight_g"] / 1000.0), "", _in_kgd))
+                          kg_spark, _kgfmt(R["weight_g"] / 1000.0) + _dc_kg, "", _in_kgd))
         if any(v is not None for v in sl_ttg):
             P.append(_row("", "🛍️", "TikTok giao TC / ngày", "", _spark(sl_ttg, "#e879c8", w=60, h=22),
-                          _n(R["vngh_gtc"]), "", ""))
+                          _n(R["vngh_gtc"]) + _dc_ttk, "", ""))
     P.append("</section>")
 
     # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
@@ -1178,6 +1203,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("</div></details>")
 
     P.append("<div class='foot'><b>📖 Giải thích chỉ số</b><br>"
+             "<span class='up' style='color:var(--good);font-weight:800'>▲</span>/<span class='dn' style='color:var(--bad);font-weight:800'>▼ %</span> cạnh số ở lưới = thay đổi <b>ngày chốt hôm qua so hôm kia</b> · <span style='color:var(--good)'>xanh = tốt lên</span> · <span style='color:var(--bad)'>đỏ = xấu đi</span> (tồn/NV cần xử lý tăng là xấu; sản lượng/GTC/NV đạt tăng là tốt)<br>"
              "📥 <b>Đã gán</b> = đơn đã xếp vào chuyến hôm nay · ⏳ <b>Chưa gán</b> = đơn tồn ở kho chưa xếp chuyến<br>"
              "🏃 <b>Đang chạy</b> = số NV còn chuyến chưa kết thúc · 🚛 <b>Còn phải giao</b> = đơn của chuyến đang chạy CHƯA giao xong (đang trên đường)<br>"
              "🔴 <b>Backlog giao 120h</b> = đơn Giao tồn quá 120 giờ toàn vùng (khớp trang Tồn đọng) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
@@ -1295,6 +1321,9 @@ svg.spk{display:block}
  font-variant-numeric:tabular-nums}
 .gt.bd .gtv{color:var(--bad)} .gt.wn .gtv{color:var(--warn)}
 .gt svg.spk{width:100%;height:20px;display:block;margin-top:auto}
+.gt .dl{font-family:Manrope,sans-serif;font-size:11px;font-weight:800;vertical-align:middle;margin-left:4px;
+ letter-spacing:-.02em;white-space:nowrap}
+.gt .dl.up{color:var(--good)} .gt .dl.dn{color:var(--bad)} .gt .dl.fl{color:var(--mut)}
 .gt .gtd{padding-top:8px;margin-top:4px;border-top:1px solid var(--line)}
 .gt .gtd .bc{margin:8px 0 0}
 details.gt{padding:11px 12px 10px}
