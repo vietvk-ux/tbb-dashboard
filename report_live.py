@@ -989,7 +989,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("💰", _codm(R["cod_gtb"]),                       "COD GTB",         AMBER,   "",   False),
         ("🛒", _n(R["ltc"]),                                         "LTC",             NEU,     "",   True),
         ("📦", _n(R["ltb"]),                                         "LTB",  (RED if R["ltb"] else NEU), "", not R["ltb"]),
-        ("🎯", _n(nv_qual - nv_low),                                 "NV đạt ≥50%",     GREEN,   "",   (nv_qual - nv_low) == 0),
+        ("📉", _n(nv_low),                                           "NV %GTC &lt;50%", (RED if nv_low else NEU), "", not nv_low),
     ]
     P.append("<div class='sectitle'>📊 Chỉ số khác</div>")
     P.append("<section class='strip'>")
