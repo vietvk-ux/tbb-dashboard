@@ -1055,13 +1055,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  "<div class='sl'>%s %s</div></div>" % (cls, rgb, oc, val, ic, lab))
     P.append("</section>")
 
-    # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — ô NỔI BẬT, DƯỚI dải 'Chỉ số quan trọng' (bung scorecard AM→BC) =====
+    # ===== 🏤 BẢNG TỔNG QUÁT BƯU CỤC — ô NỔI BẬT, DƯỚI dải 'Chỉ số quan trọng' (bung scorecard AM→BC) =====
     if bcm is not None:
-        _bc_sub = (("📌 Số chốt cuối ngày %s · AM → bưu cục · bấm mở" % _esc(bcm["label"]))
-                   if bcm.get("label") else "mọi chỉ số từng bưu cục · AM → bưu cục · bấm mở")
+        # Số NV đi làm trong ngày = NV có chuyến/đơn gán hôm nay (live, gộp theo driverId)
+        _nv_lv = len({(d.get("id") or ("~" + d.get("name", "")))
+                      for r in rows for d in r.get("drivers", [])})
+        _bc_sub = "Vùng TBB · 7 AM · <b class='ld'>%s</b> NV đi làm trong ngày" % _n(_nv_lv)
         P.append("<details class='cgbento bcfeat' style='--h:99,179,237'><summary>"
                  "<div class='mic'>🏤</div>"
-                 "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
+                 "<div class='mtx'><div class='mn'>BẢNG TỔNG QUÁT BƯU CỤC</div>"
                  "<div class='ms'>%s</div></div>"
                  "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
                  "</summary><div class='dtl'>%s</div></details>" % (_bc_sub, bcm["n"], bcm["html"]))
@@ -1349,7 +1351,7 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .cgbento .cvar{flex:none;color:rgb(var(--h));font-size:14px;transition:transform .2s}
 .cgbento[open] .cvar{transform:rotate(180deg)}
 .cgbento .dtl{padding:0 12px 12px}
-/* 🏤 Bảng điều khiển Bưu cục — ô NỔI BẬT, to & cân bằng (ngay sau hero) */
+/* 🏤 Bảng tổng quát Bưu cục — ô NỔI BẬT, to & cân bằng */
 .bcfeat{margin:6px 0 16px;border-width:1.5px;border-color:rgba(var(--h),.7);
  background:linear-gradient(120deg,rgba(var(--h),.30),#0d1526 70%);
  box-shadow:0 10px 34px rgba(var(--h),.20),inset 0 1px 0 rgba(255,255,255,.05)}
@@ -1357,6 +1359,7 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .bcfeat .mic{width:58px;height:58px;border-radius:17px;font-size:30px;background:rgba(var(--h),.32);border-color:rgba(var(--h),.6)}
 .bcfeat .mn{font-size:21px}
 .bcfeat .ms{font-size:12.5px;margin-top:4px}
+.bcfeat .ms b{color:#9ec9f0;font-weight:800}
 .bcfeat .mbig{font-size:38px;text-shadow:0 0 18px rgba(var(--h),.4)}
 .bcfeat .mbig .u{font-size:15px;margin-left:4px}
 .bcfeat .cvar{font-size:18px}

@@ -242,12 +242,12 @@ def gen_html(rows, collectable=None, label=None):
     P.append("<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>")
     P.append("<link rel='stylesheet' href='https://fonts.googleapis.com/css2?"
              "family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap'>")
-    P.append("<title>Bảng điều khiển Bưu cục · %s</title>" % now.strftime("%H:%M"))
+    P.append("<title>Bảng tổng quát Bưu cục · %s</title>" % now.strftime("%H:%M"))
     P.append(_CSS)
     P.append(_EXTRA_CSS)
     P.append("<div class='wrap'>")
     P.append("<header class='top'><div class='brand'><span class='live'></span>"
-             "BẢNG ĐIỀU KHIỂN BƯU CỤC</div><div class='ts'>%s · %s</div></header>"
+             "BẢNG TỔNG QUÁT BƯU CỤC</div><div class='ts'>%s · %s</div></header>"
              % (now.strftime("%H:%M"), now.strftime("%d/%m")))
     P.append("<a class='backlnk' href='index.html'>← Trang trực tiếp</a>")
     if label:
