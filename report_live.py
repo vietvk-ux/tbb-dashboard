@@ -1505,9 +1505,14 @@ def main():
             _pt_amt = sum(u["amount"] for us in collectable.values() for u in us)
             _store_phieuthu(_pt_nv, _pt_amt)
         pt_trend = _fetch_phieuthu_trend(14)
-        # Lưu khối lượng đơn giao đã gán hôm nay (kg) → đồ thị (đọc lại trong _fetch_region_trend)
-        _store_weight(sum(r.get("weight_g", 0) for r in rows) / 1000.0)
-        # Lưu Tồn Lấy / Tồn Trả (chưa gán) hôm nay → đồ thị 14 ngày (builds dần)
+        # Lưu KHỐI LƯỢNG đơn giao đã gán → đồ thị. CHỐT SỐ ~12h TRƯA (xe đã ra hàng đầy đủ,
+        # đại diện tải cả ngày; cuối ngày giao gần hết nên số nhỏ, không đúng). Cửa sổ VN
+        # 11:50–12:40; các slot khác KHÔNG ghi → giữ số 12h cả ngày. ENV WEIGHT_NOON=1 để ép.
+        _vnm = datetime.now(VN).hour * 60 + datetime.now(VN).minute
+        if ((11 * 60 + 50) <= _vnm <= (12 * 60 + 40)
+                or os.environ.get("WEIGHT_NOON", "").strip() == "1"):
+            _store_weight(sum(r.get("weight_g", 0) for r in rows) / 1000.0)
+        # Lưu Tồn Lấy / Tồn Trả (chưa gán) hôm nay → đồ thị 14 ngày (builds dần, chốt cuối ngày)
         _store_ton(sum(r.get("ton_lay", 0) for r in rows), sum(r.get("ton_tra", 0) for r in rows))
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.

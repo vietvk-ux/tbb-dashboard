@@ -23,6 +23,10 @@ on:
         description: 'Ép CHỤP bản chốt Bảng điều khiển Bưu cục ngay bây giờ? 1=có (bình thường tự chụp ~23:15)'
         required: false
         default: ''
+      weight_noon:
+        description: 'Ép ghi điểm biểu đồ Khối lượng ngay bây giờ? 1=có (bình thường tự chốt ~12h trưa)'
+        required: false
+        default: ''
   schedule:
     # Mỗi 15' trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h).
     # Đây chỉ là BACKUP — lịch chính do cron-job.org kích (GitHub schedule hay bỏ lượt).
@@ -59,6 +63,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           BUUCUC_CHOT: ${{ github.event.inputs.buucuc_chot }}
+          WEIGHT_NOON: ${{ github.event.inputs.weight_noon }}
         run: python report_live.py
       - name: Tạo trang tồn đọng (backlog.html)
         env:
