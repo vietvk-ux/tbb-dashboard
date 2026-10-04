@@ -198,7 +198,7 @@ def _bc_drv_details(b, drivers):
 _CSS = """<style>
 :root{
  --bg:#0a0d18;--card:#161b2d;--card2:#1b2136;--line:#272d45;
- --mut:#8b92ab;--txt:#eef0f7;--good:#2fd07a;--warn:#f7b955;--bad:#f2585f;--ink:#0a0d18
+ --mut:#c6cde6;--txt:#fbfcff;--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -224,9 +224,9 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 
 .bar{height:7px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
 .bar i{display:block;height:100%;border-radius:99px}
-.bar i.good{background:linear-gradient(90deg,#25b56b,#2fd07a)}
-.bar i.warn{background:linear-gradient(90deg,#e39a2e,#f7b955)}
-.bar i.bad{background:linear-gradient(90deg,#d8434b,#f2585f)}
+.bar i.good{background:linear-gradient(90deg,#25b56b,#17c983)}
+.bar i.warn{background:linear-gradient(90deg,#e39a2e,#f5aa17)}
+.bar i.bad{background:linear-gradient(90deg,#d8434b,#f5455c)}
 .bar i.na{background:#4b5168}
 
 .strip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}

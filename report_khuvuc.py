@@ -198,7 +198,7 @@ def _svg_bars(series, unit="%", target=None, vfmt=None):
 
 def build_html(days):
     if not days:
-        return ("<div style='padding:40px;text-align:center;color:#8792ad;font-family:sans-serif'>"
+        return ("<div style='padding:40px;text-align:center;color:#c6cde6;font-family:sans-serif'>"
                 "Chưa có dữ liệu khu vực. Trang sẽ có số sau lần chốt cuối ngày đầu tiên.</div>")
     latest = days[-1]
 
@@ -391,8 +391,8 @@ window.addEventListener('resize',draw);draw();
 
 
 _CSS = """<style>
-:root{--bg:#0a0d18;--card:#131829;--line:#1f2740;--txt:#e7ecf7;--mut:#8792ad;
---good:#22c55e;--warn:#f59e0b;--bad:#ef4444;--accent:#3b82f6}
+:root{--bg:#0a0d18;--card:#131829;--line:#1f2740;--txt:#fbfcff;--mut:#c6cde6;
+--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--accent:#3b82f6}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);
 font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 .wrap{max-width:760px;margin:0 auto;padding:12px}
@@ -413,7 +413,7 @@ canvas{display:block;width:100%;height:auto}
 .leg{display:flex;align-items:center;gap:8px;justify-content:center;margin:8px 0 2px;font-size:11px;color:var(--mut);flex-wrap:wrap}
 .bar{height:10px;width:150px;border-radius:6px}
 .bar.dens{background:linear-gradient(90deg,#10203a,#2b6cff,#fff2a8,#ff5a3c)}
-.bar.gtc{background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e)}
+.bar.gtc{background:linear-gradient(90deg,#f5455c,#f5aa17,#17c983)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 6px}
 .chart{width:100%;height:auto;display:block}
 .chart .grid{stroke:rgba(255,255,255,.06);stroke-width:1}

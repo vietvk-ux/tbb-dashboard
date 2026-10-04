@@ -171,8 +171,8 @@ async def fetch_all(token):
 
 
 _CSS = """<style>
-:root{--bg:#0a0d18;--card:#161a2b;--tx:#eef0f7;--mut:#9aa2bd;--line:#252b42;
---good:#22c55e;--warn:#f59e0b;--orng:#fb923c;--bad:#ef4444;--acc:#38bdf8}
+:root{--bg:#0a0d18;--card:#161a2b;--tx:#fbfcff;--mut:#c6cde6;--line:#252b42;
+--good:#17c983;--warn:#f5aa17;--orng:#fb923c;--bad:#f5455c;--acc:#38bdf8}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx);-webkit-text-size-adjust:100%}
 .wrap{max-width:820px;margin:0 auto;padding:0 12px 40px;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));padding-bottom:calc(40px + env(safe-area-inset-bottom))}

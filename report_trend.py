@@ -845,7 +845,7 @@ _HEAD = """<!doctype html><html lang='vi'><head><meta charset='utf-8'>
 <meta name='theme-color' content='#0a0d18'>
 <title>Xu hướng TBB</title>
 <style>
-:root{--card:#161b2d;--line:#272d45;--mut:#8b92ab;--txt:#eef0f7;--good:#2fd07a;--warn:#f7b955;--bad:#f2585f;--ink:#0a0d18}
+:root{--card:#161b2d;--line:#272d45;--mut:#c6cde6;--txt:#fbfcff;--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(180deg,#0b0f1c,#0a0d18 240px,#0a0d18);color:var(--txt);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.35}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));padding-bottom:calc(30px + env(safe-area-inset-bottom))}
