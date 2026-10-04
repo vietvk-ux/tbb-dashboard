@@ -175,6 +175,59 @@ def _store_weight(kg):
         pass
 
 
+def _store_hourly_pct(pct):
+    """Ghi %GTC HIỆN TẠI theo GIỜ vào bao_cao_gio (upsert theo ngay+gio → giữ bản mới nhất
+    trong giờ đó) → để DỰ BÁO về đích cuối ngày. Bảng/cột thiếu → bỏ qua êm."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key) or pct is None:
+        return
+    try:
+        import requests
+        now = datetime.now(VN)
+        requests.post("%s/rest/v1/bao_cao_gio?on_conflict=ngay,gio" % url,
+                      json=[{"ngay": now.date().isoformat(), "gio": now.hour, "pct_gtc": round(pct, 1)}],
+                      headers={"apikey": key, "Authorization": "Bearer " + key,
+                               "Content-Type": "application/json",
+                               "Prefer": "resolution=merge-duplicates,return=minimal"}, timeout=20)
+    except Exception:
+        pass
+
+
+def _fetch_hour_uplift(hour, days=8):
+    """Độ BỨT TỐC trung vị %GTC từ GIỜ hiện tại → chốt cuối ngày, qua N ngày gần đây.
+    = median(eod_pct − pct_tại_giờ_h) của các ngày đã chốt. None nếu <2 ngày dữ liệu."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return None
+    try:
+        import requests
+        from datetime import timedelta
+        h = {"apikey": key, "Authorization": "Bearer " + key}
+        since = (datetime.now(VN).date() - timedelta(days=days)).isoformat()
+        today = datetime.now(VN).date().isoformat()
+        # %GTC tại GIỜ h từng ngày
+        r1 = requests.get("%s/rest/v1/bao_cao_gio?select=ngay,pct_gtc&gio=eq.%d&ngay=gte.%s"
+                          % (url, hour, since), headers=h, timeout=20)
+        # %GTC CHỐT cuối ngày (bao_cao_vung) — chỉ ngày đã chốt
+        r2 = requests.get("%s/rest/v1/bao_cao_vung?select=ngay,pct_gtc&don_giao=not.is.null&ngay=gte.%s"
+                          % (url, since), headers=h, timeout=20)
+        if not (r1.ok and r2.ok):
+            return None
+        hrp = {x["ngay"]: x["pct_gtc"] for x in r1.json() if x.get("pct_gtc") is not None}
+        eod = {x["ngay"]: x["pct_gtc"] for x in r2.json() if x.get("pct_gtc") is not None}
+        ups = [eod[d] - hrp[d] for d in hrp if d in eod and d != today]
+        if len(ups) < 2:
+            return None
+        ups.sort()
+        n = len(ups)
+        return ups[n // 2] if n % 2 else (ups[n // 2 - 1] + ups[n // 2]) / 2
+    except Exception:
+        return None
+
+
 def _store_ton(ton_lay, ton_tra):
     """Ghi Tồn Lấy/Tồn Trả (CHƯA GÁN) HÔM NAY vào bao_cao_vung (partial upsert theo ngay)
     → lần chạy cuối ngày = chốt → vẽ biểu đồ 14 ngày. Cột thiếu (chưa migration) → bỏ qua êm."""
@@ -590,7 +643,8 @@ async def fetch_live(token):
 
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
-             g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None):
+             g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
+             fc_uplift=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
@@ -655,9 +709,21 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if R["total"] == 0:
         vk, vic, vst, vsub = "neu", "⏳", "CHƯA CÓ DỮ LIỆU", "Đang chờ chuyến đầu ngày"
     elif done_ratio < 0.45:
-        vk, vic, vst = "neu", "⏳", "ĐANG LUỸ KẾ TRONG NGÀY"
-        vsub = ("Còn sớm — %%GTC chưa đủ để đánh giá%s · xem việc cần làm bên dưới"
-                % (" · hôm qua chốt %d%%" % yp if yp is not None else ""))
+        # DỰ BÁO VỀ ĐÍCH cuối ngày (đủ log theo giờ ≥2 ngày); chưa đủ → bản 'đang luỹ kế'
+        if fc_uplift is not None and reg_pct is not None:
+            fc = int(min(100, max(reg_pct, round(reg_pct + fc_uplift))))
+            vk = "good" if fc >= 70 else ("warn" if fc >= 60 else "bad")
+            vic = "📈"
+            vst = "DỰ BÁO VỀ ĐÍCH ~%d%%" % fc
+            if fc >= 70:
+                vsub = "Theo đà hiện tại · trên mục tiêu 70% 🎯"
+            else:
+                need = max(0, round(0.70 * can_giao) - R["gtc"])
+                vsub = "Theo đà hiện tại · cần giao thêm %s đơn để đạt 70%%" % _n(need)
+        else:
+            vk, vic, vst = "neu", "⏳", "ĐANG LUỸ KẾ TRONG NGÀY"
+            vsub = ("Còn sớm — %%GTC chưa đủ để đánh giá%s · xem việc cần làm bên dưới"
+                    % (" · hôm qua chốt %d%%" % yp if yp is not None else ""))
     elif reg_pct is not None and reg_pct >= 70:
         vk, vic, vst, vsub = "good", "🟢", "ĐẠT MỤC TIÊU", "Vượt/đạt mốc 70% — giữ nhịp"
     elif reg_pct is not None and reg_pct >= 60:
@@ -1518,6 +1584,10 @@ def main():
             _store_weight(sum(r.get("weight_g", 0) for r in rows) / 1000.0)
         # Lưu Tồn Lấy / Tồn Trả (chưa gán) hôm nay → đồ thị 14 ngày (builds dần, chốt cuối ngày)
         _store_ton(sum(r.get("ton_lay", 0) for r in rows), sum(r.get("ton_tra", 0) for r in rows))
+        # DỰ BÁO VỀ ĐÍCH: lưu %GTC theo GIỜ + đọc độ bứt tốc lịch sử (same-hour → cuối ngày)
+        _rp_now = _pct(sum(r["gtc"] for r in rows), sum(r["total"] for r in rows))
+        _store_hourly_pct(_rp_now)
+        fc_uplift = _fetch_hour_uplift(datetime.now(VN).hour)
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
@@ -1552,7 +1622,8 @@ def main():
         bcm = report_buucuc.embed(_bc_rows, _bc_coll, label=_bc_label)
     except Exception as e:
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
-    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm)
+    h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
+                 fc_uplift=fc_uplift)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
