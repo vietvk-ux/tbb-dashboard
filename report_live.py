@@ -957,17 +957,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     else:
         P.append("<div class='diag'>⚡ <b>Điểm Nóng Chú Ý</b> · %s</div>" % " · ".join(diag))
 
-    # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — ô NỔI BẬT ngay SAU 'Điểm Nóng Chú Ý' (bung scorecard AM→BC) =====
-    if bcm is not None:
-        _bc_sub = (("📌 Số chốt cuối ngày %s · AM → bưu cục · bấm mở" % _esc(bcm["label"]))
-                   if bcm.get("label") else "mọi chỉ số từng bưu cục · AM → bưu cục · bấm mở")
-        P.append("<details class='cgbento bcfeat' style='--h:99,179,237'><summary>"
-                 "<div class='mic'>🏤</div>"
-                 "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
-                 "<div class='ms'>%s</div></div>"
-                 "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
-                 "</summary><div class='dtl'>%s</div></details>" % (_bc_sub, bcm["n"], bcm["html"]))
-
     # ===== Dải chỉ số · Bento (Mẫu 3) · màu theo từng chỉ số =====
     vpct = _pct(R["vngh_gtc"], R["vngh"])
     _cgo = ("onclick=\"var d=document.getElementById('cgd');if(d){d.open=true;"
@@ -991,7 +980,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("📦", _n(R["ltb"]),                                         "LTB",  (RED if R["ltb"] else NEU), "", not R["ltb"]),
         ("📉", _n(nv_low),                                           "NV %GTC &lt;50%", (RED if nv_low else NEU), "", not nv_low),
     ]
-    P.append("<div class='sectitle'>📊 Chỉ số khác</div>")
+    P.append("<div class='sectitle'>📊 Chỉ số quan trọng của vùng</div>")
     P.append("<section class='strip'>")
     for ic, val, lab, rgb, extra, neu in kpis:
         cls = "st" + (" cg" if extra == "cg" else "") + (" neu" if neu else "")
@@ -999,6 +988,17 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<div class='%s' style='--h:%s'%s><div class='sv'>%s</div>"
                  "<div class='sl'>%s %s</div></div>" % (cls, rgb, oc, val, ic, lab))
     P.append("</section>")
+
+    # ===== 🏤 BẢNG ĐIỀU KHIỂN BƯU CỤC — ô NỔI BẬT, DƯỚI dải 'Chỉ số quan trọng' (bung scorecard AM→BC) =====
+    if bcm is not None:
+        _bc_sub = (("📌 Số chốt cuối ngày %s · AM → bưu cục · bấm mở" % _esc(bcm["label"]))
+                   if bcm.get("label") else "mọi chỉ số từng bưu cục · AM → bưu cục · bấm mở")
+        P.append("<details class='cgbento bcfeat' style='--h:99,179,237'><summary>"
+                 "<div class='mic'>🏤</div>"
+                 "<div class='mtx'><div class='mn'>Bảng điều khiển Bưu cục</div>"
+                 "<div class='ms'>%s</div></div>"
+                 "<div class='mbig'>%d<span class='u'>BC</span></div><span class='cvar'>▾</span>"
+                 "</summary><div class='dtl'>%s</div></details>" % (_bc_sub, bcm["n"], bcm["html"]))
 
 
     # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
