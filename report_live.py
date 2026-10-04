@@ -295,7 +295,8 @@ def _fetch_giao120h_trend(days=8):
 
 
 def _spark(vals, color, w=240, h=46, target=None, pad=6):
-    """Đường xu hướng nhỏ (SVG) từ list số; target = vạch ngang đứt (mục tiêu). '' nếu <2 điểm."""
+    """Đường xu hướng (SVG) RÕ NÉT: đường crisp 2px (non-scaling-stroke, không méo khi kéo giãn)
+    + vùng tô gradient dưới đường + điểm cuối nổi bật. target = vạch mục tiêu. '' nếu <2 điểm."""
     xs = [v for v in vals if v is not None]
     if len(xs) < 2:
         return ""
@@ -311,18 +312,31 @@ def _spark(vals, color, w=240, h=46, target=None, pad=6):
     def Y(v):
         return pad + (hi - v) / rng * (h - 2 * pad)
 
-    pts = " ".join("%.1f,%.1f" % (X(i), Y(v)) for i, v in enumerate(vals) if v is not None)
+    pl = [(X(i), Y(v)) for i, v in enumerate(vals) if v is not None]
+    pts = " ".join("%.1f,%.1f" % p for p in pl)
+    area = ("M%.1f,%.1f " % pl[0] + " ".join("L%.1f,%.1f" % p for p in pl[1:])
+            + " L%.1f,%.1f L%.1f,%.1f Z" % (pl[-1][0], h, pl[0][0], h))
+    _spark._i = getattr(_spark, "_i", 0) + 1
+    gid = "sg%d" % _spark._i
     tline = ""
     if target is not None:
         ty = Y(target)
-        tline = ("<line x1='0' y1='%.1f' x2='%d' y2='%.1f' stroke='rgba(167,139,250,.5)' "
-                 "stroke-width='1' stroke-dasharray='4 4'/>" % (ty, w, ty))
-    lx, ly = X(n - 1), Y(xs[-1])
-    return ("<svg class='spk' viewBox='0 0 %d %d' width='100%%' height='%d' preserveAspectRatio='none'>%s"
-            "<polyline points='%s' fill='none' stroke='%s' stroke-width='2.4' "
-            "stroke-linecap='round' stroke-linejoin='round'/>"
-            "<circle cx='%.1f' cy='%.1f' r='3' fill='%s'/></svg>"
-            % (w, h, h, tline, pts, color, lx, ly, color))
+        tline = ("<line x1='0' y1='%.1f' x2='%d' y2='%.1f' stroke='rgba(167,139,250,.55)' "
+                 "stroke-width='1' stroke-dasharray='4 4' vector-effect='non-scaling-stroke'/>" % (ty, w, ty))
+    lx, ly = pl[-1]
+    return ("<svg class='spk' viewBox='0 0 %d %d' width='100%%' height='%d' preserveAspectRatio='none'>"
+            "<defs><linearGradient id='%s' x1='0' y1='0' x2='0' y2='1'>"
+            "<stop offset='0' stop-color='%s' stop-opacity='.40'/>"
+            "<stop offset='1' stop-color='%s' stop-opacity='0'/></linearGradient></defs>"
+            "<path d='%s' fill='url(#%s)' stroke='none'/>%s"
+            "<polyline points='%s' fill='none' stroke='%s' stroke-width='2' "
+            "stroke-linecap='round' stroke-linejoin='round' vector-effect='non-scaling-stroke'/>"
+            "<line x1='%.1f' y1='%.1f' x2='%.1f' y2='%.1f' stroke='%s' stroke-width='5.5' "
+            "stroke-linecap='round' vector-effect='non-scaling-stroke'/>"
+            "<line x1='%.1f' y1='%.1f' x2='%.1f' y2='%.1f' stroke='#fff' stroke-width='2' "
+            "stroke-linecap='round' vector-effect='non-scaling-stroke' opacity='.92'/></svg>"
+            % (w, h, h, gid, color, color, area, gid, tline, pts, color,
+               lx, ly, lx, ly, color, lx, ly, lx, ly))
 
 
 def _late_cnt(r):
@@ -1320,7 +1334,7 @@ svg.spk{display:block}
 .gt .gtv{font-family:Sora,sans-serif;font-weight:800;font-size:24px;letter-spacing:-.01em;line-height:1;
  font-variant-numeric:tabular-nums}
 .gt.bd .gtv{color:var(--bad)} .gt.wn .gtv{color:var(--warn)}
-.gt svg.spk{width:100%;height:20px;display:block;margin-top:auto}
+.gt svg.spk{width:100%;height:26px;display:block;margin-top:auto}
 .gt .dl{font-family:Manrope,sans-serif;font-size:11px;font-weight:800;vertical-align:middle;margin-left:4px;
  letter-spacing:-.02em;white-space:nowrap}
 .gt .dl.up{color:var(--good)} .gt .dl.dn{color:var(--bad)} .gt .dl.fl{color:var(--mut)}
