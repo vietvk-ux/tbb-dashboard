@@ -666,14 +666,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     else:
         vk, vic, vst = "bad", "🔴", "DƯỚI MỤC TIÊU"
         vsub = "Cần đốc gấp · còn %d điểm tới 70%%" % (70 - (reg_pct or 0))
-    P.append("<section class='verdict %s'><div class='vic'>%s</div>"
-             "<div class='vtx'><div class='vst'>%s</div><div class='vsub'>%s</div></div>"
-             "<div class='vpct'><b>%s%s</b><i>%%GTC · %s</i></div></section>"
-             % (vk, vic, vst, vsub,
-                (reg_pct if reg_pct is not None else "—"),
-                ("%" if reg_pct is not None else ""), now.strftime("%H:%M")))
+    # (Ô đèn trạng thái riêng đã BỎ 04/10 — đưa thành DẢI MỎNG đánh giá trong Hero, tránh trùng số %GTC)
 
-    # ===== Hero %GTC + đường xu hướng 8 ngày (chốt cuối ngày) =====
+    # ===== Hero %GTC + dải đánh giá + đường xu hướng 14 ngày (chốt cuối ngày) =====
     P.append("<section class='hero %s'>" % _cls(reg_pct))
     P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG · TỚI HIỆN TẠI</div>")
     P.append("<div class='hpct'>%s<span>%%</span></div>"
@@ -681,11 +676,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     P.append("<div class='hsub'>%s / %s đơn giao thành công · LTC %s · cần giao %s</div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
+    # DẢI MỎNG ĐÁNH GIÁ (thay dòng 'Xu hướng 14 ngày...') — thông minh theo tiến độ ngày
+    P.append("<div class='hverd %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
+             % (vk, vic, vst, vsub))
     if trend and len(trend) >= 2:
         pcts = [t["pct"] for t in trend]
-        P.append("<div class='sparkwrap'><div class='spklbl'>Xu hướng %d ngày (chốt cuối ngày) · "
-                 "nay đang luỹ kế</div>%s</div>"
-                 % (len(pcts), _spark(pcts, "#fbbf24", w=280, h=50, target=70)))
+        P.append("<div class='sparkwrap'>%s</div>" % _spark(pcts, "#fbbf24", w=280, h=50, target=70))
     if ref:
         gap = ""
         if reg_pct is not None and reg_pct < 70:
@@ -1183,9 +1179,17 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .rc{font-size:11px;color:var(--mut);background:rgba(255,255,255,.05);border:1px solid var(--line);
  border-radius:99px;padding:3px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rc b{color:var(--txt);font-weight:800}
-.sparkwrap{margin-top:12px}
+.sparkwrap{margin-top:10px}
 .spklbl{font-size:9.5px;color:var(--mut);font-weight:600;letter-spacing:.02em;margin-bottom:3px}
 svg.spk{display:block}
+/* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
+.hverd{margin-top:11px;font-size:11.5px;font-weight:600;color:var(--mut);line-height:1.4;
+ padding:7px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.hverd .hvi{font-size:13px}
+.hverd b{font-family:Sora,sans-serif;font-size:12px;letter-spacing:.01em;color:var(--txt)}
+.hverd.good{border-color:rgba(23,201,131,.42);background:rgba(23,201,131,.09)}.hverd.good b{color:var(--good)}
+.hverd.warn{border-color:rgba(245,170,23,.42);background:rgba(245,170,23,.09)}.hverd.warn b{color:var(--warn)}
+.hverd.bad{border-color:rgba(245,69,92,.42);background:rgba(245,69,92,.09)}.hverd.bad b{color:var(--bad)}
 /* ĐÈN TRẠNG THÁI */
 .verdict{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:4px 0 12px;border-radius:18px;
  background:linear-gradient(120deg,rgba(139,147,255,.18),var(--card));border:1px solid rgba(139,147,255,.34)}
