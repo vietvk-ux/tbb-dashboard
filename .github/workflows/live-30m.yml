@@ -66,6 +66,7 @@ jobs:
           WEIGHT_NOON: ${{ github.event.inputs.weight_noon }}
         run: python report_live.py
       - name: Tạo trang tồn đọng (backlog.html)
+        continue-on-error: true   # hiccup GHN/API không chặn deploy trang chính
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
@@ -81,6 +82,7 @@ jobs:
           fi
       - name: EOD ~23:30 — CHỈ tạo eod.html (KHÔNG gửi nhóm; tin cuối ngày đã có 'Tổng quan cuối ngày' 23:05)
         if: steps.eodwin.outputs.iseod == '1'
+        continue-on-error: true
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           EOD_DATE: ${{ github.event.inputs.eod_date }}
@@ -95,6 +97,7 @@ jobs:
         run: python report_dashboard.py
       - name: Cảnh báo NV tụt sâu %GTC (chỉ EOD ~23:30; không ai tụt thì không gửi)
         if: steps.eodwin.outputs.iseod == '1'
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
@@ -107,6 +110,7 @@ jobs:
           curl -sf "https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/eod.html" \
             -o docs/9c7e4b21a6f0/eod.html || echo "chưa có eod.html (sẽ có sau bản 23:30 đầu tiên)"
       - name: Tạo trang xu hướng (trend.html — SAU db_sync để có số mới nhất; thiếu secret thì tạo trang chờ)
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
@@ -114,6 +118,7 @@ jobs:
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_trend.py
       - name: Tạo trang Bản đồ khu vực (khuvuc.html — đọc khuvuc_data/ trong repo)
+        continue-on-error: true
         env:
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_khuvuc.py render
