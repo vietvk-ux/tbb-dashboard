@@ -28,9 +28,10 @@ on:
         required: false
         default: ''
   schedule:
-    # Mỗi 15' trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h).
+    # Mỗi 30' trong GIỜ HOẠT ĐỘNG VN 6h–23h (UTC 23h + 0–16h). Đổi 15'→30' (05/10)
+    # để giảm số lần chạy → ít dính hiccup GitHub/GHN → ít email lỗi.
     # Đây chỉ là BACKUP — lịch chính do cron-job.org kích (GitHub schedule hay bỏ lượt).
-    - cron: '*/15 23,0-16 * * *'
+    - cron: '*/30 23,0-16 * * *'
 
 permissions:
   contents: read
