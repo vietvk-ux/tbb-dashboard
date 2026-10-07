@@ -1121,10 +1121,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     bc_low5 = sorted([(r, _pct(r["gtc"], r["total"])) for r in rows
                       if r["total"] >= 20 and _pct(r["gtc"], r["total"]) is not None
                       and _pct(r["gtc"], r["total"]) < 50], key=lambda x: x[1])[:5]
-    nv_low5 = sorted([(d, r["name"], _pct(d["gtc"], d["total"])) for r in rows
-                      for d in r.get("drivers", [])
-                      if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
-                      and _pct(d["gtc"], d["total"]) < 50], key=lambda x: x[2])[:5]
+    # Top 5 bưu cục NHIỀU ĐƠN BACKLOG (giao >120h) nhất — thay nhóm 'Top NV %GTC thấp' (07/10).
+    bl120_5 = sorted([r for r in rows if r.get("giao120h", 0) > 0],
+                     key=lambda x: -x["giao120h"])[:5]
 
     def _dgrp(title, items):
         if not items:
@@ -1145,10 +1144,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         grps.append(_dgrp("🏤 Top bưu cục %GTC thấp (≥20 đơn)", [
             "<div class='drow'><span class='dn'>%s</span><span class='pill sm %s'>%s%%</span></div>"
             % (_esc(r["name"]), _cls(p), p) for r, p in bc_low5]))
-    if nv_low5:
-        grps.append(_dgrp("👤 Top NV %GTC thấp (≥20 đơn)", [
-            "<div class='drow'><span class='dn'>%s<i>%s</i></span><span class='pill sm %s'>%s%%</span></div>"
-            % (_esc(d["name"]), _esc(bc), _cls(p), p) for d, bc, p in nv_low5]))
+    if bl120_5:
+        grps.append(_dgrp("🕙 Top bưu cục Backlog giao 120h", [
+            "<div class='drow'><span class='dn'>%s</span><span class='dv w'>%s đơn</span></div>"
+            % (_esc(r["name"]), _n(r["giao120h"])) for r in bl120_5]))
 
     # Ghi vào CHỖ ĐẶT SẴN trên đầu (trước lưới Tổng Quan Vận Hành) thay vì append cuối.
     if grps:
