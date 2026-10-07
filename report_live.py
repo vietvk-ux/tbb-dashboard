@@ -175,9 +175,10 @@ def _store_weight(kg):
         pass
 
 
-def _store_hourly_pct(pct):
+def _store_hourly_pct(pct, gtc=None, total=None):
     """Ghi %GTC HIỆN TẠI theo GIỜ vào bao_cao_gio (upsert theo ngay+gio → giữ bản mới nhất
-    trong giờ đó) → để DỰ BÁO về đích cuối ngày. Bảng/cột thiếu → bỏ qua êm."""
+    trong giờ đó) → để DỰ BÁO về đích + đo NHỊP ĐỘ (đơn/giờ). Cũng lưu gtc/total/phut (nếu
+    đã migrate supabase_migration_gio_rate.sql); cột thiếu → tự lùi về bản chỉ pct. Lỗi → êm."""
     url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
     key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
     if not (url and key) or pct is None:
@@ -185,13 +186,53 @@ def _store_hourly_pct(pct):
     try:
         import requests
         now = datetime.now(VN)
-        requests.post("%s/rest/v1/bao_cao_gio?on_conflict=ngay,gio" % url,
-                      json=[{"ngay": now.date().isoformat(), "gio": now.hour, "pct_gtc": round(pct, 1)}],
-                      headers={"apikey": key, "Authorization": "Bearer " + key,
-                               "Content-Type": "application/json",
-                               "Prefer": "resolution=merge-duplicates,return=minimal"}, timeout=20)
+        base = {"ngay": now.date().isoformat(), "gio": now.hour, "pct_gtc": round(pct, 1)}
+        rich = dict(base, gtc=gtc, total=total, phut=now.minute)
+        hdr = {"apikey": key, "Authorization": "Bearer " + key,
+               "Content-Type": "application/json",
+               "Prefer": "resolution=merge-duplicates,return=minimal"}
+        u = "%s/rest/v1/bao_cao_gio?on_conflict=ngay,gio" % url
+        r = requests.post(u, json=[rich], headers=hdr, timeout=20)
+        # Cột gtc/total/phut chưa có (chưa migrate) → PostgREST 400 → vẫn ghi được pct cho dự báo.
+        if r.status_code >= 400:
+            requests.post(u, json=[base], headers=hdr, timeout=20)
     except Exception:
         pass
+
+
+def _fetch_today_rate(gtc_now, min_gap_h=0.5):
+    """NHỊP ĐỘ giao THỰC (đơn/giờ) trong ~1h qua: so gtc hiện tại với bản ghi bao_cao_gio
+    gần nhất HÔM NAY cách ≥30' (cột gtc/phut). None nếu chưa migrate / chưa đủ mốc."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key) or gtc_now is None:
+        return None
+    try:
+        import requests
+        now = datetime.now(VN)
+        today = now.date().isoformat()
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=gio,phut,gtc&ngay=eq.%s"
+                         "&gtc=not.is.null&order=gio.asc" % (url, today),
+                         headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=20)
+        if not r.ok:
+            return None
+        now_t = now.hour + now.minute / 60.0
+        ref = None   # mốc gần hiện tại NHẤT nhưng cách ≥min_gap_h
+        for x in r.json():
+            if x.get("gtc") is None:
+                continue
+            rt = x["gio"] + (x.get("phut") or 0) / 60.0
+            if now_t - rt >= min_gap_h:
+                ref = (rt, x["gtc"])
+        if not ref:
+            return None
+        rt0, g0 = ref
+        dt = now_t - rt0
+        if dt <= 0:
+            return None
+        return (gtc_now - g0) / dt
+    except Exception:
+        return None
 
 
 def _fetch_hour_uplift(hour, days=8):
@@ -658,7 +699,7 @@ async def fetch_live(token):
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
-             fc_uplift=None):
+             fc_uplift=None, pace=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
@@ -759,6 +800,50 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # DẢI MỎNG ĐÁNH GIÁ (thay dòng 'Xu hướng 14 ngày...') — thông minh theo tiến độ ngày
     P.append("<div class='hverd %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
              % (vk, vic, vst, vsub))
+
+    # ===== 🎯 NHỊP ĐỘ CÁN ĐÍCH — tốc độ thực + "cần X đơn/giờ để chạm 70%" + dự phóng chốt =====
+    # Cùng base với %GTC Hero (R["total"]). Chỉ hiện trong giờ vận hành (9h30 → giờ giao cao
+    # điểm kết thúc, mặc định 22h; ENV PACE_CUTOFF_HOUR). Đòn bẩy điều hành số 1: biết nhịp
+    # thực, theo đà này sẽ chốt bao nhiêu %, và cần đẩy mạnh cỡ nào để chạm mục tiêu.
+    _cutoff_h = float(os.environ.get("PACE_CUTOFF_HOUR", "22"))
+    _now_t = now.hour + now.minute / 60.0
+    if R["total"] > 0 and reg_pct is not None and 9.5 <= _now_t < _cutoff_h:
+        _need = int(round(0.70 * R["total"])) - R["gtc"]
+        _hleft = max(_cutoff_h - _now_t, 0.1)
+        if _need <= 0:
+            P.append("<div class='hpace good'><span class='hvi'>🎯</span> "
+                     "<b>ĐÃ CHẠM MỐC 70%</b> · giữ nhịp tới hết ngày</div>")
+        else:
+            _rneed = _need / _hleft
+            # Dự phóng chốt ngày = %GTC hiện tại + độ bứt tốc LỊCH SỬ (median eod−giờ này),
+            # chính xác hơn nhiều so với kéo dài tuyến tính tốc độ (giao giảm dần cuối ngày).
+            _proj = None
+            if fc_uplift is not None and reg_pct is not None:
+                _proj = min(100, max(reg_pct, int(round(reg_pct + fc_uplift))))
+            if pace is not None and pace > 0:
+                # Màu theo DỰ PHÓNG chốt (nếu có) — thước đo thực tế nhất.
+                if _proj is not None:
+                    if _proj >= 70:
+                        pk, pic, pst = "good", "✅", "ĐÚNG ĐÀ ĐẠT MỤC TIÊU"
+                    elif yp is not None and _proj >= yp:
+                        pk, pic, pst = "warn", "🎯", "TRÊN NHỊP HÔM QUA"
+                    else:
+                        pk, pic, pst = "bad", "🔴", "DƯỚI ĐÀ MỤC TIÊU"
+                    _body = ("thực <b>%s đơn/giờ</b> · theo đà chốt <b>~%d%%</b> · "
+                             "cần %s/giờ để đạt 70%%"
+                             % (_n(int(round(pace))), _proj, _n(int(round(_rneed)))))
+                else:
+                    pk, pic, pst = "warn", "🎯", "NHỊP ĐỘ GIAO"
+                    _body = ("thực <b>%s đơn/giờ</b> · cần <b>%s/giờ</b> để chạm 70%% "
+                             "<i>(còn %s đơn · %.1fh)</i>"
+                             % (_n(int(round(pace))), _n(int(round(_rneed))), _n(_need), _hleft))
+            else:
+                pk, pic, pst = "warn", "🎯", "NHỊP CẦN ĐẠT"
+                _body = ("cần <b>%s đơn/giờ</b> <i>(còn %s đơn · %.1fh tới %dh)</i> để chạm 70%% "
+                         "· đang đo tốc độ thực…" % (_n(int(round(_rneed))), _n(_need),
+                                                     _hleft, int(_cutoff_h)))
+            P.append("<div class='hpace %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
+                     % (pk, pic, pst, _body))
     if trend and len(trend) >= 2:
         pcts = [t["pct"] for t in trend]
         P.append("<div class='sparkwrap'>%s</div>" % _spark(pcts, "#fbbf24", w=280, h=50, target=70))
@@ -1307,6 +1392,15 @@ svg.spk{display:block}
 .hverd.good{border-color:rgba(23,201,131,.42);background:rgba(23,201,131,.09)}.hverd.good b{color:var(--good)}
 .hverd.warn{border-color:rgba(245,170,23,.42);background:rgba(245,170,23,.09)}.hverd.warn b{color:var(--warn)}
 .hverd.bad{border-color:rgba(245,69,92,.42);background:rgba(245,69,92,.09)}.hverd.bad b{color:var(--bad)}
+/* 🎯 NHỊP ĐỘ CÁN ĐÍCH — dòng điều hành (cần X đơn/giờ) */
+.hpace{margin-top:8px;font-size:11.5px;font-weight:600;color:var(--mut);line-height:1.45;
+ padding:8px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.hpace .hvi{font-size:13px}
+.hpace b{font-family:Sora,sans-serif;font-size:12px;letter-spacing:.01em;color:var(--txt)}
+.hpace i{font-style:normal;color:var(--mut);font-weight:500}
+.hpace.good{border-color:rgba(23,201,131,.45);background:rgba(23,201,131,.10)}.hpace.good b{color:var(--good)}
+.hpace.warn{border-color:rgba(245,170,23,.45);background:rgba(245,170,23,.10)}.hpace.warn b{color:var(--warn)}
+.hpace.bad{border-color:rgba(245,69,92,.45);background:rgba(245,69,92,.10)}.hpace.bad b{color:var(--bad)}
 /* ĐÈN TRẠNG THÁI */
 .verdict{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:4px 0 12px;border-radius:18px;
  background:linear-gradient(120deg,rgba(139,147,255,.18),var(--card));border:1px solid rgba(139,147,255,.34)}
@@ -1640,9 +1734,13 @@ def main():
         # Lưu Tồn Lấy / Tồn Trả (chưa gán) hôm nay → đồ thị 14 ngày (builds dần, chốt cuối ngày)
         _store_ton(sum(r.get("ton_lay", 0) for r in rows), sum(r.get("ton_tra", 0) for r in rows))
         # DỰ BÁO VỀ ĐÍCH: lưu %GTC theo GIỜ + đọc độ bứt tốc lịch sử (same-hour → cuối ngày)
-        _rp_now = _pct(sum(r["gtc"] for r in rows), sum(r["total"] for r in rows))
-        _store_hourly_pct(_rp_now)
+        _gtc_now = sum(r["gtc"] for r in rows)
+        _tot_now = sum(r["total"] for r in rows)
+        _rp_now = _pct(_gtc_now, _tot_now)
+        _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now)
         fc_uplift = _fetch_hour_uplift(datetime.now(VN).hour)
+        # NHỊP ĐỘ: đọc SAU khi lưu (bản vừa lưu bị loại vì cách <30'); cần mốc giờ trước.
+        pace = _fetch_today_rate(_gtc_now)
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
@@ -1678,7 +1776,7 @@ def main():
     except Exception as e:
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
-                 fc_uplift=fc_uplift)
+                 fc_uplift=fc_uplift, pace=pace)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
