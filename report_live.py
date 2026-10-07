@@ -843,6 +843,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      "<b>ĐÃ CHẠM MỐC 70%</b> · giữ nhịp tới hết ngày</div>")
         else:
             _rneed = _need / _hleft
+            # Sát giờ cutoff (<45') → "cần X/giờ" nổ số (chia khoảng rất nhỏ) → vô nghĩa, bỏ vế đó.
+            _show_need = _hleft >= 0.75
+            _need_cl = (" · cần <b>%s/giờ</b> để đạt 70%%" % _n(int(round(_rneed)))) if _show_need else ""
             # Dự phóng chốt ngày = %GTC hiện tại + độ bứt tốc LỊCH SỬ (median eod−giờ này),
             # chính xác hơn nhiều so với kéo dài tuyến tính tốc độ (giao giảm dần cuối ngày).
             _proj = None
@@ -857,19 +860,21 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                         pk, pic, pst = "warn", "🎯", "TRÊN NHỊP HÔM QUA"
                     else:
                         pk, pic, pst = "bad", "🔴", "DƯỚI ĐÀ MỤC TIÊU"
-                    _body = ("thực <b>%s đơn/giờ</b> · theo đà chốt <b>~%d%%</b> · "
-                             "cần %s/giờ để đạt 70%%"
-                             % (_n(int(round(pace))), _proj, _n(int(round(_rneed)))))
+                    _body = ("thực <b>%s đơn/giờ</b> · theo đà chốt <b>~%d%%</b>%s"
+                             % (_n(int(round(pace))), _proj, _need_cl))
                 else:
                     pk, pic, pst = "warn", "🎯", "NHỊP ĐỘ GIAO"
-                    _body = ("thực <b>%s đơn/giờ</b> · cần <b>%s/giờ</b> để chạm 70%% "
-                             "<i>(còn %s đơn · %.1fh)</i>"
-                             % (_n(int(round(pace))), _n(int(round(_rneed))), _n(_need), _hleft))
+                    _tail = (_need_cl + (" <i>(còn %s đơn · %.1fh)</i>" % (_n(_need), _hleft)
+                                         if _show_need else " <i>(còn %s đơn tới 70%%)</i>" % _n(_need)))
+                    _body = "thực <b>%s đơn/giờ</b>%s" % (_n(int(round(pace))), _tail)
             else:
                 pk, pic, pst = "warn", "🎯", "NHỊP CẦN ĐẠT"
-                _body = ("cần <b>%s đơn/giờ</b> <i>(còn %s đơn · %.1fh tới %dh)</i> để chạm 70%% "
-                         "· đang đo tốc độ thực…" % (_n(int(round(_rneed))), _n(_need),
-                                                     _hleft, int(_cutoff_h)))
+                if _show_need:
+                    _body = ("cần <b>%s đơn/giờ</b> <i>(còn %s đơn · %.1fh tới %dh)</i> để chạm 70%% "
+                             "· đang đo tốc độ thực…" % (_n(int(round(_rneed))), _n(_need),
+                                                         _hleft, int(_cutoff_h)))
+                else:
+                    _body = ("còn <b>%s đơn</b> tới mốc 70%% · đang đo tốc độ thực…" % _n(_need))
             P.append("<div class='hpace %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
                      % (pk, pic, pst, _body))
 
