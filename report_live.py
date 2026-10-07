@@ -175,10 +175,10 @@ def _store_weight(kg):
         pass
 
 
-def _store_hourly_pct(pct, gtc=None, total=None):
+def _store_hourly_pct(pct, gtc=None, total=None, g120=None):
     """Ghi %GTC HIỆN TẠI theo GIỜ vào bao_cao_gio (upsert theo ngay+gio → giữ bản mới nhất
-    trong giờ đó) → để DỰ BÁO về đích + đo NHỊP ĐỘ (đơn/giờ). Cũng lưu gtc/total/phut (nếu
-    đã migrate supabase_migration_gio_rate.sql); cột thiếu → tự lùi về bản chỉ pct. Lỗi → êm."""
+    trong giờ đó) → để DỰ BÁO về đích + đo NHỊP ĐỘ (đơn/giờ) + SO CÙNG GIỜ HÔM QUA. Cũng lưu
+    gtc/total/phut/g120 (nếu đã migrate); cột thiếu → tự lùi về bản chỉ pct. Lỗi → êm."""
     url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
     key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
     if not (url and key) or pct is None:
@@ -187,17 +187,45 @@ def _store_hourly_pct(pct, gtc=None, total=None):
         import requests
         now = datetime.now(VN)
         base = {"ngay": now.date().isoformat(), "gio": now.hour, "pct_gtc": round(pct, 1)}
-        rich = dict(base, gtc=gtc, total=total, phut=now.minute)
+        rich = dict(base, gtc=gtc, total=total, phut=now.minute, g120=g120)
         hdr = {"apikey": key, "Authorization": "Bearer " + key,
                "Content-Type": "application/json",
                "Prefer": "resolution=merge-duplicates,return=minimal"}
         u = "%s/rest/v1/bao_cao_gio?on_conflict=ngay,gio" % url
         r = requests.post(u, json=[rich], headers=hdr, timeout=20)
-        # Cột gtc/total/phut chưa có (chưa migrate) → PostgREST 400 → vẫn ghi được pct cho dự báo.
+        # Cột mới chưa có (chưa migrate) → PostgREST 400 → vẫn ghi được pct cho dự báo.
         if r.status_code >= 400:
             requests.post(u, json=[base], headers=hdr, timeout=20)
     except Exception:
         pass
+
+
+def _fetch_hour_vs_yesterday(hour):
+    """SO CÙNG GIỜ HÔM QUA: đọc bao_cao_gio của HÔM QUA tại GIỜ này → {pct,gtc,total,g120}.
+    Chỉ trả field có giá trị (cột mới chỉ đầy từ ngày bắt đầu log). None nếu thiếu/không có."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key):
+        return None
+    try:
+        import requests
+        from datetime import timedelta
+        y = (datetime.now(VN).date() - timedelta(days=1)).isoformat()
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=pct_gtc,gtc,total,g120"
+                         "&ngay=eq.%s&gio=eq.%d" % (url, y, hour),
+                         headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=20)
+        if not r.ok or not r.json():
+            return None
+        x = r.json()[0]
+        out = {}
+        if x.get("pct_gtc") is not None:
+            out["pct"] = x["pct_gtc"]
+        for k in ("gtc", "total", "g120"):
+            if x.get(k) is not None:
+                out[k] = x[k]
+        return out or None
+    except Exception:
+        return None
 
 
 def _fetch_today_rate(gtc_now, min_gap_h=0.5):
@@ -699,7 +727,7 @@ async def fetch_live(token):
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
-             fc_uplift=None, pace=None):
+             fc_uplift=None, pace=None, cmp_y=None):
     now = datetime.now(VN)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
@@ -844,6 +872,52 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                                                      _hleft, int(_cutoff_h)))
             P.append("<div class='hpace %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
                      % (pk, pic, pst, _body))
+
+    # ===== ⏱ SO CÙNG GIỜ HÔM QUA — đánh giá vùng theo mốc giờ (07/10) =====
+    # So số HÔM NAY (live) với bản ghi bao_cao_gio của HÔM QUA tại GIỜ này. %GTC có ngay;
+    # Đã gán/GTC/Backlog đầy đủ từ ngày bắt đầu log cột (hôm qua chưa có → tự ẩn chỉ số đó).
+    if cmp_y and reg_pct is not None:
+        _ch = now.hour
+
+        def _dpp(td, yd):  # chênh ĐIỂM phần trăm (percentage points) cho %GTC
+            d = round(td - yd, 1)
+            s = ("+%s" % d if d > 0 else ("%s" % d if d < 0 else "±0")).replace(".", ",")
+            return d, s
+
+        def _dpc(td, yd):  # chênh % tương đối cho số đếm
+            if not yd:
+                return 0, "±0%"
+            d = round((td - yd) * 100.0 / abs(yd))
+            return d, ("+%d%%" % d if d > 0 else ("%d%%" % d if d < 0 else "±0%"))
+
+        parts = []
+        # %GTC — màu theo tốt/xấu (cao hơn hôm qua = tốt)
+        if "pct" in cmp_y:
+            d, s = _dpp(reg_pct, cmp_y["pct"])
+            c = "up" if d > 0 else ("dn" if d < 0 else "fl")
+            parts.append("<b>%%GTC</b> %d%% <span class='cq %s'>%s đ</span> <i>(hôm qua %s%%)</i>"
+                         % (reg_pct, c, s, ("%g" % cmp_y["pct"]).replace(".", ",")))
+        # Đã gán (total) — nhiều hơn = trung tính (volume)
+        if "total" in cmp_y:
+            d, s = _dpc(R["total"], cmp_y["total"])
+            parts.append("<b>Đã gán</b> %s <span class='cq nt'>%s</span>" % (_n(R["total"]), s))
+        # GTC (đơn giao TC) — nhiều hơn = tốt
+        if "gtc" in cmp_y:
+            d, s = _dpc(R["gtc"], cmp_y["gtc"])
+            c = "up" if d > 0 else ("dn" if d < 0 else "fl")
+            parts.append("<b>GTC</b> %s <span class='cq %s'>%s</span>" % (_n(R["gtc"]), c, s))
+        # Backlog 120h — nhiều hơn = XẤU (đảo màu)
+        if "g120" in cmp_y and giao_120h is not None:
+            d, s = _dpc(giao_120h, cmp_y["g120"])
+            c = "dn" if d > 0 else ("up" if d < 0 else "fl")
+            parts.append("<b>Backlog</b> %s <span class='cq %s'>%s</span>" % (_n(giao_120h), c, s))
+        _miss = "" if ("total" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
+                " · <i>(Đã gán/GTC/Backlog đủ từ mai)</i>"
+        if parts:
+            P.append("<div class='hcmp'><span class='hvi'>⏱</span> "
+                     "<b>SO CÙNG GIỜ HÔM QUA · mốc %dh</b> · %s%s</div>"
+                     % (_ch, " · ".join(parts), _miss))
+
     if trend and len(trend) >= 2:
         pcts = [t["pct"] for t in trend]
         P.append("<div class='sparkwrap'>%s</div>" % _spark(pcts, "#fbbf24", w=280, h=50, target=70))
@@ -1406,6 +1480,18 @@ svg.spk{display:block}
 .hpace.good{border-color:rgba(23,201,131,.45);background:rgba(23,201,131,.10)}.hpace.good b{color:var(--good)}
 .hpace.warn{border-color:rgba(245,170,23,.45);background:rgba(245,170,23,.10)}.hpace.warn b{color:var(--warn)}
 .hpace.bad{border-color:rgba(245,69,92,.45);background:rgba(245,69,92,.10)}.hpace.bad b{color:var(--bad)}
+/* ⏱ SO CÙNG GIỜ HÔM QUA — dòng đánh giá vùng theo mốc giờ */
+.hcmp{margin-top:8px;font-size:11px;font-weight:600;color:var(--mut);line-height:1.6;
+ padding:8px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.hcmp .hvi{font-size:13px}
+.hcmp b{font-family:Sora,sans-serif;font-size:11px;letter-spacing:.01em;color:var(--txt)}
+.hcmp i{font-style:normal;color:var(--mut);font-weight:400;font-size:10px}
+.hcmp .cq{display:inline-block;padding:0 6px;border-radius:7px;font-weight:800;font-size:10.5px;
+ font-variant-numeric:tabular-nums;margin-left:1px}
+.hcmp .cq.up{color:var(--good);background:rgba(23,201,131,.14)}
+.hcmp .cq.dn{color:var(--bad);background:rgba(245,69,92,.14)}
+.hcmp .cq.fl{color:var(--mut);background:rgba(255,255,255,.06)}
+.hcmp .cq.nt{color:var(--txt);background:rgba(255,255,255,.08)}
 /* ĐÈN TRẠNG THÁI */
 .verdict{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:4px 0 12px;border-radius:18px;
  background:linear-gradient(120deg,rgba(139,147,255,.18),var(--card));border:1px solid rgba(139,147,255,.34)}
@@ -1742,10 +1828,12 @@ def main():
         _gtc_now = sum(r["gtc"] for r in rows)
         _tot_now = sum(r["total"] for r in rows)
         _rp_now = _pct(_gtc_now, _tot_now)
-        _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now)
+        _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now, g120=giao_120h)
         fc_uplift = _fetch_hour_uplift(datetime.now(VN).hour)
         # NHỊP ĐỘ: đọc SAU khi lưu (bản vừa lưu bị loại vì cách <30'); cần mốc giờ trước.
         pace = _fetch_today_rate(_gtc_now)
+        # SO CÙNG GIỜ HÔM QUA: đọc bao_cao_gio hôm qua tại giờ này.
+        cmp_y = _fetch_hour_vs_yesterday(datetime.now(VN).hour)
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
@@ -1781,7 +1869,7 @@ def main():
     except Exception as e:
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
-                 fc_uplift=fc_uplift, pace=pace)
+                 fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
