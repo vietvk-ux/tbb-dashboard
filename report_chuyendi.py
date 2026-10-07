@@ -238,32 +238,7 @@ def gen_html(rows, collectable=None):
     thead = ("<table class='drv'><thead><tr><th class='rk'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
              "<th>Ch</th><th>Đơn/ch</th><th>Đơn/giờ</th><th>XP→Đóng</th><th>%GTC</th></tr></thead><tbody>")
 
-    # 🔴 NV cần chú ý
-    P.append("<div class='sec' style='color:var(--bad)'>🔴 NV cần chú ý — hiệu suất chuyến đi thấp</div>")
-    P.append("<section class='card'>")
-    P.append("<div class='note'>NV <b>đã đóng chuyến</b>, xếp theo <b>đơn/giờ thấp nhất</b> (&lt; %s). "
-             "Badge ⚠ nếu kèm <b>xuất phát sau 9h30</b> / <b>%%GTC &lt;%d%%</b>.</div>"
-             % (str(DPH_MIN).replace(".", ","), GTC_MIN))
-    if can_chu_y:
-        P.append(thead)
-        for i, m in enumerate(can_chu_y[:25], 1):
-            P.append(_row(i, m))
-        P.append("</tbody></table>")
-    else:
-        P.append("<div class='none'>✅ Không có NV nào dính ngưỡng cảnh báo.</div>")
-    P.append("</section>")
-
-    # 🟢 Hiệu suất cao
-    P.append("<div class='sec' style='color:var(--good)'>🟢 Hiệu suất cao — đơn/giờ tốt nhất</div>")
-    P.append("<section class='card'>")
-    if hi:
-        P.append(thead)
-        for i, m in enumerate(hi[:15], 1):
-            P.append(_row(i, m, show_flags=False))
-        P.append("</tbody></table>")
-    else:
-        P.append("<div class='none'>Chưa đủ dữ liệu chuyến kết thúc.</div>")
-    P.append("</section>")
+    # (Đã BỎ 07/10 theo yêu cầu: '🔴 NV cần chú ý — hiệu suất thấp' + '🟢 Hiệu suất cao — đơn/giờ tốt nhất' cho gọn)
 
     # 🏃 NV đang chạy — gộp AM → bưu cục → nhân viên (bấm mở drill như trang chính)
     def _pcls(pc):
