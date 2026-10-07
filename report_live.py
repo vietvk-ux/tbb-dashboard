@@ -991,6 +991,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     _in_tld = _drill_am_bc(_group_am("ton_lay"), "warn", "warn", "%d bưu cục", "Số đơn")
     _in_ttd = _drill_am_bc(_group_am("ton_tra"), "warn", "warn", "%d bưu cục", "Số đơn")
 
+    # Chỗ đặt sẵn cho khối ĐIỂM NÓNG CHÚ Ý — đẩy LÊN TRÊN Tổng Quan Vận Hành (07/10).
+    # Phần tính toán vẫn ở dưới (cần am_pcts…); tại đó ghi vào P[_diag_slot] thay vì append cuối.
+    _diag_slot = len(P)
+    P.append("")
     P.append("<div class='sectitle'>⚡ Tổng Quan Vận Hành Vùng TBB</div><section class='prilist'>")
     P.append(_row("bd", "🔴", "Backlog giao 120h", "bấm xem AM → bưu cục", g120_spark,
                   (_n(giao_120h) if giao_120h is not None else "—") + _dc_g120, "", _in_g120))
@@ -1146,13 +1150,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             "<div class='drow'><span class='dn'>%s<i>%s</i></span><span class='pill sm %s'>%s%%</span></div>"
             % (_esc(d["name"]), _esc(bc), _cls(p), p) for d, bc, p in nv_low5]))
 
+    # Ghi vào CHỖ ĐẶT SẴN trên đầu (trước lưới Tổng Quan Vận Hành) thay vì append cuối.
     if grps:
-        P.append("<details class='diag'><summary>⚡ <b>Điểm Nóng Chú Ý</b> · %s<span class='dcv'>▾</span></summary>"
-                 "<div class='ddtl'><div class='dnote'>Top 5 cần chú ý mỗi mục · "
-                 "%%GTC luỹ kế trong ngày (sáng còn thấp là bình thường)</div>%s</div></details>"
-                 % (" · ".join(diag), "".join(grps)))
+        P[_diag_slot] = (
+            "<details class='diag'><summary>⚡ <b>Điểm Nóng Chú Ý</b> · %s<span class='dcv'>▾</span></summary>"
+            "<div class='ddtl'><div class='dnote'>Top 5 cần chú ý mỗi mục · "
+            "%%GTC luỹ kế trong ngày (sáng còn thấp là bình thường)</div>%s</div></details>"
+            % (" · ".join(diag), "".join(grps)))
     else:
-        P.append("<div class='diag'>⚡ <b>Điểm Nóng Chú Ý</b> · %s</div>" % " · ".join(diag))
+        P[_diag_slot] = "<div class='diag'>⚡ <b>Điểm Nóng Chú Ý</b> · %s</div>" % " · ".join(diag)
 
     # ===== Dải chỉ số · Bento (Mẫu 3) · màu theo từng chỉ số =====
     vpct = _pct(R["vngh_gtc"], R["vngh"])
