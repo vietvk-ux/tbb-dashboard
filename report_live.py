@@ -797,11 +797,18 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # ----- Delta ▲/▼ so NGÀY CHỐT TRƯỚC (2 điểm cuối trend: hôm qua vs hôm kia) -----
     def _dchip(vals, up_good):
         xs = [v for v in (vals or []) if v is not None]
-        if len(xs) < 2 or not xs[-2]:
+        if len(xs) < 2:
             return ""
-        d = round((xs[-1] - xs[-2]) / abs(xs[-2]) * 100)
+        prev = xs[-2]
+        # Baseline quá nhỏ (chuỗi dữ liệu mới bắt đầu / gần 0) → % thay đổi vô nghĩa
+        # (vd 455 vs 1 = 45.400%). Bỏ chip thay vì hiện số nổ.
+        if abs(prev) < 5:
+            return ""
+        d = round((xs[-1] - prev) / abs(prev) * 100)
         if d == 0:
             return " <span class='dl fl'>▬</span>"
+        if abs(d) > 999:            # chặn trần an toàn, tránh số delta phi lý
+            d = 999 if d > 0 else -999
         up = d > 0
         cls = "up" if (up == up_good) else "dn"   # thay đổi TỐT = xanh · XẤU = đỏ
         return " <span class='dl %s'>%s%d%%</span>" % (cls, "▲" if up else "▼", abs(d))
