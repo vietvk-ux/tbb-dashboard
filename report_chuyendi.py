@@ -235,6 +235,47 @@ def gen_html(rows, collectable=None):
                  % (coll_nv, _money_short(coll_amt)))
     P.append("</section>")
 
+    # 💵 Phiếu thu CHƯA thu tiền (tiền COD NV chưa nộp) — ĐƯA LÊN ĐẦU (07/10) · AM → bưu cục → nhân viên
+    if collectable is not None:
+        P.append("<div class='sec' style='color:var(--warn)'>💵 Phiếu thu CHƯA thu tiền · AM → bưu cục → nhân viên</div>")
+        P.append("<section class='card' style='padding:2px 10px'>")
+        amg = {}
+        g_amt = g_ord = g_nv = 0
+        for bc, users in collectable.items():
+            amn = AM_OF.get(bc) or "(chưa gán AM)"
+            a = amg.setdefault(amn, {"amt": 0, "ord": 0, "nv": 0, "bcs": {}})
+            b = a["bcs"].setdefault(bc, {"amt": 0, "ord": 0, "users": users})
+            for u in users:
+                a["amt"] += u["amount"]; a["ord"] += u["orders"]; a["nv"] += 1
+                b["amt"] += u["amount"]; b["ord"] += u["orders"]
+                g_amt += u["amount"]; g_ord += u["orders"]; g_nv += 1
+        if amg:
+            P.append("<div class='note'>Tiền COD nhân viên đã thu nhưng <b>CHƯA nộp</b> về "
+                     "(nguồn: Phiếu thu → Thu tiền → 'Chưa thu tiền'). Tổng <b class='warn'>%s</b> · "
+                     "%s ĐH · %d CBĐP · bấm AM để xem bưu cục → nhân viên.</div>"
+                     % (_money(g_amt), _n(g_ord), g_nv))
+            for amn, a in sorted(amg.items(), key=lambda kv: -kv[1]["amt"]):
+                P.append("<details class='bc'><summary><span class='amn'>%s</span>"
+                         "<span class='ammet'>%d CBĐP · %s ĐH · <b class='warn'>%s</b> ▾</span>"
+                         "</summary><div class='dtl'>"
+                         % (_esc(amn), a["nv"], _n(a["ord"]), _money_short(a["amt"])))
+                for bc, b in sorted(a["bcs"].items(), key=lambda kv: -kv[1]["amt"]):
+                    P.append("<details class='bc sub'><summary><span class='amn' style='font-size:13px'>%s</span>"
+                             "<span class='ammet'>%d CBĐP · %s ĐH · <b class='warn'>%s</b></span>"
+                             "</summary><div class='dtl'>"
+                             % (_esc(bc), len(b["users"]), _n(b["ord"]), _money_short(b["amt"])))
+                    P.append("<table class='drv'><thead><tr><th class='lft'>Nhân viên (CBĐP)</th>"
+                             "<th>ĐH cần thu</th><th>Tiền cần thu</th></tr></thead><tbody>")
+                    for u in b["users"]:
+                        P.append("<tr><td class='nv'>%s</td><td>%s</td>"
+                                 "<td class='money'><b class='warn'>%s</b></td></tr>"
+                                 % (_esc(u["name"]), _n(u["orders"]), _money(u["amount"])))
+                    P.append("</tbody></table></div></details>")
+                P.append("</div></details>")
+        else:
+            P.append("<div class='none'>✅ Không còn phiếu thu treo — tất cả đã nộp.</div>")
+        P.append("</section>")
+
     thead = ("<table class='drv'><thead><tr><th class='rk'>#</th><th class='lft'>Nhân viên · Bưu cục</th>"
              "<th>Ch</th><th>Đơn/ch</th><th>Đơn/giờ</th><th>XP→Đóng</th><th>%GTC</th></tr></thead><tbody>")
 
@@ -323,46 +364,76 @@ def gen_html(rows, collectable=None):
         P.append("<div class='none'>Không có NV xuất phát muộn.</div>")
     P.append("</section>")
 
-    # 💵 Phiếu thu CHƯA thu tiền (tiền COD NV chưa nộp) — AM → bưu cục → nhân viên
-    if collectable is not None:
-        P.append("<div class='sec' style='color:var(--warn)'>💵 Phiếu thu CHƯA thu tiền · AM → bưu cục → nhân viên</div>")
-        P.append("<section class='card' style='padding:2px 10px'>")
-        amg = {}
-        g_amt = g_ord = g_nv = 0
-        for bc, users in collectable.items():
-            amn = AM_OF.get(bc) or "(chưa gán AM)"
-            a = amg.setdefault(amn, {"amt": 0, "ord": 0, "nv": 0, "bcs": {}})
-            b = a["bcs"].setdefault(bc, {"amt": 0, "ord": 0, "users": users})
-            for u in users:
-                a["amt"] += u["amount"]; a["ord"] += u["orders"]; a["nv"] += 1
-                b["amt"] += u["amount"]; b["ord"] += u["orders"]
-                g_amt += u["amount"]; g_ord += u["orders"]; g_nv += 1
-        if amg:
-            P.append("<div class='note'>Tiền COD nhân viên đã thu nhưng <b>CHƯA nộp</b> về "
-                     "(nguồn: Phiếu thu → Thu tiền → 'Chưa thu tiền'). Tổng <b class='warn'>%s</b> · "
-                     "%s ĐH · %d CBĐP · bấm AM để xem bưu cục → nhân viên.</div>"
-                     % (_money(g_amt), _n(g_ord), g_nv))
-            for amn, a in sorted(amg.items(), key=lambda kv: -kv[1]["amt"]):
-                P.append("<details class='bc'><summary><span class='amn'>%s</span>"
-                         "<span class='ammet'>%d CBĐP · %s ĐH · <b class='warn'>%s</b> ▾</span>"
-                         "</summary><div class='dtl'>"
-                         % (_esc(amn), a["nv"], _n(a["ord"]), _money_short(a["amt"])))
-                for bc, b in sorted(a["bcs"].items(), key=lambda kv: -kv[1]["amt"]):
-                    P.append("<details class='bc sub'><summary><span class='amn' style='font-size:13px'>%s</span>"
-                             "<span class='ammet'>%d CBĐP · %s ĐH · <b class='warn'>%s</b></span>"
-                             "</summary><div class='dtl'>"
-                             % (_esc(bc), len(b["users"]), _n(b["ord"]), _money_short(b["amt"])))
-                    P.append("<table class='drv'><thead><tr><th class='lft'>Nhân viên (CBĐP)</th>"
-                             "<th>ĐH cần thu</th><th>Tiền cần thu</th></tr></thead><tbody>")
-                    for u in b["users"]:
-                        P.append("<tr><td class='nv'>%s</td><td>%s</td>"
-                                 "<td class='money'><b class='warn'>%s</b></td></tr>"
-                                 % (_esc(u["name"]), _n(u["orders"]), _money(u["amount"])))
-                    P.append("</tbody></table></div></details>")
-                P.append("</div></details>")
-        else:
-            P.append("<div class='none'>✅ Không còn phiếu thu treo — tất cả đã nộp.</div>")
-        P.append("</section>")
+    # 📊 NĂNG SUẤT CHUYẾN ĐI THEO AM (07/10, thay chỗ phiếu thu) — đơn/giờ·giờ XP·%GTC·giờ đóng·còn phải giao
+    P.append("<div class='sec' style='color:var(--good)'>📊 Năng suất chuyến đi theo AM · bấm mở bưu cục</div>")
+    P.append("<section class='card' style='padding:2px 10px'>")
+
+    def _xpfmt(sm, n):
+        if not n:
+            return "—"
+        h = sm / n
+        return "%02d:%02d" % (int(h), round((h - int(h)) * 60))
+
+    def _dcls(v):
+        return "bad" if (v is None or v < DPH_MIN) else ("warn" if v < 4 else "good")
+
+    def _agg0():
+        return {"nv": 0, "ge": 0, "se": 0, "xs": 0, "xn": 0, "es": 0, "en": 0, "gtc": 0, "tot": 0, "road": 0}
+
+    def _acc(a, m):
+        if m["total"] > 0 or m["chuyen"] > 0:
+            a["nv"] += 1
+        if _is_done_eff(m):
+            a["ge"] += m["gtc"]; a["se"] += m["span_h"]
+        if m["start_h"] is not None:
+            a["xs"] += m["start_h"]; a["xn"] += 1
+        en = m.get("end")
+        if en:
+            try:
+                hh, mm = en.split(":"); a["es"] += int(hh) + int(mm) / 60; a["en"] += 1
+            except Exception:
+                pass
+        a["gtc"] += m["gtc"]; a["tot"] += m["total"]; a["road"] += max(m["ot_tot"] - m["ot_done"], 0)
+
+    am_s = {}
+    for m in drv:
+        amn = AM_OF.get(m["bc"]) or "(chưa gán AM)"
+        x = am_s.setdefault(amn, {"a": _agg0(), "bcs": {}})
+        _acc(x["a"], m)
+        _acc(x["bcs"].setdefault(m["bc"], _agg0()), m)
+
+    def _dph(a):
+        return round(a["ge"] / a["se"], 1) if a["se"] else None
+
+    rows_am = []
+    for amn, x in am_s.items():
+        rows_am.append((amn, _dph(x["a"]), x))
+    # đơn/giờ THẤP → cao (lề mề lên đầu); None (chưa đóng chuyến) xuống cuối
+    rows_am.sort(key=lambda t: (t[1] if t[1] is not None else 9e9))
+    P.append("<div class='note'>Đơn/giờ TB (chỉ NV <b>đã đóng chuyến</b>) · giờ XP TB · giờ đóng TB · %GTC · còn phải giao · "
+             "xếp <b>đơn/giờ THẤP → cao</b> (AM lề mề lên đầu). Bấm AM xem bưu cục.</div>")
+    for amn, dph, x in rows_am:
+        a = x["a"]
+        pct = round(a["gtc"] * 100 / a["tot"]) if a["tot"] else None
+        dtxt = str(dph).replace(".", ",") if dph is not None else "—"
+        P.append("<details class='bc %s'><summary><span class='amn'>%s</span>"
+                 "<span class='ammet'><span class='pill sm %s'>%s đơn/giờ</span> · XP %s · đóng %s · "
+                 "%s%%GTC · còn giao %s ▾</span></summary><div class='dtl'>"
+                 % (_dcls(dph), _esc(amn), _dcls(dph), dtxt,
+                    _xpfmt(a["xs"], a["xn"]), _xpfmt(a["es"], a["en"]),
+                    pct if pct is not None else "—", _n(a["road"])))
+        P.append("<table class='drv'><thead><tr><th class='lft'>Bưu cục</th><th>Đơn/giờ</th>"
+                 "<th>XP TB</th><th>Đóng TB</th><th>%GTC</th><th>Còn giao</th></tr></thead><tbody>")
+        bls = sorted(x["bcs"].items(), key=lambda kv: (_dph(kv[1]) if _dph(kv[1]) is not None else 9e9))
+        for bc, b in bls:
+            bd = _dph(b); bp = round(b["gtc"] * 100 / b["tot"]) if b["tot"] else None
+            P.append("<tr><td class='nv'>%s</td><td><span class='pill sm %s'>%s</span></td>"
+                     "<td>%s</td><td>%s</td><td>%s%%</td><td>%s</td></tr>"
+                     % (_esc(bc), _dcls(bd), str(bd).replace(".", ",") if bd is not None else "—",
+                        _xpfmt(b["xs"], b["xn"]), _xpfmt(b["es"], b["en"]),
+                        bp if bp is not None else "—", _n(b["road"])))
+        P.append("</tbody></table></div></details>")
+    P.append("</section>")
 
     P.append("<a class='eod' href='index.html'><span>← Về trang trực tiếp</span>"
              "<span class='arw'>%GTC hôm nay →</span></a>")
