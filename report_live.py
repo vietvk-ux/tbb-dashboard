@@ -219,7 +219,7 @@ def _prune_bao_cao_gio():
         import requests
         from datetime import timedelta
         today = datetime.now(VN).date()
-        snap_days = int(os.environ.get("GIO_SNAP_DAYS", "3"))
+        snap_days = int(os.environ.get("GIO_SNAP_DAYS", "8"))   # giữ 8 ngày để TB 7 ngày (mũi tên BC/AM)
         keep_days = int(os.environ.get("GIO_KEEP_DAYS", "14"))
         cut_snap = (today - timedelta(days=snap_days)).isoformat()
         cut_del = (today - timedelta(days=keep_days)).isoformat()
@@ -285,8 +285,40 @@ def _fetch_hour_vs_yesterday(hour):
         if isinstance(x.get("snap"), dict):
             out["snap"] = x["snap"]          # toàn bộ chỉ số dải cùng giờ hôm qua
         if isinstance(x.get("bcsnap"), dict):
-            out["bcsnap"] = x["bcsnap"]      # %GTC từng bưu cục cùng giờ hôm qua
+            out["bcsnap"] = x["bcsnap"]      # (không dùng cho mũi tên nữa — xem _fetch_hour_bc_avg)
         return out or None
+    except Exception:
+        return None
+
+
+def _fetch_hour_bc_avg(hour, days=7):
+    """TRUNG BÌNH %GTC từng BƯU CỤC tại GIỜ này qua `days` ngày gần nhất (KHÔNG gồm hôm nay).
+    Gộp Σgtc/Σtotal (pooled — ổn định hơn trung bình ratio, tránh nhiễu ngày ít đơn).
+    Trả {bc: [Σgtc, Σtotal]} (AM/Tỉnh = tổng BC con). Đầy dần tới đủ 7 ngày. None nếu trống."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key):
+        return None
+    try:
+        import requests
+        from datetime import timedelta
+        today = datetime.now(VN).date()
+        since = (today - timedelta(days=days)).isoformat()
+        yest = (today - timedelta(days=1)).isoformat()
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=bcsnap&gio=eq.%d"
+                         "&ngay=gte.%s&ngay=lte.%s" % (url, hour, since, yest),
+                         headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=20)
+        if not r.ok:
+            return None
+        agg = {}
+        for row in r.json():
+            bs = row.get("bcsnap")
+            if not isinstance(bs, dict):
+                continue
+            for bc, gt in bs.items():
+                if isinstance(gt, (list, tuple)) and len(gt) >= 2:
+                    z = agg.setdefault(bc, [0, 0]); z[0] += gt[0]; z[1] += gt[1]
+        return agg or None
     except Exception:
         return None
 
@@ -790,13 +822,14 @@ async def fetch_live(token):
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
-             fc_uplift=None, pace=None, cmp_y=None):
+             fc_uplift=None, pace=None, cmp_y=None, bc_avg=None):
     now = datetime.now(VN)
-    # SO CÙNG GIỜ HÔM QUA chỉ hiện từ ~10h sáng (ENV CMP_MIN_HOUR): trước đó %GTC luỹ kế
-    # biến động mạnh do 'sóng gán đơn' đầu ngày (mẫu số nhảy vọt) → so sánh dễ hiểu nhầm.
+    # SO CÙNG GIỜ HÔM QUA / TB 7 NGÀY chỉ hiện từ ~10h sáng (ENV CMP_MIN_HOUR): trước đó %GTC
+    # luỹ kế biến động mạnh do 'sóng gán đơn' đầu ngày (mẫu số nhảy vọt) → so sánh dễ hiểu nhầm.
     # Tắt sớm = dòng ⏱, chip dải .sd, mũi tên thẻ .ga đều ẩn tới khi đủ giờ.
     if now.hour < float(os.environ.get("CMP_MIN_HOUR", "10")):
         cmp_y = None
+        bc_avg = None
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
     prov = {}
@@ -1428,9 +1461,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  % (href, rgb, ic, nm, sub, spark))
     P.append("</div>")
 
-    # ===== Mũi tên %GTC SO CÙNG GIỜ HÔM QUA cho thẻ AM / Tỉnh / Bưu cục =====
-    # ▲ xanh = %GTC tốt hơn cùng giờ hôm qua · ▼ đỏ = kém hơn. Đầy đủ từ ngày có snap hôm qua.
-    _ybc = (cmp_y or {}).get("bcsnap") or {}
+    # ===== Mũi tên %GTC SO TB CÙNG GIỜ 7 NGÀY cho thẻ AM / Tỉnh / Bưu cục =====
+    # ▲ xanh = %GTC tốt hơn mức TB cùng giờ 7 ngày · ▼ đỏ = kém hơn. Đầy dần tới đủ 7 ngày.
+    # Nguồn: bc_avg = {bc:[Σgtc,Σtotal]} pooled 7 ngày; AM/Tỉnh = tổng BC con.
+    _ybc = bc_avg or {}
     _y_am, _y_prov = {}, {}
     for _bcn, _gt in _ybc.items():
         if not (isinstance(_gt, (list, tuple)) and len(_gt) >= 2):
@@ -1441,7 +1475,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         z = _y_prov.setdefault(_prov(_bcn), [0, 0]); z[0] += _gt[0]; z[1] += _gt[1]
 
     def _gtc_arrow(tg, tt, yv):
-        """Mũi tên %GTC today vs cùng giờ hôm qua. yv=[gtc,total]. ▲ xanh=tốt hơn·▼ đỏ=kém."""
+        """Mũi tên %GTC today vs TB cùng giờ 7 ngày. yv=[Σgtc,Σtotal] pooled. ▲ xanh=tốt·▼ đỏ=kém."""
         if not (isinstance(yv, (list, tuple)) and len(yv) >= 2):
             return ""
         tp = _pct(tg, tt); yp2 = _pct(yv[0], yv[1])
@@ -1449,9 +1483,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             return ""
         d = round(tp - yp2, 1)
         if d == 0:
-            return "<span class='ga fl'>▬</span>"
+            return "<span class='ga fl' title='= TB 7 ngày cùng giờ'>▬</span>"
         up = d > 0
-        return "<span class='ga %s'>%s%sđ</span>" % (
+        return "<span class='ga %s' title='so TB 7 ngày cùng giờ'>%s%sđ</span>" % (
             "up" if up else "dn", "▲" if up else "▼", ("%.1f" % abs(d)).replace(".", ","))
 
     # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
@@ -2003,8 +2037,10 @@ def main():
         fc_uplift = _fetch_hour_uplift(datetime.now(VN).hour)
         # NHỊP ĐỘ: đọc SAU khi lưu (bản vừa lưu bị loại vì cách <30'); cần mốc giờ trước.
         pace = _fetch_today_rate(_gtc_now)
-        # SO CÙNG GIỜ HÔM QUA: đọc bao_cao_gio hôm qua tại giờ này.
+        # SO CÙNG GIỜ HÔM QUA: đọc bao_cao_gio hôm qua tại giờ này (cho dòng ⏱ + chip dải).
         cmp_y = _fetch_hour_vs_yesterday(datetime.now(VN).hour)
+        # Mũi tên BC/AM/Tỉnh: so TRUNG BÌNH cùng giờ 7 NGÀY gần nhất (tổng quan chính xác hơn).
+        bc_avg = _fetch_hour_bc_avg(datetime.now(VN).hour)
         # Dọn bao_cao_gio cho gọn — 1 lần/ngày (khung 6h sáng, slot đầu ngày).
         if datetime.now(VN).hour == 6:
             _prune_bao_cao_gio()
@@ -2043,7 +2079,7 @@ def main():
     except Exception as e:
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
-                 fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y)
+                 fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
