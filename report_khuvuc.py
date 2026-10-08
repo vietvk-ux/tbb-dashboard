@@ -219,6 +219,31 @@ def build_html(days):
     top_dist = sorted(dist.items(), key=lambda x: -x[1][0])[:12]
     dmax = top_dist[0][1][0] if top_dist else 1
 
+    # ----- GỘP 30 ngày cho BẢN ĐỒ NHIỆT + DRILL + dải chỉ số (đồng bộ bảng — 08/10) -----
+    cell_agg = collections.defaultdict(lambda: [0, 0, 0.0, 0.0])  # (gy,gx)->[n,g,Σlat*n,Σlng*n]
+    prov_agg = collections.defaultdict(lambda: [0, 0, 0.0, 0.0])  # city->[n,g,Σlat*n,Σlng*n]
+    nv_agg = collections.defaultdict(lambda: [0, 0])              # (bc,nv,dist,ward)->[n,g]
+    tot30 = gtc30 = 0
+    for d in days:
+        tot30 += d.get("tot", 0); gtc30 += d.get("gtc", 0)
+        for lat, lng, n, g in d.get("cells", []):
+            gy = round(lat / CELL); gx = round(lng / CELL)
+            c = cell_agg[(gy, gx)]; c[0] += n; c[1] += g; c[2] += lat * n; c[3] += lng * n
+        for p in d.get("provs", []):
+            if len(p) >= 5 and isinstance(p[3], (int, float)):
+                a = prov_agg[p[0]]; a[0] += p[1]; a[1] += p[2]; a[2] += p[3] * p[1]; a[3] += p[4] * p[1]
+        for bc, nv, dd, ww, n, g in d.get("nv", []):
+            a = nv_agg[(bc, nv, dd, ww)]; a[0] += n; a[1] += g
+    cells_all = [[round(c[2] / c[0], 4), round(c[3] / c[0], 4), c[0], c[1]]
+                 for c in cell_agg.values() if c[0] > 0]
+    _la = [c[0] for c in cells_all]; _lo = [c[1] for c in cells_all]
+    bbox_all = ({"minLat": min(_la), "maxLat": max(_la), "minLng": min(_lo), "maxLng": max(_lo)}
+                if cells_all else None)
+    provs_all = [[nm, v[0], v[1], (v[2] / v[0] if v[0] else None), (v[3] / v[0] if v[0] else None)]
+                 for nm, v in prov_agg.items()]
+    nv_all = [(bc, nv, dd, ww, v[0], v[1]) for (bc, nv, dd, ww), v in nv_agg.items()]
+    nward30 = len(ward_agg)
+
     P = []
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
     P.append("<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>")
@@ -232,17 +257,17 @@ def build_html(days):
     P.append("<div class='note'>Phân tích GTC theo <b>xã/phường</b> &amp; toạ độ giao hàng · gom mức xã trở lên "
              "(không lộ địa chỉ/GPS từng khách) · lưu 30 ngày · nguồn nhanh.ghn.vn.</div>")
 
-    # dải chỉ số ngày mới nhất
-    lp = _pct(latest["gtc"], latest["tot"])
+    # dải chỉ số — TỔNG 30 ngày (đồng bộ)
+    lp = _pct(gtc30, tot30)
     P.append("<section class='strip'>")
-    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📦 Đơn giao</div></div>" % _n(latest["tot"]))
-    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ GTC</div></div>" % _n(latest["gtc"]))
-    P.append("<div class='st'><div class='sv %s'>%d%%</div><div class='sl'>🎯 %%GTC</div></div>" % (_cls(lp), lp))
-    P.append("<div class='st'><div class='sv'>%d</div><div class='sl'>🏘 Xã/phường</div></div>" % len(latest["wards"]))
+    P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>📦 Đơn giao · %dng</div></div>" % (_n(tot30), nday))
+    P.append("<div class='st'><div class='sv good'>%s</div><div class='sl'>✅ GTC · %dng</div></div>" % (_n(gtc30), nday))
+    P.append("<div class='st'><div class='sv %s'>%d%%</div><div class='sl'>🎯 %%GTC TB</div></div>" % (_cls(lp), lp))
+    P.append("<div class='st'><div class='sv'>%d</div><div class='sl'>🏘 Xã/phường</div></div>" % nward30)
     P.append("</section>")
 
-    # ----- BẢN ĐỒ NHIỆT -----
-    P.append("<div class='sec'>🔥 Bản đồ nhiệt · ngày %s</div>" % _fmt(latest["ngay"]))
+    # ----- BẢN ĐỒ NHIỆT (tích luỹ 30 ngày) -----
+    P.append("<div class='sec'>🔥 Bản đồ nhiệt · tích luỹ %d ngày gần nhất</div>" % nday)
     P.append("<div class='tabs'><div class='tab on' id='tA' onclick='setMode(0)'>🌡 Mật độ đơn</div>"
              "<div class='tab' id='tB' onclick='setMode(1)'>🎯 %GTC khu vực</div></div>")
     P.append("<div class='mapwrap' id='mw'><canvas id='cv'></canvas></div>")
@@ -289,7 +314,7 @@ def build_html(days):
     # ----- DRILL AM → BƯU CỤC → NV × XÃ -----
     P.append("<div class='sec'>👤 GTC theo AM → Bưu cục → Nhân viên (theo xã/phường) · bấm mở</div>")
     by_bc = collections.defaultdict(list)
-    for bc, nv, dist, ward, n, g in latest["nv"]:
+    for bc, nv, dist, ward, n, g in nv_all:
         by_bc[bc].append((nv, dist, ward, n, g))
 
     def _bc_pct(bc):
@@ -350,11 +375,12 @@ def build_html(days):
     P.append("<div class='foot'>%GTC = giao thành công / tổng đơn giao (gộp theo mã đơn) · địa bàn chính = huyện nhiều đơn nhất của NV<br>"
              "dữ liệu chốt cuối ngày · lưu 30 ngày gần nhất</div>")
 
-    # data cho canvas heatmap (ngày mới nhất)
-    hd = {"cells": [[c[0], c[1], c[2], c[3]] for c in latest["cells"]],
-          "bbox": latest["bbox"] or {"minLat": 20, "maxLat": 23, "minLng": 102, "maxLng": 106},
+    # data cho canvas heatmap (tích luỹ 30 ngày)
+    _provs_sorted = sorted(provs_all, key=lambda p: -p[1])
+    hd = {"cells": [[c[0], c[1], c[2], c[3]] for c in cells_all],
+          "bbox": bbox_all or {"minLat": 20, "maxLat": 23, "minLng": 102, "maxLng": 106},
           "provs": [{"name": p[0], "n": p[1], "lat": p[3], "lng": p[4]}
-                    for p in latest["provs"][:8] if len(p) > 4 and p[3] is not None and p[1] >= 200]}
+                    for p in _provs_sorted[:8] if len(p) > 4 and p[3] is not None and p[1] >= 200]}
     P.append("<script>var HD=%s;</script>" % json.dumps(hd, ensure_ascii=False, separators=(",", ":")))
     P.append(_JS)
     P.append("</div></body></html>")
