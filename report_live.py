@@ -175,7 +175,30 @@ def _store_weight(kg):
         pass
 
 
-def _store_hourly_pct(pct, gtc=None, total=None, g120=None):
+def _region_snapshot(rows, giao_120h=None):
+    """Snapshot toàn bộ chỉ số DẢI của vùng (để lưu theo giờ → so cùng giờ hôm qua).
+    Khớp đúng cách tính trong gen_html (R + on_road/late/nv_low/vpct)."""
+    tot = gtc = vngh = vgtc = cod = ltc = ltb = ontrip = 0
+    ot_tot = ot_done = late = nv_low = 0
+    for r in rows:
+        tot += r.get("total", 0); gtc += r.get("gtc", 0); ontrip += r.get("ontrip", 0)
+        vngh += r.get("vngh", 0); vgtc += r.get("vngh_gtc", 0); cod += r.get("cod_gtb", 0)
+        ltc += r.get("ltc", 0); ltb += r.get("ltb", 0)
+        for d in r.get("drivers", []):
+            ot_tot += d.get("ot_tot", 0); ot_done += d.get("ot_done", 0)
+            st = d.get("st")
+            if st is not None and (st.hour * 60 + st.minute) > 570:
+                late += 1
+            if d.get("total", 0) >= 20:
+                p = _pct(d.get("gtc", 0), d["total"])
+                if p is not None and p < 50:
+                    nv_low += 1
+    return {"total": tot, "ontrip": ontrip, "on_road": max(ot_tot - ot_done, 0), "gtc": gtc,
+            "late": late, "vngh": vngh, "vngh_gtc": vgtc, "vpct": _pct(vgtc, vngh),
+            "cod_gtb": cod, "ltc": ltc, "ltb": ltb, "nv_low": nv_low, "g120": giao_120h}
+
+
+def _store_hourly_pct(pct, gtc=None, total=None, g120=None, snap=None):
     """Ghi %GTC HIỆN TẠI theo GIỜ vào bao_cao_gio (upsert theo ngay+gio → giữ bản mới nhất
     trong giờ đó) → để DỰ BÁO về đích + đo NHỊP ĐỘ (đơn/giờ) + SO CÙNG GIỜ HÔM QUA. Cũng lưu
     gtc/total/phut/g120 (nếu đã migrate); cột thiếu → tự lùi về bản chỉ pct. Lỗi → êm."""
@@ -187,7 +210,7 @@ def _store_hourly_pct(pct, gtc=None, total=None, g120=None):
         import requests
         now = datetime.now(VN)
         base = {"ngay": now.date().isoformat(), "gio": now.hour, "pct_gtc": round(pct, 1)}
-        rich = dict(base, gtc=gtc, total=total, phut=now.minute, g120=g120)
+        rich = dict(base, gtc=gtc, total=total, phut=now.minute, g120=g120, snap=snap)
         hdr = {"apikey": key, "Authorization": "Bearer " + key,
                "Content-Type": "application/json",
                "Prefer": "resolution=merge-duplicates,return=minimal"}
@@ -211,7 +234,7 @@ def _fetch_hour_vs_yesterday(hour):
         import requests
         from datetime import timedelta
         y = (datetime.now(VN).date() - timedelta(days=1)).isoformat()
-        r = requests.get("%s/rest/v1/bao_cao_gio?select=pct_gtc,gtc,total,g120"
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=pct_gtc,gtc,total,g120,snap"
                          "&ngay=eq.%s&gio=eq.%d" % (url, y, hour),
                          headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=20)
         if not r.ok or not r.json():
@@ -223,6 +246,8 @@ def _fetch_hour_vs_yesterday(hour):
         for k in ("gtc", "total", "g120"):
             if x.get(k) is not None:
                 out[k] = x[k]
+        if isinstance(x.get("snap"), dict):
+            out["snap"] = x["snap"]          # toàn bộ chỉ số dải cùng giờ hôm qua
         return out or None
     except Exception:
         return None
@@ -1270,28 +1295,55 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     NEU, AMBER, RED, GREEN = "128,140,174", "247,185,85", "242,88,95", "47,208,122"
     xp_rgb = RED if late_cnt else NEU                       # xuất phát muộn: đỏ khi >0
     tt_rgb = {"good": GREEN, "warn": AMBER, "bad": RED}.get(_cls(vpct), NEU) if vpct is not None else NEU
-    #      icon, giá trị, nhãn, màu rgb, extra, neu(ô trung tính)
+    #      icon, giá trị, nhãn, màu rgb, extra, neu, key(snap), raw(số nay), up_good
     kpis = [
-        ("📥", _n(R["total"]),                                       "Đã gán",          NEU,     "",   True),
-        ("🏃", _n(R["ontrip"]),                                      "Đang chạy",       NEU,     "",   True),
-        ("🚛", _n(on_road),                                          "Còn phải giao",   NEU,     "",   True),
-        ("✅", _n(R["gtc"]),                                         "GTC nay",         NEU,     "",   True),
-        ("🕘", _n(late_cnt),                                         "XP muộn &gt;9h30",xp_rgb,  "",   not late_cnt),
-        ("🛍️", _n(R["vngh"]),                                       "TikTok gán",      NEU,     "",   True),
-        ("🛍️", _n(R["vngh_gtc"]),                                   "TikTok GTC",      NEU,     "",   True),
-        ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"),      "%GTC TikTok",     tt_rgb,  "",   vpct is None),
-        ("💰", _codm(R["cod_gtb"]),                       "COD GTB",         AMBER,   "",   False),
-        ("🛒", _n(R["ltc"]),                                         "LTC",             NEU,     "",   True),
-        ("📦", _n(R["ltb"]),                                         "LTB",  (RED if R["ltb"] else NEU), "", not R["ltb"]),
-        ("📉", _n(nv_low),                                           "NV %GTC &lt;50%", (RED if nv_low else NEU), "", not nv_low),
+        ("📥", _n(R["total"]),     "Đã gán",          NEU,   "", True,  "total",    R["total"],    None),
+        ("🏃", _n(R["ontrip"]),    "Đang chạy",       NEU,   "", True,  "ontrip",   R["ontrip"],   None),
+        ("🚛", _n(on_road),        "Còn phải giao",   NEU,   "", True,  "on_road",  on_road,       False),
+        ("✅", _n(R["gtc"]),       "GTC nay",         NEU,   "", True,  "gtc",      R["gtc"],      True),
+        ("🕘", _n(late_cnt),       "XP muộn &gt;9h30",xp_rgb,"", not late_cnt, "late", late_cnt,   False),
+        ("🛍️", _n(R["vngh"]),     "TikTok gán",      NEU,   "", True,  "vngh",     R["vngh"],     None),
+        ("🛍️", _n(R["vngh_gtc"]), "TikTok GTC",      NEU,   "", True,  "vngh_gtc", R["vngh_gtc"], True),
+        ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"), "%GTC TikTok", tt_rgb, "", vpct is None, "vpct", vpct, True),
+        ("💰", _codm(R["cod_gtb"]),"COD GTB",         AMBER, "", False, "cod_gtb",  R["cod_gtb"],  False),
+        ("🛒", _n(R["ltc"]),       "LTC",             NEU,   "", True,  "ltc",      R["ltc"],      True),
+        ("📦", _n(R["ltb"]),       "LTB",  (RED if R["ltb"] else NEU), "", not R["ltb"], "ltb", R["ltb"], False),
+        ("📉", _n(nv_low),         "NV %GTC &lt;50%", (RED if nv_low else NEU), "", not nv_low, "nv_low", nv_low, False),
     ]
+    # Snapshot CÙNG GIỜ HÔM QUA (để so ▲/▼ mỗi ô) — đầy đủ từ ngày sau khi bắt đầu log snap.
+    ysnap = (cmp_y or {}).get("snap") or {}
+
+    def _sd(raw, y, up_good, is_pct=False):
+        """Chip ▲/▼ so cùng giờ hôm qua. is_pct → chênh điểm; khác → % tương đối."""
+        if y is None or raw is None:
+            return ""
+        if is_pct:
+            d = round(raw - y, 1)
+            if d == 0:
+                return "<div class='sd fl'>▬</div>"
+            up = d > 0
+            mag = ("%.1f" % abs(d)).replace(".", ",") + "đ"
+        else:
+            if abs(y) < 5:              # baseline quá nhỏ → % vô nghĩa
+                return ""
+            pc = round((raw - y) * 100.0 / abs(y))
+            if pc == 0:
+                return "<div class='sd fl'>▬</div>"
+            if abs(pc) > 999:
+                pc = 999 if pc > 0 else -999
+            up = pc > 0
+            mag = "%d%%" % abs(pc)
+        cls = "nt" if up_good is None else ("up" if (up == up_good) else "dn")
+        return "<div class='sd %s'>%s%s</div>" % (cls, "▲" if up else "▼", mag)
+
     P.append("<div class='sectitle'>📊 Chỉ số quan trọng của vùng</div>")
     P.append("<section class='strip'>")
-    for ic, val, lab, rgb, extra, neu in kpis:
+    for ic, val, lab, rgb, extra, neu, key, raw, up_good in kpis:
         cls = "st" + (" cg" if extra == "cg" else "") + (" neu" if neu else "")
         oc = (" " + _cgo) if extra == "cg" else ""
+        sd = _sd(raw, ysnap.get(key), up_good, is_pct=(key == "vpct")) if key else ""
         P.append("<div class='%s' style='--h:%s'%s><div class='sv'>%s</div>"
-                 "<div class='sl'>%s %s</div></div>" % (cls, rgb, oc, val, ic, lab))
+                 "<div class='sl'>%s %s</div>%s</div>" % (cls, rgb, oc, val, ic, lab, sd))
     P.append("</section>")
 
     # ===== 🏤 BẢNG TỔNG QUÁT BƯU CỤC — ô NỔI BẬT, DƯỚI dải 'Chỉ số quan trọng' (bung scorecard AM→BC) =====
@@ -1645,6 +1697,13 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:rgb(var(--h))}
 .sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
 .sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
+/* chip ▲/▼ so cùng giờ hôm qua trên mỗi ô dải chỉ số */
+.sd{margin-top:4px;font-size:9.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+ display:inline-block;padding:1px 5px;border-radius:7px;line-height:1.35}
+.sd.up{color:var(--good);background:rgba(23,201,131,.14)}
+.sd.dn{color:var(--bad);background:rgba(245,69,92,.14)}
+.sd.nt{color:var(--mut);background:rgba(255,255,255,.07)}
+.sd.fl{color:var(--mut);background:rgba(255,255,255,.05)}
 
 .eod{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--txt);
  background:linear-gradient(135deg,#20264a,#191f38);border:1px solid #313a63;border-radius:14px;
@@ -1857,7 +1916,8 @@ def main():
         _gtc_now = sum(r["gtc"] for r in rows)
         _tot_now = sum(r["total"] for r in rows)
         _rp_now = _pct(_gtc_now, _tot_now)
-        _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now, g120=giao_120h)
+        _snap_now = _region_snapshot(rows, giao_120h)
+        _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now, g120=giao_120h, snap=_snap_now)
         fc_uplift = _fetch_hour_uplift(datetime.now(VN).hour)
         # NHỊP ĐỘ: đọc SAU khi lưu (bản vừa lưu bị loại vì cách <30'); cần mốc giờ trước.
         pace = _fetch_today_rate(_gtc_now)
