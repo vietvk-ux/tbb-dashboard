@@ -1274,31 +1274,62 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         sl_don = [t.get("don_giao") for t in trend]
         sl_ttg = [t.get("tiktok_gtc") for t in trend]
         if any(v is not None for v in sl_don):
-            # Bung chi tiết AM → bưu cục: đơn ĐÃ GÁN + CHƯA GÁN GIAO (số đơn).
+            # Bung AM → bưu cục → XÃ/PHƯỜNG: đơn ĐÃ GÁN + CHƯA GÁN + TỔNG.
             sl_am = {}
             for r in rows:
-                dg = r.get("total", 0); cg = r.get("backlog", 0)
-                if dg > 0 or cg > 0:
-                    sl_am.setdefault(AM_OF.get(r["name"]) or "(chưa phân AM)", []).append((r["name"], dg, cg))
+                if r.get("total", 0) > 0 or r.get("backlog", 0) > 0:
+                    sl_am.setdefault(AM_OF.get(r["name"]) or "(chưa phân AM)", []).append(r)
             _in_sld = ""
             if sl_am:
                 S = []
-                for amn, bcs in sorted(sl_am.items(), key=lambda kv: -sum(x[1] for x in kv[1])):
-                    a_dg = sum(x[1] for x in bcs); a_cg = sum(x[2] for x in bcs)
+                for amn, brows in sorted(sl_am.items(), key=lambda kv: -sum(x.get("total", 0) for x in kv[1])):
+                    a_dg = sum(x.get("total", 0) for x in brows)
+                    a_cg = sum(x.get("backlog", 0) for x in brows)
                     S.append("<details class='bc'><summary>"
                              "<div class='bch'><span class='dot' style='background:#22d3ee'></span>"
                              "<span class='bcn'>🧑‍💼 %s</span></div>"
                              "<div class='bcm'><span>📦 đã gán <b class='ltc'>%s</b></span>"
-                             "<span>⏳ chưa gán <b class='w'>%s</b></span></div>"
-                             "</summary><div class='dtl'>" % (_esc(amn), _n(a_dg), _n(a_cg)))
-                    S.append("<table class='drv'><thead><tr><th class='lft'>Bưu cục</th>"
-                             "<th>Đã gán</th><th>Chưa gán</th></tr></thead><tbody>")
-                    for bcn, dg, cg in sorted(bcs, key=lambda x: -x[1]):
-                        S.append("<tr><td class='nv'>%s</td><td><b class='ltc'>%s</b></td>"
-                                 "<td><b class='w'>%s</b></td></tr>" % (_esc(bcn), _n(dg), _n(cg)))
-                    S.append("</tbody></table></div></details>")
+                             "<span>⏳ chưa gán <b class='w'>%s</b></span>"
+                             "<span>Σ tổng <b>%s</b></span></div>"
+                             "</summary><div class='dtl'>" % (_esc(amn), _n(a_dg), _n(a_cg), _n(a_dg + a_cg)))
+                    for r in sorted(brows, key=lambda x: -x.get("total", 0)):
+                        b_dg = r.get("total", 0); b_cg = r.get("backlog", 0)
+                        # Đã gán theo xã (gộp từ drivers' wards[xã][0]) + chưa gán theo xã (backlog_wards)
+                        w_dg = {}
+                        for d in r.get("drivers", []):
+                            for ward, gv in d.get("wards", {}).items():
+                                if gv and gv[0] > 0:
+                                    w_dg[ward] = w_dg.get(ward, 0) + gv[0]
+                        w_cg = {}
+                        for ward, cnt in r.get("backlog_wards", []):
+                            w_cg[ward] = w_cg.get(ward, 0) + cnt
+                        allw = set(w_dg) | set(w_cg)
+                        inner = ""
+                        if allw:
+                            wr = sorted(((w, w_dg.get(w, 0), w_cg.get(w, 0)) for w in allw),
+                                        key=lambda x: -(x[1] + x[2]))
+                            I = ["<table class='drv'><thead><tr><th class='lft'>Xã/phường</th>"
+                                 "<th>Đã gán</th><th>Chưa gán</th><th>Tổng</th></tr></thead><tbody>"]
+                            for w, dg, cg in wr:
+                                I.append("<tr><td class='nv'>%s</td><td><b class='ltc'>%s</b></td>"
+                                         "<td><b class='w'>%s</b></td><td><b>%s</b></td></tr>"
+                                         % (_esc(w), _n(dg), _n(cg), _n(dg + cg)))
+                            I.append("</tbody></table>")
+                            inner = "".join(I)
+                        else:
+                            inner = "<div class='note'>Chưa có chi tiết xã (chuyến chưa bóc đủ).</div>"
+                        S.append("<details class='bc sub'><summary>"
+                                 "<div class='bch'><span class='dot' style='background:#22d3ee'></span>"
+                                 "<span class='bcn' style='font-size:14px'>%s</span></div>"
+                                 "<div class='bcm'><span>📦 đã gán <b class='ltc'>%s</b></span>"
+                                 "<span>⏳ chưa gán <b class='w'>%s</b></span>"
+                                 "<span>Σ <b>%s</b></span></div>"
+                                 "</summary><div class='dtl'>%s</div></details>"
+                                 % (_esc(r["name"]), _n(b_dg), _n(b_cg), _n(b_dg + b_cg), inner))
+                    S.append("</div></details>")
                 _in_sld = "".join(S)
-            P.append(_row("", "📦", "Sản lượng giao / ngày", "bấm xem AM → bưu cục · đã gán + chưa gán",
+            P.append(_row("", "📦", "Sản lượng giao / ngày",
+                          "bấm AM → bưu cục → xã · đã gán + chưa gán + tổng",
                           _spark(sl_don, "#22d3ee", w=60, h=22), _n(R["total"]) + _dc_sl, "", _in_sld))
         # Khối lượng (kg thực) đơn giao đã gán — ngay dưới Sản lượng · bung chi tiết AM→BC tại chỗ
         if R["weight_g"] > 0:
