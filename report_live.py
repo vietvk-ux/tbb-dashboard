@@ -1019,13 +1019,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             parts.append("<b>Backlog</b> %s <span class='cq %s'>%s</span>" % (_n(giao_120h), c, s))
         _miss = "" if ("total" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
                 " · <i>(Đã gán/GTC/Backlog đủ từ mai)</i>"
-        if parts:
-            P.append("<div class='hcmp'><span class='hvi'>⏱</span> "
-                     "<b>SO CÙNG GIỜ HÔM QUA · mốc %dh</b> · %s%s</div>"
-                     % (_ch, " · ".join(parts), _miss))
-
-        # CHI TIẾT THEO AM: %GTC từng AM today vs cùng giờ hôm qua (gộp bcsnap hôm qua → AM).
+        # CHI TIẾT THEO AM (bấm dòng ⏱ để xổ): %GTC + Đã gán + GTC từng AM vs cùng giờ hôm qua.
         _ybc_h = cmp_y.get("bcsnap") if isinstance(cmp_y.get("bcsnap"), dict) else None
+        _am_tbl = ""
         if _ybc_h:
             _yam_h = {}
             for _bc, _gt in _ybc_h.items():
@@ -1034,25 +1030,47 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                 _a = AM_OF.get(_bc)
                 if _a:
                     z = _yam_h.setdefault(_a, [0, 0]); z[0] += _gt[0]; z[1] += _gt[1]
-            _amc = []
+            _rows_am = []
             for _amn, _v in am.items():
-                _tp = _pct(_v["gtc"], _v["total"]); _yv = _yam_h.get(_amn)
-                _yp = _pct(_yv[0], _yv[1]) if _yv else None
+                _yv = _yam_h.get(_amn)
+                if not _yv:
+                    continue
+                _tp = _pct(_v["gtc"], _v["total"]); _yp = _pct(_yv[0], _yv[1])
                 if _tp is None or _yp is None:
                     continue
-                _amc.append((_amn, _tp, round(_tp - _yp, 1)))
-            _amc.sort(key=lambda x: x[2])          # AM tụt nhiều nhất lên đầu
-            if _amc:
-                _chips = []
-                for _amn, _tp, _dd in _amc:
-                    _cc, _ar = (("fl", "▬") if _dd == 0 else
-                                (("up", "▲") if _dd > 0 else ("dn", "▼")))
-                    _chips.append("<span class='amx %s'>%s <b>%s%%</b> %s%sđ</span>"
-                                  % (_cc, _esc(_amn), ("%g" % _tp).replace(".", ","),
-                                     _ar, ("%.1f" % abs(_dd)).replace(".", ",")))
-                P.append("<div class='hamc'><span class='hvi'>↳</span> "
-                         "<b>Theo AM</b> (so hôm qua, kém nhất → tốt nhất) · %s</div>"
-                         % "".join(_chips))
+                _rows_am.append((_amn, _v, _tp, _yp, _yv))
+            _rows_am.sort(key=lambda x: (x[2] - x[3]))   # %GTC tụt nhiều nhất → đầu
+
+            def _cqd(d, s, good_up=True, neutral=False, suffix=""):
+                cc = "nt" if neutral else ("fl" if d == 0 else ("up" if (d > 0) == good_up else "dn"))
+                return "<span class='cq %s'>%s%s</span>" % (cc, s, suffix)
+
+            if _rows_am:
+                _R2 = ["<table class='amtab'><thead><tr><th class='aml'>AM</th><th>%GTC</th>"
+                       "<th>Đã gán</th><th>GTC</th></tr></thead><tbody>"]
+                for _amn, _v, _tp, _yp, _yv in _rows_am:
+                    _dp, _sp = _dpp(_tp, _yp)
+                    _dg, _sg = _dpc(_v["total"], _yv[1])
+                    _dv, _sv = _dpc(_v["gtc"], _yv[0])
+                    _R2.append("<tr><td class='aml'>%s</td><td><b>%s%%</b> %s</td>"
+                               "<td>%s %s</td><td>%s %s</td></tr>"
+                               % (_esc(_amn), ("%g" % _tp).replace(".", ","),
+                                  _cqd(_dp, _sp, True, suffix="đ"),
+                                  _n(_v["total"]), _cqd(_dg, _sg, neutral=True),
+                                  _n(_v["gtc"]), _cqd(_dv, _sv, True)))
+                _R2.append("</tbody></table>")
+                _am_tbl = "".join(_R2)
+
+        if parts:
+            _sumline = ("<span class='hvi'>⏱</span> <b>SO CÙNG GIỜ HÔM QUA · mốc %dh</b> · %s%s"
+                        % (_ch, " · ".join(parts), _miss))
+            if _am_tbl:
+                P.append("<details class='hcmp cx'><summary>%s<span class='hcv'>▾</span></summary>"
+                         "<div class='amwrap'><div class='amnote'>Chi tiết từng AM · so cùng giờ "
+                         "hôm qua · %%GTC tụt nhiều nhất lên đầu</div>%s</div></details>"
+                         % (_sumline, _am_tbl))
+            else:
+                P.append("<div class='hcmp'>%s</div>" % _sumline)
 
     if trend and len(trend) >= 2:
         pcts = [t["pct"] for t in trend]
@@ -1711,18 +1729,19 @@ svg.spk{display:block}
 .hcmp .cq.dn{color:var(--bad);background:rgba(245,69,92,.14)}
 .hcmp .cq.fl{color:var(--mut);background:rgba(255,255,255,.06)}
 .hcmp .cq.nt{color:var(--txt);background:rgba(255,255,255,.08)}
-/* ↳ Chi tiết SO CÙNG GIỜ HÔM QUA theo từng AM */
-.hamc{margin-top:7px;font-size:11px;font-weight:600;color:var(--mut);line-height:1.9;
- padding:8px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.025)}
-.hamc>.hvi{font-size:13px}
-.hamc>b{font-family:Sora,sans-serif;font-size:10.5px;letter-spacing:.01em;color:var(--txt)}
-.amx{display:inline-block;margin:2px 3px 2px 0;padding:2px 8px;border-radius:8px;font-size:10.5px;
- font-weight:600;color:var(--txt);background:rgba(255,255,255,.05);border:1px solid var(--line);
- font-variant-numeric:tabular-nums;white-space:nowrap}
-.amx b{font-weight:800;margin:0 2px}
-.amx.up{border-color:rgba(23,201,131,.4)}.amx.up b{color:var(--good)}
-.amx.dn{border-color:rgba(245,69,92,.4)}.amx.dn b{color:var(--bad)}
-.amx.fl b{color:var(--mut)}
+/* ⏱ bấm xổ ra bảng chi tiết SO CÙNG GIỜ HÔM QUA theo từng AM */
+details.hcmp.cx>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px}
+details.hcmp.cx>summary::-webkit-details-marker{display:none}
+details.hcmp.cx .hcv{position:absolute;right:9px;top:8px;color:var(--mut);font-size:11px;transition:transform .2s}
+details.hcmp.cx[open] .hcv{transform:rotate(180deg)}
+.amwrap{margin-top:9px;border-top:1px solid var(--line);padding-top:9px;overflow-x:auto}
+.amnote{font-size:10px;color:var(--mut);margin-bottom:6px}
+table.amtab{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}
+table.amtab th,table.amtab td{padding:6px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}
+table.amtab th{color:var(--mut);font-weight:600;font-size:9.5px;text-transform:uppercase;letter-spacing:.02em}
+table.amtab th.aml,table.amtab td.aml{text-align:left;font-weight:700;color:var(--txt)}
+table.amtab tbody tr:last-child td{border-bottom:none}
+table.amtab td b{font-weight:800}
 /* ĐÈN TRẠNG THÁI */
 .verdict{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:4px 0 12px;border-radius:18px;
  background:linear-gradient(120deg,rgba(139,147,255,.18),var(--card));border:1px solid rgba(139,147,255,.34)}
