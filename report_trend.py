@@ -123,7 +123,7 @@ def _get_all(url, key, path, page=1000, order="id.asc"):
         offset += page
 
 
-def fetch_trend(days=90):
+def fetch_trend(days=60):   # chỉ lấy 60 ngày gần nhất cho biểu đồ xu hướng (08/10)
     url = os.environ.get("SUPABASE_URL", "").strip()
     key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
            or os.environ.get("SUPABASE_ANON_KEY", "").strip())
