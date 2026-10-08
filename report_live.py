@@ -613,6 +613,29 @@ async def fetch_giao_120h(session, hub_ids, token):
         return None
 
 
+async def fetch_lgt_weight(session, hub_ids, token):
+    """KHỐI LƯỢNG (kg thực, gram) TỒN ĐỌNG Lấy/Giao/Trả toàn vùng — 1 CALL get-general-info
+    gộp hết hub_ids (≤200). Trả bản gộp 'ALL' (nhiều hub) hoặc cộng các entry. Giao = DELIVER +
+    DELIVER_PRIORITY (ưu tiên giao). Trả về gram: {lay, giao, tra}. None nếu lỗi."""
+    try:
+        d = await _post(session, "/core/oss/v1/report/get-general-info",
+                        {"hub_ids": [str(h) for h in hub_ids], "view_mode": "WARD",
+                         "order_type": "ALL"}, hub_ids[0] if hub_ids else "1", token)
+        data = d.get("data") or []
+        alle = [e for e in data if str(e.get("hub_id") or "") == "ALL"]
+        use = alle if alle else data            # nhiều hub → chỉ entry ALL; 1 hub → entry đó
+        agg = {"PICK": 0, "DELIVER": 0, "DELIVER_PRIORITY": 0, "RETURN": 0}
+        for e in use:
+            for gi in (e.get("general_infos") or []):
+                ot = gi.get("order_type")
+                if ot in agg:
+                    agg[ot] += gi.get("total_weight") or 0
+        return {"lay": agg["PICK"], "giao": agg["DELIVER"] + agg["DELIVER_PRIORITY"],
+                "tra": agg["RETURN"]}
+    except Exception:
+        return None
+
+
 async def _giao120h_one(session, hid, token):
     """Giao>120h của 1 bưu cục (get-general-info hub đơn) → int; lỗi → 0. Dùng để drill AM→BC."""
     try:
@@ -818,12 +841,14 @@ async def fetch_live(token):
         rows = await asyncio.gather(*[one(h) for h in hubs])
         # Tổng Giao>120h = Σ per-hub (đã lấy trong one()) → khớp drill AM→BC.
         giao_120h = sum(r.get("giao120h", 0) for r in rows)
-        return rows, giao_120h
+        # Khối lượng tồn Lấy/Giao/Trả toàn vùng — 1 call gộp (hero).
+        lgt_w = await fetch_lgt_weight(session, [str(h["locationCode"]) for h in hubs], token)
+        return rows, giao_120h, lgt_w
 
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
-             fc_uplift=None, pace=None, cmp_y=None, bc_avg=None):
+             fc_uplift=None, pace=None, cmp_y=None, bc_avg=None, lgt_w=None):
     now = datetime.now(VN)
     # SO CÙNG GIỜ HÔM QUA / TB 7 NGÀY chỉ hiện từ ~10h sáng (ENV CMP_MIN_HOUR): trước đó %GTC
     # luỹ kế biến động mạnh do 'sóng gán đơn' đầu ngày (mẫu số nhảy vọt) → so sánh dễ hiểu nhầm.
@@ -932,6 +957,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='hsub'><b class='hn'>%s</b> / <b class='hn'>%s</b> đơn giao thành công · "
              "LTC <b class='hn'>%s</b> · cần giao <b class='hn'>%s</b></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
+    # ⚖️ Khối lượng TỒN ĐỌNG Lấy/Giao/Trả toàn vùng (kg thực) — ngay dưới subtext %GTC (08/10)
+    if lgt_w:
+        P.append("<div class='hlgt'><span class='hvi'>⚖️</span> Tồn kho <i>(kg thực)</i> · "
+                 "📥 Lấy <b>%s</b> · 🚚 Giao <b>%s</b> · ↩️ Trả <b>%s</b></div>"
+                 % (_kgfmt(lgt_w.get("lay", 0) / 1000.0), _kgfmt(lgt_w.get("giao", 0) / 1000.0),
+                    _kgfmt(lgt_w.get("tra", 0) / 1000.0)))
     # DẢI MỎNG ĐÁNH GIÁ (thay dòng 'Xu hướng 14 ngày...') — thông minh theo tiến độ ngày
     P.append("<div class='hverd %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
              % (vk, vic, vst, vsub))
@@ -1728,6 +1759,12 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
 .hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
 .hsub b.hn{color:#18c07a;font-weight:800;font-size:13.5px}
+.hlgt{margin-top:8px;font-size:11.5px;font-weight:600;color:var(--mut);line-height:1.5;
+ padding:7px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035);
+ font-variant-numeric:tabular-nums}
+.hlgt .hvi{font-size:13px}
+.hlgt i{font-style:normal;color:var(--mut);font-size:10px}
+.hlgt b{font-family:Sora,sans-serif;color:var(--txt);font-weight:800;font-size:12.5px;margin-left:1px}
 .hsub .ld{color:var(--txt);font-weight:700}
 .href{display:flex;flex-wrap:wrap;gap:6px 7px;margin-top:12px}
 .rc{font-size:11px;color:var(--mut);background:rgba(255,255,255,.05);border:1px solid var(--line);
@@ -2078,7 +2115,7 @@ def main():
     if not token:
         raise SystemExit("Thiếu NHANH_TOKEN")
     try:
-        rows, giao_120h = asyncio.run(fetch_live(token))
+        rows, giao_120h, lgt_w = asyncio.run(fetch_live(token))
         # NV cần xử lý (kém dai dẳng 14 ngày, đọc Supabase — có creds trong step live).
         # Supabase thiếu/lỗi → None → gen_html tự fallback về "NV <50% hôm nay".
         nv_xuly, _nvr, nvm = None, None, None
@@ -2178,7 +2215,7 @@ def main():
     except Exception as e:
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
-                 fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg)
+                 fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg, lgt_w=lgt_w)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
