@@ -205,10 +205,17 @@ def build_html(days):
     # ----- SỐ ĐƠN theo ngày (14 ngày) · màu cột theo %GTC ngày đó -----
     dord_series = [(d["ngay"][8:] + "/" + d["ngay"][5:7], d["tot"], _cls(_pct(d["gtc"], d["tot"])))
                    for d in days][-14:]
-    # ----- TOP HUYỆN/TP theo số đơn (ngày mới nhất) -----
+    # ----- GỘP TOÀN BỘ ngày đã tải (≤30) cho 3 bảng tổng quan Huyện/Xã (08/10) -----
+    nday = len(days)
+    ward_agg = collections.defaultdict(lambda: [0, 0])   # (huyện, xã) -> [đơn, gtc] cộng N ngày
+    for d in days:
+        for dd, w, n, g in d["wards"]:
+            a = ward_agg[(dd, w)]; a[0] += n; a[1] += g
+    wards_all = [(dd, w, nn, gg) for (dd, w), (nn, gg) in ward_agg.items()]
+    # Top Huyện/TP theo số đơn (tổng N ngày)
     dist = collections.defaultdict(lambda: [0, 0])
-    for dd, w, n, g in latest["wards"]:
-        dist[dd][0] += n; dist[dd][1] += g
+    for (dd, w), (nn, gg) in ward_agg.items():
+        dist[dd][0] += nn; dist[dd][1] += gg
     top_dist = sorted(dist.items(), key=lambda x: -x[1][0])[:12]
     dmax = top_dist[0][1][0] if top_dist else 1
 
@@ -248,7 +255,7 @@ def build_html(days):
     P.append("<div class='card'>%s</div>" % _svg_bars(dord_series, unit="đơn", vfmt=_n))
 
     # ----- TOP HUYỆN/TP THEO SỐ ĐƠN -----
-    P.append("<div class='sec'>🏙 Top 12 Huyện/Thành phố có đơn nhiều nhất · ngày %s</div>" % _fmt(latest["ngay"]))
+    P.append("<div class='sec'>🏙 Top 12 Huyện/Thành phố có đơn nhiều nhất · tổng %d ngày gần nhất</div>" % nday)
     P.append("<div class='tw'><table class='t'><thead><tr><th class='rk'>#</th><th class='l'>Huyện/TP</th>"
              "<th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
     for i, (dd, (n, g)) in enumerate(top_dist, 1):
@@ -260,8 +267,8 @@ def build_html(days):
     P.append("</tbody></table></div>")
 
     # ----- XÃ KHÓ GIAO -----
-    P.append("<div class='sec'>🔴 Xã/phường khó giao nhất · %GTC thấp → cao (≥20 đơn)</div>")
-    hard = sorted([w for w in latest["wards"] if w[2] >= 20], key=lambda w: _pct(w[3], w[2]))[:15]
+    P.append("<div class='sec'>🔴 Xã/phường khó giao DAI DẲNG · %%GTC thấp → cao (≥50 đơn / %d ngày)</div>" % nday)
+    hard = sorted([w for w in wards_all if w[2] >= 50], key=lambda w: _pct(w[3], w[2]))[:15]
     P.append("<div class='tw'><table class='t'><thead><tr><th class='l'>Huyện</th><th class='l'>Xã/Phường</th><th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
     for dist, ward, n, g in hard:
         p = _pct(g, n)
@@ -270,8 +277,8 @@ def build_html(days):
     P.append("</tbody></table></div>")
 
     # ----- TOP 20 XÃ ĐƠN NHIỀU NHẤT -----
-    P.append("<div class='sec'>📦 Top 20 xã/phường có đơn giao về nhiều nhất vùng</div>")
-    topw = sorted(latest["wards"], key=lambda w: -w[2])[:20]
+    P.append("<div class='sec'>📦 Top 20 xã/phường có đơn giao về nhiều nhất vùng · tổng %d ngày</div>" % nday)
+    topw = sorted(wards_all, key=lambda w: -w[2])[:20]
     P.append("<div class='tw'><table class='t'><thead><tr><th class='rk'>#</th><th class='l'>Huyện</th><th class='l'>Xã/Phường</th><th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
     for i, (dist, ward, n, g) in enumerate(topw, 1):
         p = _pct(g, n)
