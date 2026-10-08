@@ -301,15 +301,47 @@ def build_html(days):
                  "<td><span class='pill %s'>%d%%</span></td></tr>" % (_esc(dist), _esc(ward), n, g, _cls(p), p))
     P.append("</tbody></table></div>")
 
-    # ----- TOP 20 XÃ ĐƠN NHIỀU NHẤT -----
-    P.append("<div class='sec'>📦 Top 20 xã/phường có đơn giao về nhiều nhất vùng · tổng %d ngày</div>" % nday)
-    topw = sorted(wards_all, key=lambda w: -w[2])[:20]
-    P.append("<div class='tw'><table class='t'><thead><tr><th class='rk'>#</th><th class='l'>Huyện</th><th class='l'>Xã/Phường</th><th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
-    for i, (dist, ward, n, g) in enumerate(topw, 1):
-        p = _pct(g, n)
-        P.append("<tr><td class='rk'>%d</td><td class='l'>%s</td><td class='l'>%s</td><td><b>%d</b></td><td>%d</td>"
-                 "<td><span class='pill %s'>%d%%</span></td></tr>" % (i, _esc(dist), _esc(ward), n, g, _cls(p), p))
-    P.append("</tbody></table></div>")
+    # ----- ĐƠN GIAO theo AM → BƯU CỤC → XÃ/PHƯỜNG (bấm mở · gộp xã, không cấp NV) -----
+    P.append("<div class='sec'>📦 Đơn giao theo AM → Bưu cục → Xã/phường · tổng %d ngày · bấm mở</div>" % nday)
+    bcw = collections.defaultdict(lambda: collections.defaultdict(lambda: [0, 0]))  # bc->(dist,ward)->[n,g]
+    for bc, nv, dist, ward, n, g in nv_all:
+        a = bcw[bc][(dist, ward)]; a[0] += n; a[1] += g
+    am_bc2 = collections.defaultdict(list)
+    for bc in bcw:
+        am_bc2[AM_OF.get(bc) or "(chưa phân AM)"].append(bc)
+
+    def _bc2(bc):
+        return sum(v[0] for v in bcw[bc].values()), sum(v[1] for v in bcw[bc].values())
+
+    def _am2(am):
+        tt = gg = 0
+        for bc in am_bc2[am]:
+            t, g = _bc2(bc); tt += t; gg += g
+        return tt, gg
+    for am in sorted(am_bc2, key=lambda a: -_am2(a)[0]):          # AM nhiều đơn → đầu
+        at, ag = _am2(am); ap = _pct(ag, at)
+        P.append("<details class='bc %s'><summary><div class='bch'><span class='dot %s'></span>"
+                 "<span class='bcn'>%s</span><span class='pill %s'>%d%%</span></div>"
+                 "<div class='pmeta'>🏤 %d BC · 📦 %s đơn · ✅ %s GTC</div></summary><div class='dtl'>"
+                 % (_cls(ap), _cls(ap), _esc(am), _cls(ap), ap if ap is not None else 0,
+                    len(am_bc2[am]), _n(at), _n(ag)))
+        for bc in sorted(am_bc2[am], key=lambda b: -_bc2(b)[0]):  # BC nhiều đơn → đầu
+            bt, bg = _bc2(bc); bp = _pct(bg, bt)
+            wl = sorted(bcw[bc].items(), key=lambda kv: -kv[1][0])   # xã nhiều đơn → đầu
+            P.append("<details class='bc sub %s'><summary><div class='bch'><span class='dot %s'></span>"
+                     "<span class='bcn'>%s</span><span class='pill %s'>%d%%</span></div>"
+                     "<div class='pmeta'>🏘 %d xã · 📦 %s đơn · ✅ %s GTC</div></summary><div class='dtl'>"
+                     % (_cls(bp), _cls(bp), _esc(bc), _cls(bp), bp if bp is not None else 0,
+                        len(wl), _n(bt), _n(bg)))
+            P.append("<table class='drv'><thead><tr><th class='l'>Huyện</th><th class='l'>Xã/Phường</th>"
+                     "<th>Đơn</th><th>GTC</th><th>%GTC</th></tr></thead><tbody>")
+            for (dist, ward), (n, g) in wl:
+                p = _pct(g, n)
+                P.append("<tr><td class='l'>%s</td><td class='l'>%s</td><td><b>%s</b></td><td>%s</td>"
+                         "<td><span class='pill %s'>%d%%</span></td></tr>"
+                         % (_esc(dist), _esc(ward), _n(n), _n(g), _cls(p), p))
+            P.append("</tbody></table></div></details>")
+        P.append("</div></details>")
 
     # ----- DRILL AM → BƯU CỤC → NV × XÃ -----
     P.append("<div class='sec'>👤 GTC theo AM → Bưu cục → Nhân viên (theo xã/phường) · bấm mở</div>")
