@@ -945,8 +945,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _yg = cmp_y.get("g120")
         if _yg and _yg >= 100 and giao_120h is not None and giao_120h > _yg * 1.15:
             _oprisk.append("Backlog 120h ↑%d%%" % round((giao_120h - _yg) * 100.0 / _yg))
-    if _oprisk:
-        vsub = vsub + " · <b class='rk'>⚠️ %s</b>" % " · ".join(_oprisk)
 
     # ===== Hero %GTC + dải đánh giá + đường xu hướng 14 ngày (chốt cuối ngày) =====
     P.append("<section class='hero %s'>" % _cls(reg_pct))
@@ -963,9 +961,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  "📥 Lấy <b>%s</b> · 🚚 Giao <b>%s</b> · ↩️ Trả <b>%s</b></div>"
                  % (_kgfmt(lgt_w.get("lay", 0) / 1000.0), _kgfmt(lgt_w.get("giao", 0) / 1000.0),
                     _kgfmt(lgt_w.get("tra", 0) / 1000.0)))
-    # DẢI MỎNG ĐÁNH GIÁ (thay dòng 'Xu hướng 14 ngày...') — thông minh theo tiến độ ngày
-    P.append("<div class='hverd %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
-             % (vk, vic, vst, vsub))
+    # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
+    # (Bỏ dòng đánh giá thường ngày '🟡 CẦN CHÚ Ý · còn X điểm' 08/10 — trùng số %GTC + bar + chips.)
+    if _oprisk:
+        P.append("<div class='hverd bad'><span class='hvi'>⚠️</span> "
+                 "<b>RỦI RO VẬN HÀNH</b> · %s</div>" % " · ".join(_oprisk))
 
     # ===== 🎯 NHỊP ĐỘ CÁN ĐÍCH — tốc độ thực + "cần X đơn/giờ để chạm 70%" + dự phóng chốt =====
     # Cùng base với %GTC Hero (R["total"]). Chỉ hiện trong giờ vận hành (9h30 → giờ giao cao
