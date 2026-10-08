@@ -1109,6 +1109,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             else:
                 P.append("<div class='hcmp'>%s</div>" % _sumline)
 
+    # ⚡ ĐIỂM NÓNG CHÚ Ý — chèn vào ĐÂY (TRONG hero, ngay dưới ⏱ so cùng giờ). Nội dung tính ở
+    # dưới (cần am_pcts…) rồi ghi vào P[_diag_slot]. (Chuyển từ trên lưới vào hero 08/10.)
+    _diag_slot = len(P)
+    P.append("")
+
     if trend and len(trend) >= 2:
         pcts = [t["pct"] for t in trend]
         P.append("<div class='sparkwrap'>%s</div>" % _spark(pcts, "#fbbf24", w=280, h=50, target=70))
@@ -1254,10 +1259,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     _in_tld = _drill_am_bc(_group_am("ton_lay"), "warn", "warn", "%d bưu cục", "Số đơn")
     _in_ttd = _drill_am_bc(_group_am("ton_tra"), "warn", "warn", "%d bưu cục", "Số đơn")
 
-    # Chỗ đặt sẵn cho khối ĐIỂM NÓNG CHÚ Ý — đẩy LÊN TRÊN Tổng Quan Vận Hành (07/10).
-    # Phần tính toán vẫn ở dưới (cần am_pcts…); tại đó ghi vào P[_diag_slot] thay vì append cuối.
-    _diag_slot = len(P)
-    P.append("")
+    # (Điểm Nóng Chú Ý đã chuyển VÀO HERO 08/10 — placeholder _diag_slot nằm trong hero, dưới ⏱.)
     P.append("<div class='sectitle'>⚡ Tổng Quan Vận Hành Vùng TBB</div><section class='prilist'>")
     P.append(_row("bd", "🔴", "Backlog giao 120h", "bấm xem AM → bưu cục", g120_spark,
                   (_n(giao_120h) if giao_120h is not None else "—") + _dc_g120, "", _in_g120))
@@ -1863,9 +1865,9 @@ details.gt>summary::-webkit-details-marker{display:none}
 details.gt>summary:active{transform:scale(.997)}
 details.gt[open]{grid-column:1/-1}          /* bung → chiếm cả 2 cột */
 details.gt[open] .gtcar{transform:rotate(90deg);color:var(--txt)}
-.diag{background:radial-gradient(120% 100% at 0% 0%,rgba(255,255,255,.06),var(--card) 72%);
- border:1px solid var(--line);border-radius:14px;padding:10px 13px;margin:0 0 12px;
- font-size:12.5px;line-height:1.55;color:var(--mut)}
+.diag{background:rgba(255,255,255,.04);
+ border:1px solid var(--line);border-radius:11px;padding:8px 11px;margin:8px 0 0;
+ font-size:11.5px;line-height:1.55;color:var(--mut)}
 .diag b{color:var(--txt);font-weight:800}
 details.diag>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px}
 details.diag>summary::-webkit-details-marker{display:none}
