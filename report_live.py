@@ -1024,6 +1024,36 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      "<b>SO CÙNG GIỜ HÔM QUA · mốc %dh</b> · %s%s</div>"
                      % (_ch, " · ".join(parts), _miss))
 
+        # CHI TIẾT THEO AM: %GTC từng AM today vs cùng giờ hôm qua (gộp bcsnap hôm qua → AM).
+        _ybc_h = cmp_y.get("bcsnap") if isinstance(cmp_y.get("bcsnap"), dict) else None
+        if _ybc_h:
+            _yam_h = {}
+            for _bc, _gt in _ybc_h.items():
+                if not (isinstance(_gt, (list, tuple)) and len(_gt) >= 2):
+                    continue
+                _a = AM_OF.get(_bc)
+                if _a:
+                    z = _yam_h.setdefault(_a, [0, 0]); z[0] += _gt[0]; z[1] += _gt[1]
+            _amc = []
+            for _amn, _v in am.items():
+                _tp = _pct(_v["gtc"], _v["total"]); _yv = _yam_h.get(_amn)
+                _yp = _pct(_yv[0], _yv[1]) if _yv else None
+                if _tp is None or _yp is None:
+                    continue
+                _amc.append((_amn, _tp, round(_tp - _yp, 1)))
+            _amc.sort(key=lambda x: x[2])          # AM tụt nhiều nhất lên đầu
+            if _amc:
+                _chips = []
+                for _amn, _tp, _dd in _amc:
+                    _cc, _ar = (("fl", "▬") if _dd == 0 else
+                                (("up", "▲") if _dd > 0 else ("dn", "▼")))
+                    _chips.append("<span class='amx %s'>%s <b>%s%%</b> %s%sđ</span>"
+                                  % (_cc, _esc(_amn), ("%g" % _tp).replace(".", ","),
+                                     _ar, ("%.1f" % abs(_dd)).replace(".", ",")))
+                P.append("<div class='hamc'><span class='hvi'>↳</span> "
+                         "<b>Theo AM</b> (so hôm qua, kém nhất → tốt nhất) · %s</div>"
+                         % "".join(_chips))
+
     if trend and len(trend) >= 2:
         pcts = [t["pct"] for t in trend]
         P.append("<div class='sparkwrap'>%s</div>" % _spark(pcts, "#fbbf24", w=280, h=50, target=70))
@@ -1681,6 +1711,18 @@ svg.spk{display:block}
 .hcmp .cq.dn{color:var(--bad);background:rgba(245,69,92,.14)}
 .hcmp .cq.fl{color:var(--mut);background:rgba(255,255,255,.06)}
 .hcmp .cq.nt{color:var(--txt);background:rgba(255,255,255,.08)}
+/* ↳ Chi tiết SO CÙNG GIỜ HÔM QUA theo từng AM */
+.hamc{margin-top:7px;font-size:11px;font-weight:600;color:var(--mut);line-height:1.9;
+ padding:8px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.025)}
+.hamc>.hvi{font-size:13px}
+.hamc>b{font-family:Sora,sans-serif;font-size:10.5px;letter-spacing:.01em;color:var(--txt)}
+.amx{display:inline-block;margin:2px 3px 2px 0;padding:2px 8px;border-radius:8px;font-size:10.5px;
+ font-weight:600;color:var(--txt);background:rgba(255,255,255,.05);border:1px solid var(--line);
+ font-variant-numeric:tabular-nums;white-space:nowrap}
+.amx b{font-weight:800;margin:0 2px}
+.amx.up{border-color:rgba(23,201,131,.4)}.amx.up b{color:var(--good)}
+.amx.dn{border-color:rgba(245,69,92,.4)}.amx.dn b{color:var(--bad)}
+.amx.fl b{color:var(--mut)}
 /* ĐÈN TRẠNG THÁI */
 .verdict{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:4px 0 12px;border-radius:18px;
  background:linear-gradient(120deg,rgba(139,147,255,.18),var(--card));border:1px solid rgba(139,147,255,.34)}
