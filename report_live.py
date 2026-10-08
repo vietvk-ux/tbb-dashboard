@@ -1121,8 +1121,32 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         sl_don = [t.get("don_giao") for t in trend]
         sl_ttg = [t.get("tiktok_gtc") for t in trend]
         if any(v is not None for v in sl_don):
-            P.append(_row("", "📦", "Sản lượng giao / ngày", "", _spark(sl_don, "#22d3ee", w=60, h=22),
-                          _n(R["total"]) + _dc_sl, "", ""))
+            # Bung chi tiết AM → bưu cục: đơn ĐÃ GÁN + CHƯA GÁN GIAO (số đơn).
+            sl_am = {}
+            for r in rows:
+                dg = r.get("total", 0); cg = r.get("backlog", 0)
+                if dg > 0 or cg > 0:
+                    sl_am.setdefault(AM_OF.get(r["name"]) or "(chưa phân AM)", []).append((r["name"], dg, cg))
+            _in_sld = ""
+            if sl_am:
+                S = []
+                for amn, bcs in sorted(sl_am.items(), key=lambda kv: -sum(x[1] for x in kv[1])):
+                    a_dg = sum(x[1] for x in bcs); a_cg = sum(x[2] for x in bcs)
+                    S.append("<details class='bc'><summary>"
+                             "<div class='bch'><span class='dot' style='background:#22d3ee'></span>"
+                             "<span class='bcn'>🧑‍💼 %s</span></div>"
+                             "<div class='bcm'><span>📦 đã gán <b class='ltc'>%s</b></span>"
+                             "<span>⏳ chưa gán <b class='w'>%s</b></span></div>"
+                             "</summary><div class='dtl'>" % (_esc(amn), _n(a_dg), _n(a_cg)))
+                    S.append("<table class='drv'><thead><tr><th class='lft'>Bưu cục</th>"
+                             "<th>Đã gán</th><th>Chưa gán</th></tr></thead><tbody>")
+                    for bcn, dg, cg in sorted(bcs, key=lambda x: -x[1]):
+                        S.append("<tr><td class='nv'>%s</td><td><b class='ltc'>%s</b></td>"
+                                 "<td><b class='w'>%s</b></td></tr>" % (_esc(bcn), _n(dg), _n(cg)))
+                    S.append("</tbody></table></div></details>")
+                _in_sld = "".join(S)
+            P.append(_row("", "📦", "Sản lượng giao / ngày", "bấm xem AM → bưu cục · đã gán + chưa gán",
+                          _spark(sl_don, "#22d3ee", w=60, h=22), _n(R["total"]) + _dc_sl, "", _in_sld))
         # Khối lượng (kg thực) đơn giao đã gán — ngay dưới Sản lượng · bung chi tiết AM→BC tại chỗ
         if R["weight_g"] > 0:
             sl_kg = [t.get("weight_kg") for t in trend]
