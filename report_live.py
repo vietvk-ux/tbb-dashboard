@@ -204,6 +204,36 @@ def _bc_snapshot(rows):
             for r in rows if r.get("total", 0) > 0}
 
 
+def _prune_bao_cao_gio():
+    """Dọn bao_cao_gio cho GỌN — chỉ giữ đúng thời gian mỗi cột cần:
+    - snap/bcsnap (jsonb nặng) chỉ phục vụ so 'cùng giờ hôm qua' → giữ GIO_SNAP_DAYS ngày (mặc định 3),
+      cũ hơn thì XOÁ nội dung jsonb (NULL) để nhẹ.
+    - pct_gtc (nhẹ) phục vụ dự báo uplift (cần ~8 ngày) → giữ cả dòng GIO_KEEP_DAYS ngày (mặc định 14),
+      cũ hơn XOÁ hẳn dòng.
+    Chạy 1 lần/ngày (gọi có gate trong main). Lỗi/thiếu cột → bỏ qua êm."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key):
+        return
+    try:
+        import requests
+        from datetime import timedelta
+        today = datetime.now(VN).date()
+        snap_days = int(os.environ.get("GIO_SNAP_DAYS", "3"))
+        keep_days = int(os.environ.get("GIO_KEEP_DAYS", "14"))
+        cut_snap = (today - timedelta(days=snap_days)).isoformat()
+        cut_del = (today - timedelta(days=keep_days)).isoformat()
+        hdr = {"apikey": key, "Authorization": "Bearer " + key,
+               "Content-Type": "application/json", "Prefer": "return=minimal"}
+        # 1) NULL jsonb cũ (chỉ đụng dòng còn snap → lần sau là no-op)
+        requests.patch("%s/rest/v1/bao_cao_gio?ngay=lt.%s&snap=not.is.null" % (url, cut_snap),
+                       json={"snap": None, "bcsnap": None}, headers=hdr, timeout=20)
+        # 2) Xoá dòng quá cũ (có filter ngay → PostgREST cho phép)
+        requests.delete("%s/rest/v1/bao_cao_gio?ngay=lt.%s" % (url, cut_del), headers=hdr, timeout=20)
+    except Exception:
+        pass
+
+
 def _store_hourly_pct(pct, gtc=None, total=None, g120=None, snap=None, bcsnap=None):
     """Ghi %GTC HIỆN TẠI theo GIỜ vào bao_cao_gio (upsert theo ngay+gio → giữ bản mới nhất
     trong giờ đó) → để DỰ BÁO về đích + đo NHỊP ĐỘ (đơn/giờ) + SO CÙNG GIỜ HÔM QUA. Cũng lưu
@@ -1975,6 +2005,9 @@ def main():
         pace = _fetch_today_rate(_gtc_now)
         # SO CÙNG GIỜ HÔM QUA: đọc bao_cao_gio hôm qua tại giờ này.
         cmp_y = _fetch_hour_vs_yesterday(datetime.now(VN).hour)
+        # Dọn bao_cao_gio cho gọn — 1 lần/ngày (khung 6h sáng, slot đầu ngày).
+        if datetime.now(VN).hour == 6:
+            _prune_bao_cao_gio()
     except Exception as e:
         # Token hết hạn / API lỗi → rơi về snapshot Supabase thay vì để trang trắng/đọng.
         if _write_fallback(e):
