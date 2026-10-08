@@ -178,12 +178,12 @@ def _store_weight(kg):
 def _region_snapshot(rows, giao_120h=None):
     """Snapshot toàn bộ chỉ số DẢI của vùng (để lưu theo giờ → so cùng giờ hôm qua).
     Khớp đúng cách tính trong gen_html (R + on_road/late/nv_low/vpct)."""
-    tot = gtc = vngh = vgtc = cod = ltc = ltb = ontrip = 0
+    tot = gtc = vngh = vgtc = cod = ltc = ltb = ontrip = chua_gan = 0
     ot_tot = ot_done = late = nv_low = 0
     for r in rows:
         tot += r.get("total", 0); gtc += r.get("gtc", 0); ontrip += r.get("ontrip", 0)
         vngh += r.get("vngh", 0); vgtc += r.get("vngh_gtc", 0); cod += r.get("cod_gtb", 0)
-        ltc += r.get("ltc", 0); ltb += r.get("ltb", 0)
+        ltc += r.get("ltc", 0); ltb += r.get("ltb", 0); chua_gan += r.get("backlog", 0)
         for d in r.get("drivers", []):
             ot_tot += d.get("ot_tot", 0); ot_done += d.get("ot_done", 0)
             st = d.get("st")
@@ -195,7 +195,8 @@ def _region_snapshot(rows, giao_120h=None):
                     nv_low += 1
     return {"total": tot, "ontrip": ontrip, "on_road": max(ot_tot - ot_done, 0), "gtc": gtc,
             "late": late, "vngh": vngh, "vngh_gtc": vgtc, "vpct": _pct(vgtc, vngh),
-            "cod_gtb": cod, "ltc": ltc, "ltb": ltb, "nv_low": nv_low, "g120": giao_120h}
+            "cod_gtb": cod, "ltc": ltc, "ltb": ltb, "nv_low": nv_low, "g120": giao_120h,
+            "chua_gan": chua_gan}
 
 
 def _bc_snapshot(rows):
@@ -907,6 +908,20 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         vk, vic, vst = "bad", "🔴", "DƯỚI MỤC TIÊU"
         vsub = "Cần đốc gấp · còn %d điểm tới 70%%" % (70 - (reg_pct or 0))
     # (Ô đèn trạng thái riêng đã BỎ 04/10 — đưa thành DẢI MỎNG đánh giá trong Hero, tránh trùng số %GTC)
+
+    # ===== CỜ RỦI RO VẬN HÀNH (ưu tiên 1, 08/10) — verdict tổng quát hơn %GTC =====
+    # Gắn cảnh báo khi TẮC GÁN (chưa gán cao bất thường) hoặc BACKLOG 120h tăng mạnh so CÙNG GIỜ
+    # HÔM QUA (cmp_y). Chỉ hiện khi có số hôm qua (gate 10h); baseline nhỏ → bỏ (tránh nhiễu).
+    _oprisk = []
+    if cmp_y:
+        _ycg = (cmp_y.get("snap") or {}).get("chua_gan")
+        if _ycg and _ycg >= 500 and R["backlog"] > _ycg * 1.20:
+            _oprisk.append("TẮC GÁN ↑%d%%" % round((R["backlog"] - _ycg) * 100.0 / _ycg))
+        _yg = cmp_y.get("g120")
+        if _yg and _yg >= 100 and giao_120h is not None and giao_120h > _yg * 1.15:
+            _oprisk.append("Backlog 120h ↑%d%%" % round((giao_120h - _yg) * 100.0 / _yg))
+    if _oprisk:
+        vsub = vsub + " · <b class='rk'>⚠️ %s</b>" % " · ".join(_oprisk)
 
     # ===== Hero %GTC + dải đánh giá + đường xu hướng 14 ngày (chốt cuối ngày) =====
     P.append("<section class='hero %s'>" % _cls(reg_pct))
@@ -1696,6 +1711,8 @@ svg.spk{display:block}
 .hverd.good{border-color:rgba(23,201,131,.42);background:rgba(23,201,131,.09)}.hverd.good b{color:var(--good)}
 .hverd.warn{border-color:rgba(245,170,23,.42);background:rgba(245,170,23,.09)}.hverd.warn b{color:var(--warn)}
 .hverd.bad{border-color:rgba(245,69,92,.42);background:rgba(245,69,92,.09)}.hverd.bad b{color:var(--bad)}
+.hverd b.rk{color:var(--bad)!important;background:rgba(245,69,92,.16);padding:1px 7px;border-radius:7px;
+ font-size:11px;white-space:nowrap}
 /* 🎯 NHỊP ĐỘ CÁN ĐÍCH — dòng điều hành (cần X đơn/giờ) */
 .hpace{margin-top:8px;font-size:11.5px;font-weight:600;color:var(--mut);line-height:1.45;
  padding:8px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
