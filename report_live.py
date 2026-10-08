@@ -198,7 +198,13 @@ def _region_snapshot(rows, giao_120h=None):
             "cod_gtb": cod, "ltc": ltc, "ltb": ltb, "nv_low": nv_low, "g120": giao_120h}
 
 
-def _store_hourly_pct(pct, gtc=None, total=None, g120=None, snap=None):
+def _bc_snapshot(rows):
+    """Snapshot [gtc,total] TỪNG BƯU CỤC (để so %GTC cùng giờ hôm qua). AM/Tỉnh = tổng BC con."""
+    return {r["name"]: [r.get("gtc", 0), r.get("total", 0)]
+            for r in rows if r.get("total", 0) > 0}
+
+
+def _store_hourly_pct(pct, gtc=None, total=None, g120=None, snap=None, bcsnap=None):
     """Ghi %GTC HIỆN TẠI theo GIỜ vào bao_cao_gio (upsert theo ngay+gio → giữ bản mới nhất
     trong giờ đó) → để DỰ BÁO về đích + đo NHỊP ĐỘ (đơn/giờ) + SO CÙNG GIỜ HÔM QUA. Cũng lưu
     gtc/total/phut/g120 (nếu đã migrate); cột thiếu → tự lùi về bản chỉ pct. Lỗi → êm."""
@@ -210,7 +216,7 @@ def _store_hourly_pct(pct, gtc=None, total=None, g120=None, snap=None):
         import requests
         now = datetime.now(VN)
         base = {"ngay": now.date().isoformat(), "gio": now.hour, "pct_gtc": round(pct, 1)}
-        rich = dict(base, gtc=gtc, total=total, phut=now.minute, g120=g120, snap=snap)
+        rich = dict(base, gtc=gtc, total=total, phut=now.minute, g120=g120, snap=snap, bcsnap=bcsnap)
         hdr = {"apikey": key, "Authorization": "Bearer " + key,
                "Content-Type": "application/json",
                "Prefer": "resolution=merge-duplicates,return=minimal"}
@@ -234,7 +240,7 @@ def _fetch_hour_vs_yesterday(hour):
         import requests
         from datetime import timedelta
         y = (datetime.now(VN).date() - timedelta(days=1)).isoformat()
-        r = requests.get("%s/rest/v1/bao_cao_gio?select=pct_gtc,gtc,total,g120,snap"
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=pct_gtc,gtc,total,g120,snap,bcsnap"
                          "&ngay=eq.%s&gio=eq.%d" % (url, y, hour),
                          headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=20)
         if not r.ok or not r.json():
@@ -248,6 +254,8 @@ def _fetch_hour_vs_yesterday(hour):
                 out[k] = x[k]
         if isinstance(x.get("snap"), dict):
             out["snap"] = x["snap"]          # toàn bộ chỉ số dải cùng giờ hôm qua
+        if isinstance(x.get("bcsnap"), dict):
+            out["bcsnap"] = x["bcsnap"]      # %GTC từng bưu cục cùng giờ hôm qua
         return out or None
     except Exception:
         return None
@@ -1385,6 +1393,32 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  % (href, rgb, ic, nm, sub, spark))
     P.append("</div>")
 
+    # ===== Mũi tên %GTC SO CÙNG GIỜ HÔM QUA cho thẻ AM / Tỉnh / Bưu cục =====
+    # ▲ xanh = %GTC tốt hơn cùng giờ hôm qua · ▼ đỏ = kém hơn. Đầy đủ từ ngày có snap hôm qua.
+    _ybc = (cmp_y or {}).get("bcsnap") or {}
+    _y_am, _y_prov = {}, {}
+    for _bcn, _gt in _ybc.items():
+        if not (isinstance(_gt, (list, tuple)) and len(_gt) >= 2):
+            continue
+        _a = AM_OF.get(_bcn)
+        if _a:
+            z = _y_am.setdefault(_a, [0, 0]); z[0] += _gt[0]; z[1] += _gt[1]
+        z = _y_prov.setdefault(_prov(_bcn), [0, 0]); z[0] += _gt[0]; z[1] += _gt[1]
+
+    def _gtc_arrow(tg, tt, yv):
+        """Mũi tên %GTC today vs cùng giờ hôm qua. yv=[gtc,total]. ▲ xanh=tốt hơn·▼ đỏ=kém."""
+        if not (isinstance(yv, (list, tuple)) and len(yv) >= 2):
+            return ""
+        tp = _pct(tg, tt); yp2 = _pct(yv[0], yv[1])
+        if tp is None or yp2 is None:
+            return ""
+        d = round(tp - yp2, 1)
+        if d == 0:
+            return "<span class='ga fl'>▬</span>"
+        up = d > 0
+        return "<span class='ga %s'>%s%sđ</span>" % (
+            "up" if up else "dn", "▲" if up else "▼", ("%.1f" % abs(d)).replace(".", ","))
+
     # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
     am_rows = {}
     for r in rows:
@@ -1398,7 +1432,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<details class='bc %s'>" % cls)
         P.append("<summary>")
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
-                 "<span class='pill %s'>%s%%</span></div>" % (cls, cls, _esc(amn), cls, pc if pc is not None else "—"))
+                 "%s<span class='pill %s'>%s%%</span></div>"
+                 % (cls, cls, _esc(amn), _gtc_arrow(v["gtc"], v["total"], _y_am.get(amn)),
+                    cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         _am_late = sum(_late_cnt(r) for r in am_rows.get(amn, []))
         _am_low = sum(_low_cnt(r) for r in am_rows.get(amn, []))
@@ -1424,7 +1460,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<details class='bc %s'>" % cls)
         P.append("<summary>")
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
-                 "<span class='pill %s'>%s%%</span></div>" % (cls, cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—"))
+                 "%s<span class='pill %s'>%s%%</span></div>"
+                 % (cls, cls, _esc(PROV_NAME.get(pv, pv)), _gtc_arrow(v["gtc"], v["total"], _y_prov.get(pv)),
+                    cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         _pv_late = sum(_late_cnt(r) for r in prov_rows.get(pv, []))
         _pv_low = sum(_low_cnt(r) for r in prov_rows.get(pv, []))
@@ -1452,8 +1490,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<details class='bc %s' data-k=\"%s\">" % (cls, _esc(keys)))
         P.append("<summary>")
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
-                 "<span class='pill %s'>%s%%</span></div>"
-                 % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
+                 "%s<span class='pill %s'>%s%%</span></div>"
+                 % (cls, cls, _esc(r["name"]), _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"])),
+                    cls, pc if pc is not None else "—"))
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
                  "<span class='w'>⏳ %s</span><span>✅ %s</span>"
@@ -1704,6 +1743,12 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .sd.dn{color:var(--bad);background:rgba(245,69,92,.14)}
 .sd.nt{color:var(--mut);background:rgba(255,255,255,.07)}
 .sd.fl{color:var(--mut);background:rgba(255,255,255,.05)}
+/* mũi tên %GTC so cùng giờ hôm qua trên thẻ AM / Tỉnh / Bưu cục (▲ xanh tốt hơn · ▼ đỏ kém) */
+.ga{flex:none;margin-right:7px;font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;
+ letter-spacing:-.02em;padding:1px 6px;border-radius:7px;line-height:1.4}
+.ga.up{color:var(--good);background:rgba(23,201,131,.15)}
+.ga.dn{color:var(--bad);background:rgba(245,69,92,.15)}
+.ga.fl{color:var(--mut);background:rgba(255,255,255,.07)}
 
 .eod{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--txt);
  background:linear-gradient(135deg,#20264a,#191f38);border:1px solid #313a63;border-radius:14px;
@@ -1917,7 +1962,9 @@ def main():
         _tot_now = sum(r["total"] for r in rows)
         _rp_now = _pct(_gtc_now, _tot_now)
         _snap_now = _region_snapshot(rows, giao_120h)
-        _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now, g120=giao_120h, snap=_snap_now)
+        _bcsnap_now = _bc_snapshot(rows)
+        _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now, g120=giao_120h,
+                          snap=_snap_now, bcsnap=_bcsnap_now)
         fc_uplift = _fetch_hour_uplift(datetime.now(VN).hour)
         # NHỊP ĐỘ: đọc SAU khi lưu (bản vừa lưu bị loại vì cách <30'); cần mốc giờ trước.
         pace = _fetch_today_rate(_gtc_now)
