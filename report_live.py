@@ -893,21 +893,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if R["total"] == 0:
         vk, vic, vst, vsub = "neu", "⏳", "CHƯA CÓ DỮ LIỆU", "Đang chờ chuyến đầu ngày"
     elif done_ratio < 0.45:
-        # DỰ BÁO VỀ ĐÍCH cuối ngày (đủ log theo giờ ≥2 ngày); chưa đủ → bản 'đang luỹ kế'
-        if fc_uplift is not None and reg_pct is not None:
-            fc = int(min(100, max(reg_pct, round(reg_pct + fc_uplift))))
-            vk = "good" if fc >= 70 else ("warn" if fc >= 60 else "bad")
-            vic = "📈"
-            vst = "DỰ BÁO VỀ ĐÍCH ~%d%%" % fc
-            if fc >= 70:
-                vsub = "Theo đà hiện tại · trên mục tiêu 70% 🎯"
-            else:
-                need = max(0, round(0.70 * can_giao) - R["gtc"])
-                vsub = "Theo đà hiện tại · cần giao thêm %s đơn để đạt 70%%" % _n(need)
-        else:
-            vk, vic, vst = "neu", "⏳", "ĐANG LUỸ KẾ TRONG NGÀY"
-            vsub = ("Còn sớm — %%GTC chưa đủ để đánh giá%s · xem việc cần làm bên dưới"
-                    % (" · hôm qua chốt %d%%" % yp if yp is not None else ""))
+        # Buổi sáng: hverd CHỈ là trạng thái 'đang luỹ kế' (không lặp số dự báo) — DỰ PHÓNG chốt
+        # ~X% nay nằm GỌN trong dòng NHỊP ĐỘ bên dưới, tránh 2 ô cùng nói '~X%'. (gộp 08/10)
+        vk, vic, vst = "neu", "⏳", "ĐANG LUỸ KẾ TRONG NGÀY"
+        vsub = ("Còn sớm — %%GTC luỹ kế sẽ tăng dần%s · xem nhịp độ & việc cần làm bên dưới"
+                % (" · hôm qua chốt %d%%" % yp if yp is not None else ""))
     elif reg_pct is not None and reg_pct >= 70:
         vk, vic, vst, vsub = "good", "🟢", "ĐẠT MỤC TIÊU", "Vượt/đạt mốc 70% — giữ nhịp"
     elif reg_pct is not None and reg_pct >= 60:
@@ -1076,14 +1066,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         pcts = [t["pct"] for t in trend]
         P.append("<div class='sparkwrap'>%s</div>" % _spark(pcts, "#fbbf24", w=280, h=50, target=70))
     if ref:
-        gap = ""
-        if reg_pct is not None and reg_pct < 70:
-            gap = "<span class='rc'>Còn <b>%d</b> điểm tới 70%%</span>" % (70 - reg_pct)
+        # (Bỏ chip 'Còn X điểm tới 70%' 08/10 — trùng thanh bar + mục tiêu; giữ 3 mốc tham chiếu.)
         P.append("<div class='href'>"
                  "<span class='rc'>🎯 Mục tiêu <b>70%%</b></span>"
                  "<span class='rc'>Hôm qua <b>%d%%</b></span>"
-                 "<span class='rc'>TB %d ngày <b>%d%%</b></span>%s</div>"
-                 % (ref["yp"], ref["ndays"], ref["avg7p"], gap))
+                 "<span class='rc'>TB %d ngày <b>%d%%</b></span></div>"
+                 % (ref["yp"], ref["ndays"], ref["avg7p"]))
     P.append("</section>")
 
     # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
