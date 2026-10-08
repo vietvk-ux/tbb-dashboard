@@ -184,9 +184,6 @@ def gen_html(rows, collectable=None):
     # để loại chuyến lẻ buổi sáng gây đơn/giờ ảo.
     eff = [m for m in drv if _is_done_eff(m)]
     timed = [m for m in drv if m["start_h"] is not None]
-    # Cần chú ý = NV đã đóng chuyến nhưng đơn/giờ ĐÁY (chậm). Muộn/%GTC kém chỉ là badge.
-    can_chu_y = sorted([m for m in eff if m["dph"] < DPH_MIN], key=lambda x: x["dph"])
-    hi = sorted([m for m in eff if m["total"] >= 20], key=lambda x: -x["dph"])
     dang_chay = sorted([m for m in drv if m["ot_tot"] > 0], key=lambda x: -x["ot_tot"])
 
     # Chỉ số vùng
@@ -226,7 +223,6 @@ def gen_html(rows, collectable=None):
     P.append("<div class='st'><div class='sv'>%s</div><div class='sl'>🕗 Giờ XP TB</div></div>" % xp_tb)
     P.append("<div class='st'><div class='sv %s'>%s</div><div class='sl'>🎯 %%GTC vùng</div></div>"
              % (_gtc_cls(gtc_vung), ("%d%%" % gtc_vung) if gtc_vung is not None else "—"))
-    P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🐢 Cần chú ý</div></div>" % len(can_chu_y))
     P.append("<div class='st'><div class='sv'>%d</div><div class='sl'>🏃 Đang chạy</div></div>" % len(dang_chay))
     P.append("<div class='st'><div class='sv bad'>%d</div><div class='sl'>🕘 XP muộn >9h30</div></div>" % late_count)
     P.append("<div class='st'><div class='sv warn'>%s</div><div class='sl'>🚛 Còn phải giao</div></div>" % _n(on_road))
