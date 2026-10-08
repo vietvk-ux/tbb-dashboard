@@ -929,7 +929,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
-    P.append("<div class='hsub'>%s / %s đơn giao thành công · LTC %s · cần giao %s</div>"
+    P.append("<div class='hsub'><b class='hn'>%s</b> / <b class='hn'>%s</b> đơn giao thành công · "
+             "LTC <b class='hn'>%s</b> · cần giao <b class='hn'>%s</b></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
     # DẢI MỎNG ĐÁNH GIÁ (thay dòng 'Xu hướng 14 ngày...') — thông minh theo tiến độ ngày
     P.append("<div class='hverd %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
@@ -1695,6 +1696,7 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
 .hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
 .hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
+.hsub b.hn{color:#18c07a;font-weight:800;font-size:13.5px}
 .hsub .ld{color:var(--txt);font-weight:700}
 .href{display:flex;flex-wrap:wrap;gap:6px 7px;margin-top:12px}
 .rc{font-size:11px;color:var(--mut);background:rgba(255,255,255,.05);border:1px solid var(--line);
