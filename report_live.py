@@ -762,6 +762,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
              fc_uplift=None, pace=None, cmp_y=None):
     now = datetime.now(VN)
+    # SO CÙNG GIỜ HÔM QUA chỉ hiện từ ~10h sáng (ENV CMP_MIN_HOUR): trước đó %GTC luỹ kế
+    # biến động mạnh do 'sóng gán đơn' đầu ngày (mẫu số nhảy vọt) → so sánh dễ hiểu nhầm.
+    # Tắt sớm = dòng ⏱, chip dải .sd, mũi tên thẻ .ga đều ẩn tới khi đủ giờ.
+    if now.hour < float(os.environ.get("CMP_MIN_HOUR", "10")):
+        cmp_y = None
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
     prov = {}
