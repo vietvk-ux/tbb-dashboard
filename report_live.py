@@ -205,6 +205,37 @@ def _bc_snapshot(rows):
             for r in rows if r.get("total", 0) > 0}
 
 
+def _nv_snapshot(rows):
+    """Snapshot [gtc,total] TỪNG NHÂN VIÊN (khoá driver_id) → so %GTC TB 7 ngày của chính NV."""
+    out = {}
+    for r in rows:
+        for d in r.get("drivers", []):
+            did = d.get("id")
+            if did and d.get("total", 0) > 0:
+                out[str(did)] = [d.get("gtc", 0), d.get("total", 0)]
+    return out
+
+
+# TB 7 ngày cùng giờ theo NV ({driver_id: [Σgtc, Σtotal]}) — set trong gen_html (sau gate 10h).
+_NV_AVG = {}
+
+
+def _nv_arrow(d):
+    """Mũi tên %GTC NV today vs TB 7 ngày cùng giờ (chính NV đó). ▲ xanh tốt hơn·▼ đỏ kém hơn."""
+    yv = _NV_AVG.get(str(d.get("id"))) if d.get("id") else None
+    if not (isinstance(yv, (list, tuple)) and len(yv) >= 2):
+        return ""
+    tp = _pct(d.get("gtc", 0), d.get("total", 0)); yp = _pct(yv[0], yv[1])
+    if tp is None or yp is None:
+        return ""
+    dd = round(tp - yp, 1)
+    if dd == 0:
+        return "<span class='ga fl' title='= TB 7 ngày của NV'>▬</span>"
+    up = dd > 0
+    return "<span class='ga %s' title='so TB 7 ngày của NV'>%s%sđ</span>" % (
+        "up" if up else "dn", "▲" if up else "▼", ("%.1f" % abs(dd)).replace(".", ","))
+
+
 def _prune_bao_cao_gio():
     """Dọn bao_cao_gio cho GỌN — chỉ giữ đúng thời gian mỗi cột cần:
     - snap/bcsnap (jsonb nặng) chỉ phục vụ so 'cùng giờ hôm qua' → giữ GIO_SNAP_DAYS ngày (mặc định 3),
@@ -228,14 +259,14 @@ def _prune_bao_cao_gio():
                "Content-Type": "application/json", "Prefer": "return=minimal"}
         # 1) NULL jsonb cũ (chỉ đụng dòng còn snap → lần sau là no-op)
         requests.patch("%s/rest/v1/bao_cao_gio?ngay=lt.%s&snap=not.is.null" % (url, cut_snap),
-                       json={"snap": None, "bcsnap": None}, headers=hdr, timeout=20)
+                       json={"snap": None, "bcsnap": None, "nvsnap": None}, headers=hdr, timeout=20)
         # 2) Xoá dòng quá cũ (có filter ngay → PostgREST cho phép)
         requests.delete("%s/rest/v1/bao_cao_gio?ngay=lt.%s" % (url, cut_del), headers=hdr, timeout=20)
     except Exception:
         pass
 
 
-def _store_hourly_pct(pct, gtc=None, total=None, g120=None, snap=None, bcsnap=None):
+def _store_hourly_pct(pct, gtc=None, total=None, g120=None, snap=None, bcsnap=None, nvsnap=None):
     """Ghi %GTC HIỆN TẠI theo GIỜ vào bao_cao_gio (upsert theo ngay+gio → giữ bản mới nhất
     trong giờ đó) → để DỰ BÁO về đích + đo NHỊP ĐỘ (đơn/giờ) + SO CÙNG GIỜ HÔM QUA. Cũng lưu
     gtc/total/phut/g120 (nếu đã migrate); cột thiếu → tự lùi về bản chỉ pct. Lỗi → êm."""
@@ -247,15 +278,20 @@ def _store_hourly_pct(pct, gtc=None, total=None, g120=None, snap=None, bcsnap=No
         import requests
         now = datetime.now(VN)
         base = {"ngay": now.date().isoformat(), "gio": now.hour, "pct_gtc": round(pct, 1)}
-        rich = dict(base, gtc=gtc, total=total, phut=now.minute, g120=g120, snap=snap, bcsnap=bcsnap)
+        rich = dict(base, gtc=gtc, total=total, phut=now.minute, g120=g120,
+                    snap=snap, bcsnap=bcsnap, nvsnap=nvsnap)
         hdr = {"apikey": key, "Authorization": "Bearer " + key,
                "Content-Type": "application/json",
                "Prefer": "resolution=merge-duplicates,return=minimal"}
         u = "%s/rest/v1/bao_cao_gio?on_conflict=ngay,gio" % url
         r = requests.post(u, json=[rich], headers=hdr, timeout=20)
-        # Cột mới chưa có (chưa migrate) → PostgREST 400 → vẫn ghi được pct cho dự báo.
+        # Cột mới chưa migrate → PostgREST 400. Lùi dần: bỏ nvsnap (giữ snap/bcsnap) → nếu vẫn 400
+        # thì chỉ pct (dự báo). Tránh mất snap/bcsnap chỉ vì cột nvsnap chưa có.
         if r.status_code >= 400:
-            requests.post(u, json=[base], headers=hdr, timeout=20)
+            rich2 = {k: v for k, v in rich.items() if k != "nvsnap"}
+            r2 = requests.post(u, json=[rich2], headers=hdr, timeout=20)
+            if r2.status_code >= 400:
+                requests.post(u, json=[base], headers=hdr, timeout=20)
     except Exception:
         pass
 
@@ -319,6 +355,37 @@ def _fetch_hour_bc_avg(hour, days=7):
             for bc, gt in bs.items():
                 if isinstance(gt, (list, tuple)) and len(gt) >= 2:
                     z = agg.setdefault(bc, [0, 0]); z[0] += gt[0]; z[1] += gt[1]
+        return agg or None
+    except Exception:
+        return None
+
+
+def _fetch_hour_nv_avg(hour, days=7):
+    """TB %GTC từng NHÂN VIÊN (driver_id) tại GIỜ này qua `days` ngày gần nhất (trừ hôm nay).
+    Pooled Σgtc/Σtotal từ cột nvsnap. Trả {driver_id: [Σgtc, Σtotal]}. None nếu trống/chưa migrate."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if not (url and key):
+        return None
+    try:
+        import requests
+        from datetime import timedelta
+        today = datetime.now(VN).date()
+        since = (today - timedelta(days=days)).isoformat()
+        yest = (today - timedelta(days=1)).isoformat()
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=nvsnap&gio=eq.%d"
+                         "&ngay=gte.%s&ngay=lte.%s" % (url, hour, since, yest),
+                         headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=20)
+        if not r.ok:
+            return None
+        agg = {}
+        for row in r.json():
+            ns = row.get("nvsnap")
+            if not isinstance(ns, dict):
+                continue
+            for did, gt in ns.items():
+                if isinstance(gt, (list, tuple)) and len(gt) >= 2:
+                    z = agg.setdefault(did, [0, 0]); z[0] += gt[0]; z[1] += gt[1]
         return agg or None
     except Exception:
         return None
@@ -556,9 +623,9 @@ def _drv_table(drv):
         # TÊN NV tô màu theo %GTC (giống bưu cục): đỏ<60 · vàng<70 · xanh≥70
         nmc = "nmc " + _cls(pc2)
         P.append("<tr%s><td class='nv'>%s<span class='%s'>%s</span>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                 "<td><span class='pill sm %s'>%s%%</span></td><td>%s</td></tr>"
+                 "<td><span class='pill sm %s'>%s%%</span> %s</td><td>%s</td></tr>"
                  % (attr, cx, nmc, _esc(d["name"]), lb, _n(d["total"]), _n(d["gtc"]),
-                    ltc_cell, _cls(pc2), pc2 if pc2 is not None else "—",
+                    ltc_cell, _cls(pc2), pc2 if pc2 is not None else "—", _nv_arrow(d),
                     _tt_cell(d.get("vngh_gtc", 0), d.get("vngh", 0))))
         if has:
             ws = sorted(wards.items(), key=lambda kv: -kv[1][0])
@@ -865,7 +932,7 @@ async def fetch_live(token):
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
-             fc_uplift=None, pace=None, cmp_y=None, bc_avg=None, lgt_w=None):
+             fc_uplift=None, pace=None, cmp_y=None, bc_avg=None, lgt_w=None, nv_avg=None):
     now = datetime.now(VN)
     # SO CÙNG GIỜ HÔM QUA / TB 7 NGÀY chỉ hiện từ ~10h sáng (ENV CMP_MIN_HOUR): trước đó %GTC
     # luỹ kế biến động mạnh do 'sóng gán đơn' đầu ngày (mẫu số nhảy vọt) → so sánh dễ hiểu nhầm.
@@ -873,6 +940,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if now.hour < float(os.environ.get("CMP_MIN_HOUR", "10")):
         cmp_y = None
         bc_avg = None
+        nv_avg = None
+    globals()["_NV_AVG"] = nv_avg or {}   # mũi tên NV trong _drv_table đọc từ đây
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
     prov = {}
@@ -2191,8 +2260,9 @@ def main():
         _rp_now = _pct(_gtc_now, _tot_now)
         _snap_now = _region_snapshot(rows, giao_120h)
         _bcsnap_now = _bc_snapshot(rows)
+        _nvsnap_now = _nv_snapshot(rows)
         _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now, g120=giao_120h,
-                          snap=_snap_now, bcsnap=_bcsnap_now)
+                          snap=_snap_now, bcsnap=_bcsnap_now, nvsnap=_nvsnap_now)
         fc_uplift = _fetch_hour_uplift(datetime.now(VN).hour)
         # NHỊP ĐỘ: đọc SAU khi lưu (bản vừa lưu bị loại vì cách <30'); cần mốc giờ trước.
         pace = _fetch_today_rate(_gtc_now)
@@ -2200,6 +2270,8 @@ def main():
         cmp_y = _fetch_hour_vs_yesterday(datetime.now(VN).hour)
         # Mũi tên BC/AM/Tỉnh: so TRUNG BÌNH cùng giờ 7 NGÀY gần nhất (tổng quan chính xác hơn).
         bc_avg = _fetch_hour_bc_avg(datetime.now(VN).hour)
+        # Mũi tên từng NHÂN VIÊN: so TB cùng giờ 7 ngày của chính NV.
+        nv_avg = _fetch_hour_nv_avg(datetime.now(VN).hour)
         # Dọn bao_cao_gio cho gọn — 1 lần/ngày (khung 6h sáng, slot đầu ngày).
         if datetime.now(VN).hour == 6:
             _prune_bao_cao_gio()
@@ -2238,7 +2310,8 @@ def main():
     except Exception as e:
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
-                 fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg, lgt_w=lgt_w)
+                 fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg, lgt_w=lgt_w,
+                 nv_avg=nv_avg)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
