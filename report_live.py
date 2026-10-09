@@ -613,27 +613,44 @@ async def fetch_giao_120h(session, hub_ids, token):
         return None
 
 
+def _agg_lgt_weight(d, types):
+    """Cộng total_weight (gram) theo order_type từ response get-general-info /
+    get-backlog-transport-info. Nhiều hub → chỉ entry 'ALL'; 1 hub → entry đó."""
+    data = (d or {}).get("data") or []
+    alle = [e for e in data if str(e.get("hub_id") or "") == "ALL"]
+    use = alle if alle else data
+    agg = {t: 0 for t in types}
+    for e in use:
+        for gi in (e.get("general_infos") or []):
+            ot = gi.get("order_type")
+            if ot in agg:
+                agg[ot] += gi.get("total_weight") or 0
+    return agg
+
+
 async def fetch_lgt_weight(session, hub_ids, token):
-    """KHỐI LƯỢNG (kg thực, gram) TỒN ĐỌNG Lấy/Giao/Trả toàn vùng — 1 CALL get-general-info
-    gộp hết hub_ids (≤200). Trả bản gộp 'ALL' (nhiều hub) hoặc cộng các entry. Giao = DELIVER +
-    DELIVER_PRIORITY (ưu tiên giao). Trả về gram: {lay, giao, tra}. None nếu lỗi."""
+    """KHỐI LƯỢNG (kg thực, gram) TỒN ĐỌNG toàn vùng → {lay, giao, tra, lc_giao, lc_tra}.
+    2 CALL gộp hết hub_ids (≤200): get-general-info (Lấy/Giao/Trả; Giao=DELIVER+DELIVER_PRIORITY)
+    + get-backlog-transport-info (Luân chuyển giao=TRANSPORT_DELIVERY · trả=TRANSPORT_RETURN).
+    Lỗi từng call → bỏ qua phần đó. None nếu không có gì."""
+    hids = [str(h) for h in hub_ids]
+    hid0 = hids[0] if hids else "1"
+    out = {"lay": 0, "giao": 0, "tra": 0, "lc_giao": 0, "lc_tra": 0}
     try:
         d = await _post(session, "/core/oss/v1/report/get-general-info",
-                        {"hub_ids": [str(h) for h in hub_ids], "view_mode": "WARD",
-                         "order_type": "ALL"}, hub_ids[0] if hub_ids else "1", token)
-        data = d.get("data") or []
-        alle = [e for e in data if str(e.get("hub_id") or "") == "ALL"]
-        use = alle if alle else data            # nhiều hub → chỉ entry ALL; 1 hub → entry đó
-        agg = {"PICK": 0, "DELIVER": 0, "DELIVER_PRIORITY": 0, "RETURN": 0}
-        for e in use:
-            for gi in (e.get("general_infos") or []):
-                ot = gi.get("order_type")
-                if ot in agg:
-                    agg[ot] += gi.get("total_weight") or 0
-        return {"lay": agg["PICK"], "giao": agg["DELIVER"] + agg["DELIVER_PRIORITY"],
-                "tra": agg["RETURN"]}
+                        {"hub_ids": hids, "view_mode": "WARD", "order_type": "ALL"}, hid0, token)
+        a = _agg_lgt_weight(d, ("PICK", "DELIVER", "DELIVER_PRIORITY", "RETURN"))
+        out["lay"] = a["PICK"]; out["giao"] = a["DELIVER"] + a["DELIVER_PRIORITY"]; out["tra"] = a["RETURN"]
     except Exception:
-        return None
+        pass
+    try:
+        d2 = await _post(session, "/core/oss/v1/report/get-backlog-transport-info",
+                         {"hub_ids": hids}, hid0, token)
+        a2 = _agg_lgt_weight(d2, ("TRANSPORT_DELIVERY", "TRANSPORT_RETURN"))
+        out["lc_giao"] = a2["TRANSPORT_DELIVERY"]; out["lc_tra"] = a2["TRANSPORT_RETURN"]
+    except Exception:
+        pass
+    return out if any(out.values()) else None
 
 
 async def _giao120h_one(session, hid, token):
@@ -955,12 +972,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='hsub'><b class='hn'>%s</b> / <b class='hn'>%s</b> đơn giao thành công · "
              "LTC <b class='hn'>%s</b> · cần giao <b class='hn'>%s</b></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
-    # ⚖️ Khối lượng TỒN ĐỌNG Lấy/Giao/Trả toàn vùng (kg thực) — ngay dưới subtext %GTC (08/10)
+    # ⚖️ Khối lượng TỒN ĐỌNG toàn vùng (kg thực) — ngay dưới subtext %GTC (08/10). Thêm LC (09/10).
     if lgt_w:
+        _lc = ""
+        if lgt_w.get("lc_giao") or lgt_w.get("lc_tra"):
+            _lc = (" · 🔁 LC giao <b>%s</b> · 🔁 LC trả <b>%s</b>"
+                   % (_kgfmt(lgt_w.get("lc_giao", 0) / 1000.0), _kgfmt(lgt_w.get("lc_tra", 0) / 1000.0)))
         P.append("<div class='hlgt'><span class='hvi'>⚖️</span> Tồn kho <i>(kg thực)</i> · "
-                 "📥 Lấy <b>%s</b> · 🚚 Giao <b>%s</b> · ↩️ Trả <b>%s</b></div>"
+                 "📥 Lấy <b>%s</b> · 🚚 Giao <b>%s</b> · ↩️ Trả <b>%s</b>%s</div>"
                  % (_kgfmt(lgt_w.get("lay", 0) / 1000.0), _kgfmt(lgt_w.get("giao", 0) / 1000.0),
-                    _kgfmt(lgt_w.get("tra", 0) / 1000.0)))
+                    _kgfmt(lgt_w.get("tra", 0) / 1000.0), _lc))
     # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
     # (Bỏ dòng đánh giá thường ngày '🟡 CẦN CHÚ Ý · còn X điểm' 08/10 — trùng số %GTC + bar + chips.)
     if _oprisk:
