@@ -10,7 +10,7 @@ Số LIVE tại thời điểm chạy. Refresh 30' qua workflow + trang tự rel
 Env: NHANH_TOKEN. Xuất: docs/<slug>/backlog.html (self-contained).
 """
 from __future__ import annotations
-import asyncio, html, json, logging, os
+import asyncio, collections, html, json, logging, os
 from datetime import datetime, timezone, timedelta
 
 import aiohttp
@@ -20,7 +20,9 @@ from am_map import AM_OF
 logger = logging.getLogger("backlog-web")
 VN = timezone(timedelta(hours=7))
 EP_LGT = "/core/oss/v1/report/get-general-info"
+EP_DETAIL = "/core/oss/v1/report/get-detail-by-status"   # có breakdown theo XÃ (cùng khung giờ)
 EP_TR = "/core/oss/v1/report/get-backlog-transport-info"
+RED_DUR = ("120_192", "192")   # >120h
 
 PROV_NAME = {"LCA": "Lào Cai", "YBA": "Yên Bái", "SLA": "Sơn La",
              "DBI": "Điện Biên", "LCH": "Lai Châu"}
@@ -68,6 +70,28 @@ def parse_hub(hub_data):
         buckets = {inv["duration"]: inv.get("total_order", 0)
                    for inv in info.get("order_inventories", [])}
         out[ot] = {"total": info.get("total_order", 0), "buckets": buckets}
+    return out
+
+
+def parse_hub_ward(data):
+    """get-detail-by-status (view WARD) → {order_type: {total, buckets, wards:[(tên xã, tổng, >120h)]}}.
+    Cộng xã = tổng theo khung giờ (khớp y hệt get-general-info) + GIỮ breakdown theo xã cho drill."""
+    out = {}
+    for bt in (data or {}).get("detail_backlog_types", []):
+        ot = bt.get("backlog_type")
+        buckets = collections.defaultdict(int)
+        wards, total = [], 0
+        for w in (bt.get("details") or []):
+            wtot, wred = 0, 0
+            for inv in (w.get("order_inventories") or []):
+                dur = inv.get("duration"); n = inv.get("total_order") or 0
+                buckets[dur] += n; wtot += n
+                if dur in RED_DUR:
+                    wred += n
+            if wtot > 0:
+                wards.append((w.get("name") or "?", wtot, wred))
+            total += wtot
+        out[ot] = {"total": total, "buckets": dict(buckets), "wards": wards}
     return out
 
 
@@ -138,12 +162,13 @@ async def _hub_fetch(session, token, hub, sem):
     async with sem:
         lgt, tr = {}, {}
         try:
-            d = await _post(session, EP_LGT,
-                            {"hub_ids": [code], "view_mode": "WARD", "order_type": "ALL"},
+            # get-detail-by-status (view WARD) = cùng số liệu LGT theo khung giờ NHƯNG có thêm
+            # breakdown theo XÃ/phường (cho drill BC→xã). Cùng 1 call, thay get-general-info.
+            d = await _post(session, EP_DETAIL,
+                            {"hub_id": code, "order_type": "ALL", "view_mode": "WARD",
+                             "status": ["PICK", "DELIVER", "DELIVER_PRIORITY", "RETURN"]},
                             code, token)
-            data = d.get("data") or []
-            if data:
-                lgt = parse_hub(data[0])
+            lgt = parse_hub_ward(d.get("data") or {})
         except TokenExpiredError:
             raise
         except Exception as e:
@@ -286,7 +311,7 @@ def render_summary(entries, key, types, hero_lbl, tr=False, prev_val=None, prev_
         tys = {ot: e[key].get(ot, {}).get("total", 0) for ot, _, _ in types}
         for ot in a["ty"]:
             a["ty"][ot] += tys[ot]
-        am_bcs.setdefault(amn, []).append((e["name"], tys, tot, red120))
+        am_bcs.setdefault(amn, []).append((e, tys, tot, red120))
     am_rows = sorted(am.items(), key=lambda kv: -kv[1]["total"])
     if am_rows:
         P.append("<div class='subh'>🧑‍💼 Theo AM · cao → thấp · bấm xem bưu cục</div>")
@@ -301,19 +326,59 @@ def render_summary(entries, key, types, hero_lbl, tr=False, prev_val=None, prev_
             pill = ("<span class='pill acc'>%s</span>" % _n(a["total"])) if a["total"] > 0 \
                 else "<span class='pill mut'>0</span>"
             P.append("<div class='bcr'>%s</div></summary>" % pill)
-            P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th>")
-            for ot, _, short in types:
-                P.append("<th>%s</th>" % _esc(short))
-            P.append("<th>🔴&gt;120h</th><th>Tổng</th></tr>")
-            for name, tys, tot, red120 in sorted(am_bcs[amn], key=lambda x: (-x[3], -x[2])):
-                P.append("<tr><td>%s</td>" % _esc(name))
-                for ot, _, _ in types:
-                    v = tys[ot]
-                    P.append("<td>%s</td>" % (_n(v) if v else "<span class='muted'>–</span>"))
-                rc = ("<span class='pill bad'>%s</span>" % _n(red120)) if red120 > 0 else "<span class='muted'>–</span>"
-                tc = ("<span class='pill acc'>%s</span>" % _n(tot)) if tot > 0 else "<span class='muted'>0</span>"
-                P.append("<td>%s</td><td>%s</td></tr>" % (rc, tc))
-            P.append("</table></div></div></details>")
+            bcs_sorted = sorted(am_bcs[amn], key=lambda x: (-x[3], -x[2]))
+            if tr:
+                # Luân chuyển: bảng bưu cục phẳng (không có breakdown xã).
+                P.append("<div class='dtl'><div class='scroll'><table><tr><th>Bưu cục</th>")
+                for ot, _, short in types:
+                    P.append("<th>%s</th>" % _esc(short))
+                P.append("<th>🔴&gt;120h</th><th>Tổng</th></tr>")
+                for e, tys, tot, red120 in bcs_sorted:
+                    P.append("<tr><td>%s</td>" % _esc(e["name"]))
+                    for ot, _, _ in types:
+                        v = tys[ot]
+                        P.append("<td>%s</td>" % (_n(v) if v else "<span class='muted'>–</span>"))
+                    rc = ("<span class='pill bad'>%s</span>" % _n(red120)) if red120 > 0 else "<span class='muted'>–</span>"
+                    tc = ("<span class='pill acc'>%s</span>" % _n(tot)) if tot > 0 else "<span class='muted'>0</span>"
+                    P.append("<td>%s</td><td>%s</td></tr>" % (rc, tc))
+                P.append("</table></div></div></details>")
+            else:
+                # Lấy-Giao-Trả: mỗi BƯU CỤC là details con → bấm mở BẢNG XÃ/PHƯỜNG.
+                P.append("<div class='dtl'>")
+                for e, tys, tot, red120 in bcs_sorted:
+                    bmeta = " · ".join("%s %s" % (short, _n(tys[ot])) for ot, _, short in types if tys[ot])
+                    if red120 > 0:
+                        bmeta += " · 🔴&gt;120h %s" % _n(red120)
+                    wc = {}
+                    for ot, _, _ in types:
+                        for wn, wt, wr in e[key].get(ot, {}).get("wards", []):
+                            w = wc.setdefault(wn, {o: 0 for o, _, _ in types})
+                            w[ot] = w.get(ot, 0) + wt
+                            w["red"] = w.get("red", 0) + wr
+                            w["total"] = w.get("total", 0) + wt
+                    P.append("<details class='bc sub' data-u='%s'><summary>" % ("1" if tot > 0 else "0"))
+                    P.append("<div><div class='bcn'>%s</div><div class='bcm'>%s</div></div>"
+                             % (_esc(e["name"]), bmeta or "không có đơn tồn"))
+                    bpill = ("<span class='pill acc'>%s</span>" % _n(tot)) if tot > 0 else "<span class='pill mut'>0</span>"
+                    P.append("<div class='bcr'>%s</div></summary>" % bpill)
+                    if wc:
+                        P.append("<div class='dtl'><div class='scroll'><table><tr><th>Xã/phường</th>")
+                        for ot, _, short in types:
+                            P.append("<th>%s</th>" % _esc(short))
+                        P.append("<th>🔴&gt;120h</th><th>Tổng</th></tr>")
+                        for wn, w in sorted(wc.items(), key=lambda kv: (-kv[1]["red"], -kv[1]["total"])):
+                            P.append("<tr><td>%s</td>" % _esc(wn))
+                            for ot, _, _ in types:
+                                v = w.get(ot, 0)
+                                P.append("<td>%s</td>" % (_n(v) if v else "<span class='muted'>–</span>"))
+                            rc = ("<span class='pill bad'>%s</span>" % _n(w["red"])) if w["red"] > 0 else "<span class='muted'>–</span>"
+                            tc = ("<span class='pill acc'>%s</span>" % _n(w["total"])) if w["total"] > 0 else "<span class='muted'>0</span>"
+                            P.append("<td>%s</td><td>%s</td></tr>" % (rc, tc))
+                        P.append("</table></div></div>")
+                    else:
+                        P.append("<div class='dtl'><div class='cap'>Không có chi tiết xã.</div></div>")
+                    P.append("</details>")
+                P.append("</div></details>")
     return P
 
 
