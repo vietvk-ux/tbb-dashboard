@@ -616,7 +616,7 @@ def _ai_hotspot(rows, bc_avg, now):
     else:
         phase, urg = "tối muộn", 3.5
     bc_avg = bc_avg or {}
-    best = None
+    cands = []
     for r in rows:
         tot = r.get("total", 0)
         if tot < 30:                       # bỏ BC quá nhỏ (nhiễu)
@@ -638,45 +638,53 @@ def _ai_hotspot(rows, bc_avg, now):
         risk = on_road + backlog           # đơn chưa giao (áp lực cuối ngày)
         score = (risk * urg * (1 + gtc_gap / 40.0 + phong_gap / 25.0)
                  + g120 * urg * 0.8 + low * 25 * urg + late * 8 * urg)
-        if best is None or score > best["s"]:
-            best = dict(s=score, name=r["name"], am=AM_OF.get(r["name"]) or "(chưa phân AM)",
-                        pc=pc, avg_pc=avg_pc, backlog=backlog, on_road=on_road, g120=g120,
-                        low=low, late=late, tot=tot, gtc_gap=gtc_gap, phong_gap=phong_gap)
-    if best is None or best["s"] <= 0:
+        cands.append(dict(s=score, name=r["name"], am=AM_OF.get(r["name"]) or "(chưa phân AM)",
+                          pc=pc, avg_pc=avg_pc, backlog=backlog, on_road=on_road, g120=g120,
+                          low=low, late=late, tot=tot, gtc_gap=gtc_gap, phong_gap=phong_gap))
+    cands = [c for c in cands if c["s"] > 0]
+    if not cands:
         return ""
-    b = best
-    pts = ["%%GTC <b>%d%%</b> (%s)" % (b["pc"], ("dưới mục tiêu %dđ" % b["gtc_gap"])
-                                       if b["gtc_gap"] > 0 else "đạt ≥70%")]
-    if b["phong_gap"] > 2 and b["avg_pc"] is not None:
-        pts.append("<b class='rk'>tụt %sđ dưới phong độ BC</b>" % ("%g" % b["phong_gap"]).replace(".", ","))
-    if b["on_road"]:
-        pts.append("còn <b>%s</b> đơn đang giao" % _n(b["on_road"]))
-    if b["backlog"]:
-        pts.append("<b>%s</b> chưa gán" % _n(b["backlog"]))
-    if b["g120"]:
-        pts.append("<b class='rk'>%s</b> đơn quá 120h" % _n(b["g120"]))
-    if b["low"]:
-        pts.append("<b>%d</b> NV &lt;50%%" % b["low"])
-    if b["late"]:
-        pts.append("<b>%d</b> NV ra hàng muộn" % b["late"])
+    cands.sort(key=lambda c: -c["s"])
+    top = cands[:3]
+
+    def _issues(b):
+        pts = ["%%GTC <b>%d%%</b>%s" % (b["pc"], (" (dưới MT %dđ)" % b["gtc_gap"]) if b["gtc_gap"] > 0 else "")]
+        if b["phong_gap"] > 2 and b["avg_pc"] is not None:
+            pts.append("<b class='rk'>tụt %sđ phong độ</b>" % ("%g" % b["phong_gap"]).replace(".", ","))
+        if b["on_road"]:
+            pts.append("còn <b>%s</b> đơn giao" % _n(b["on_road"]))
+        if b["backlog"]:
+            pts.append("<b>%s</b> chưa gán" % _n(b["backlog"]))
+        if b["g120"]:
+            pts.append("<b class='rk'>%s</b> &gt;120h" % _n(b["g120"]))
+        if b["low"]:
+            pts.append("<b>%d</b> NV&lt;50%%" % b["low"])
+        if b["late"]:
+            pts.append("<b>%d</b> XP muộn" % b["late"])
+        return " · ".join(pts)
+
+    rk_icon = ["🥇", "🥈", "🥉"]
+    rrows = []
+    for i, b in enumerate(top):
+        rrows.append("<div class='airow'><span class='airk'>%s <b>%s</b> <i>· AM %s · %s gán</i></span>"
+                     "<div class='aiis'>%s</div></div>"
+                     % (rk_icon[i], _esc(b["name"]), _esc(b["am"]), _n(b["tot"]), _issues(b)))
+    b = top[0]
     left = _n(b["on_road"] + b["backlog"])
     if phase == "sáng":
-        act = ("Sáng còn tồn/chưa gán → đốc <b>%s</b> gán chuyến%s, bám ra hàng sớm."
-               % (_esc(b["am"]), (" + giục %d NV ra hàng muộn" % b["late"]) if b["late"] else ""))
+        act = ("Sáng còn tồn/chưa gán → đốc <b>%s</b> gán chuyến%s, bám ra hàng sớm (ưu tiên #1 <b>%s</b>)."
+               % (_esc(b["am"]), (" + giục NV ra hàng muộn") if b["late"] else "", _esc(b["name"])))
     elif phase == "trưa-chiều":
-        act = ("Giờ cao điểm → đốc <b>%s</b> tăng tốc giao ở <b>%s</b>, kéo %%GTC lên."
-               % (_esc(b["am"]), _esc(b["name"])))
+        act = ("Giờ cao điểm → dồn lực 3 BC trên tăng tốc giao, kéo %%GTC; nặng nhất <b>%s</b> (%s đơn chưa xong)."
+               % (_esc(b["name"]), left))
     elif phase == "chiều tối":
-        act = ("Chiều tối còn <b>%s</b> đơn chưa xong → NGUY CƠ dồn sang mai, ưu tiên dồn lực <b>%s</b> NGAY."
-               % (left, _esc(b["name"])))
+        act = ("Chiều tối 3 BC còn nhiều đơn chưa xong → NGUY CƠ dồn sang mai, ưu tiên <b>%s</b> (%s đơn) NGAY."
+               % (_esc(b["name"]), left))
     else:
-        act = ("Tối muộn → chốt backlog <b>%s</b>%s, lên kế hoạch xử lý sớm mai."
-               % (_esc(b["name"]), (" · %s đơn quá 120h" % _n(b["g120"])) if b["g120"] else ""))
-    head = ("🤖 <b>Phân tích điểm nóng</b> · %s %dh: <b>%s</b> cần chú ý nhất"
-            % (phase, hr, _esc(b["name"])))
-    body = ("<div class='aibd'><div class='airow'>📍 <b>%s</b> · AM %s · %s đơn gán</div>"
-            "<div class='airow'>⚠️ %s</div><div class='airow aiact'>👉 %s</div></div>"
-            % (_esc(b["name"]), _esc(b["am"]), _n(b["tot"]), " · ".join(pts), act))
+        act = ("Tối muộn → chốt backlog 3 BC trên, nặng nhất <b>%s</b>, kế hoạch xử lý sớm mai."
+               % _esc(b["name"]))
+    head = ("🤖 <b>Phân tích điểm nóng</b> · %s %dh · Top 3 bưu cục cần chú ý nhất" % (phase, hr))
+    body = "<div class='aibd'>%s<div class='airow aiact'>👉 %s</div></div>" % ("".join(rrows), act)
     return "<details class='aidx'><summary>%s<span class='dcv'>▾</span></summary>%s</details>" % (head, body)
 
 
@@ -2052,8 +2060,10 @@ details.aidx>summary::-webkit-details-marker{display:none}
 details.aidx[open] .dcv{transform:rotate(180deg)}
 .aibd{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;display:flex;flex-direction:column;gap:5px}
 .aibd b{color:var(--txt);font-weight:800}
-.airow.aiact{color:var(--txt);font-weight:600}
+.airow.aiact{color:var(--txt);font-weight:600;border-top:1px solid rgba(255,255,255,.08);padding-top:6px;margin-top:2px}
 .aibd b.rk{color:var(--bad)}
+.airk{color:var(--txt);font-size:12px}.airk i{color:var(--mut);font-weight:400;font-size:10.5px;font-style:normal}
+.aiis{margin-top:2px;padding-left:2px;font-size:11px}
 .diag b{color:var(--txt);font-weight:800}
 details.diag>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px}
 details.diag>summary::-webkit-details-marker{display:none}
