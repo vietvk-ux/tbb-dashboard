@@ -601,6 +601,85 @@ def _low_badge(n):
     return ("<span class='lwc' title='%d NV %%GTC &lt;50%% (≥20 đơn)'>📉 %s</span>" % (n, _n(n))) if n else ""
 
 
+def _ai_hotspot(rows, bc_avg, now):
+    """PHÂN TÍCH THÔNG MINH THEO KHUNG GIỜ (rule-based): chấm điểm từng bưu cục theo mức độ
+    'đáng lo' phụ thuộc giờ trong ngày (sáng: tồn/gán·ra hàng muộn · chiều: tốc độ giao·%GTC ·
+    tối: đơn chưa xong dồn sang mai · khuya: quá hạn), chọn ĐIỂM NÓNG #1 và sinh nhận xét +
+    hành động. Trả HTML box <details>; '' nếu chưa đủ dữ liệu."""
+    hr = now.hour
+    if hr < 13:
+        phase, urg = "sáng", 1.0
+    elif hr < 17:
+        phase, urg = "trưa-chiều", 1.6
+    elif hr < 21:
+        phase, urg = "chiều tối", 2.6
+    else:
+        phase, urg = "tối muộn", 3.5
+    bc_avg = bc_avg or {}
+    best = None
+    for r in rows:
+        tot = r.get("total", 0)
+        if tot < 30:                       # bỏ BC quá nhỏ (nhiễu)
+            continue
+        pc = _pct(r["gtc"], tot)
+        if pc is None:
+            continue
+        backlog = r.get("backlog", 0)
+        g120 = r.get("giao120h", 0)
+        ot_t = ot_d = 0
+        for d in r.get("drivers", []):
+            ot_t += d.get("ot_tot", 0); ot_d += d.get("ot_done", 0)
+        on_road = max(ot_t - ot_d, 0)
+        late = _late_cnt(r); low = _low_cnt(r)
+        yv = bc_avg.get(r["name"])
+        avg_pc = _pct(yv[0], yv[1]) if (isinstance(yv, (list, tuple)) and len(yv) >= 2 and yv[1]) else None
+        gtc_gap = max(0, 70 - pc)
+        phong_gap = round(max(0.0, (avg_pc - pc)), 1) if avg_pc is not None else 0
+        risk = on_road + backlog           # đơn chưa giao (áp lực cuối ngày)
+        score = (risk * urg * (1 + gtc_gap / 40.0 + phong_gap / 25.0)
+                 + g120 * urg * 0.8 + low * 25 * urg + late * 8 * urg)
+        if best is None or score > best["s"]:
+            best = dict(s=score, name=r["name"], am=AM_OF.get(r["name"]) or "(chưa phân AM)",
+                        pc=pc, avg_pc=avg_pc, backlog=backlog, on_road=on_road, g120=g120,
+                        low=low, late=late, tot=tot, gtc_gap=gtc_gap, phong_gap=phong_gap)
+    if best is None or best["s"] <= 0:
+        return ""
+    b = best
+    pts = ["%%GTC <b>%d%%</b> (%s)" % (b["pc"], ("dưới mục tiêu %dđ" % b["gtc_gap"])
+                                       if b["gtc_gap"] > 0 else "đạt ≥70%")]
+    if b["phong_gap"] > 2 and b["avg_pc"] is not None:
+        pts.append("<b class='rk'>tụt %sđ dưới phong độ BC</b>" % ("%g" % b["phong_gap"]).replace(".", ","))
+    if b["on_road"]:
+        pts.append("còn <b>%s</b> đơn đang giao" % _n(b["on_road"]))
+    if b["backlog"]:
+        pts.append("<b>%s</b> chưa gán" % _n(b["backlog"]))
+    if b["g120"]:
+        pts.append("<b class='rk'>%s</b> đơn quá 120h" % _n(b["g120"]))
+    if b["low"]:
+        pts.append("<b>%d</b> NV &lt;50%%" % b["low"])
+    if b["late"]:
+        pts.append("<b>%d</b> NV ra hàng muộn" % b["late"])
+    left = _n(b["on_road"] + b["backlog"])
+    if phase == "sáng":
+        act = ("Sáng còn tồn/chưa gán → đốc <b>%s</b> gán chuyến%s, bám ra hàng sớm."
+               % (_esc(b["am"]), (" + giục %d NV ra hàng muộn" % b["late"]) if b["late"] else ""))
+    elif phase == "trưa-chiều":
+        act = ("Giờ cao điểm → đốc <b>%s</b> tăng tốc giao ở <b>%s</b>, kéo %%GTC lên."
+               % (_esc(b["am"]), _esc(b["name"])))
+    elif phase == "chiều tối":
+        act = ("Chiều tối còn <b>%s</b> đơn chưa xong → NGUY CƠ dồn sang mai, ưu tiên dồn lực <b>%s</b> NGAY."
+               % (left, _esc(b["name"])))
+    else:
+        act = ("Tối muộn → chốt backlog <b>%s</b>%s, lên kế hoạch xử lý sớm mai."
+               % (_esc(b["name"]), (" · %s đơn quá 120h" % _n(b["g120"])) if b["g120"] else ""))
+    head = ("🤖 <b>Phân tích điểm nóng</b> · %s %dh: <b>%s</b> cần chú ý nhất"
+            % (phase, hr, _esc(b["name"])))
+    body = ("<div class='aibd'><div class='airow'>📍 <b>%s</b> · AM %s · %s đơn gán</div>"
+            "<div class='airow'>⚠️ %s</div><div class='airow aiact'>👉 %s</div></div>"
+            % (_esc(b["name"]), _esc(b["am"]), _n(b["tot"]), " · ".join(pts), act))
+    return "<details class='aidx'><summary>%s<span class='dcv'>▾</span></summary>%s</details>" % (head, body)
+
+
 def _drv_table(drv):
     """Bảng nhân viên của 1 bưu cục. Mỗi NV BẤM MỞ được → hàng con %GTC theo xã/phường
     (từ d['wards'] gộp lúc bóc chuyến, 0 call thêm). NV không có đơn giao → không mở."""
@@ -1203,6 +1282,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # dưới (cần am_pcts…) rồi ghi vào P[_diag_slot]. (Chuyển từ trên lưới vào hero 08/10.)
     _diag_slot = len(P)
     P.append("")
+    # 🤖 PHÂN TÍCH ĐIỂM NÓNG theo khung giờ (rule-based) — ngay dưới Điểm Nóng, từ ~10h.
+    if now.hour >= float(os.environ.get("CMP_MIN_HOUR", "10")):
+        _aibox = _ai_hotspot(rows, bc_avg, now)
+        if _aibox:
+            P.append(_aibox)
 
     if trend and len(trend) >= 2:
         pcts = [t["pct"] for t in trend]
@@ -1958,6 +2042,18 @@ details.gt[open] .gtcar{transform:rotate(90deg);color:var(--txt)}
 .diag{background:rgba(255,255,255,.04);
  border:1px solid var(--line);border-radius:11px;padding:8px 11px;margin:8px 0 0;
  font-size:11.5px;line-height:1.55;color:var(--mut)}
+/* 🤖 Phân tích điểm nóng theo khung giờ */
+.aidx{margin:8px 0 0;border-radius:11px;padding:9px 11px;font-size:11.5px;line-height:1.55;color:var(--mut);
+ border:1px solid rgba(245,170,23,.38);background:linear-gradient(120deg,rgba(245,170,23,.1),rgba(255,255,255,.03))}
+details.aidx>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px;color:var(--txt);font-weight:600}
+details.aidx>summary::-webkit-details-marker{display:none}
+.aidx summary b{color:var(--warn)}
+.aidx .dcv{position:absolute;right:0;top:1px;color:var(--mut);font-size:12px;transition:transform .2s}
+details.aidx[open] .dcv{transform:rotate(180deg)}
+.aibd{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;display:flex;flex-direction:column;gap:5px}
+.aibd b{color:var(--txt);font-weight:800}
+.airow.aiact{color:var(--txt);font-weight:600}
+.aibd b.rk{color:var(--bad)}
 .diag b{color:var(--txt);font-weight:800}
 details.diag>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px}
 details.diag>summary::-webkit-details-marker{display:none}
