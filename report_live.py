@@ -221,7 +221,8 @@ _NV_AVG = {}
 
 
 def _nv_arrow(d):
-    """Mũi tên %GTC NV today vs TB 7 ngày cùng giờ (chính NV đó). ▲ xanh tốt hơn·▼ đỏ kém hơn."""
+    """Mũi tên %GTC NV vs TB 7 ngày của chính NV — GỌN cho mobile (không nền, số nguyên điểm,
+    không chèn mất tên NV). ▲ xanh tốt hơn·▼ đỏ kém hơn. Tooltip có số đầy đủ."""
     yv = _NV_AVG.get(str(d.get("id"))) if d.get("id") else None
     if not (isinstance(yv, (list, tuple)) and len(yv) >= 2):
         return ""
@@ -230,10 +231,11 @@ def _nv_arrow(d):
         return ""
     dd = round(tp - yp, 1)
     if dd == 0:
-        return "<span class='ga fl' title='= TB 7 ngày của NV'>▬</span>"
+        return "<span class='nva fl' title='= TB 7 ngày của NV'>▬</span>"
     up = dd > 0
-    return "<span class='ga %s' title='so TB 7 ngày của NV'>%s%sđ</span>" % (
-        "up" if up else "dn", "▲" if up else "▼", ("%.1f" % abs(dd)).replace(".", ","))
+    return "<span class='nva %s' title='%s%sđ so TB 7 ngày của NV'>%s%d</span>" % (
+        "up" if up else "dn", "+" if up else "-", ("%.1f" % abs(dd)).replace(".", ","),
+        "▲" if up else "▼", round(abs(dd)))
 
 
 def _prune_bao_cao_gio():
@@ -2152,6 +2154,10 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .ga.up{color:var(--good);background:rgba(23,201,131,.15)}
 .ga.dn{color:var(--bad);background:rgba(245,69,92,.15)}
 .ga.fl{color:var(--mut);background:rgba(255,255,255,.07)}
+/* mũi tên %GTC NV (GỌN trong bảng NV — không nền, không chèn mất tên NV) */
+.nva{font-size:9px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em;margin-left:2px;white-space:nowrap}
+.nva.up{color:var(--good)}.nva.dn{color:var(--bad)}.nva.fl{color:var(--mut)}
+table.drv td:nth-child(5){white-space:nowrap}   /* cột %GTC: pill + mũi tên không xuống dòng */
 
 .eod{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--txt);
  background:linear-gradient(135deg,#20264a,#191f38);border:1px solid #313a63;border-radius:14px;
@@ -2234,7 +2240,7 @@ table.drv th,table.drv td{padding:7px 3px;text-align:right;border-bottom:1px sol
 table.drv th{color:var(--mut);font-weight:600;font-size:9.5px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid var(--line)}
 table.drv th:first-child,table.drv td:first-child{text-align:left}
 table.drv tbody tr:last-child td{border-bottom:none}
-td.nv{font-weight:600;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.nv{font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 td.nv .sc{font-size:9.5px;color:var(--mut);font-weight:400;margin-top:1px;overflow:hidden;text-overflow:ellipsis}
 .tt{color:#e879c8;font-weight:700}
 /* NV bấm mở → %GTC theo xã/phường (live hôm nay) */
@@ -2264,7 +2270,7 @@ tr.wsub>td{padding:2px 6px 10px !important;text-align:left}
   table.drv{font-size:11px}
   table.drv th,table.drv td{padding:6px 2px}
   table.drv th{font-size:8px;letter-spacing:0}
-  td.nv{max-width:78px}
+  td.nv{max-width:112px}
   .pill.sm{min-width:34px;font-size:10px;padding:2px 5px}
   .bcm,.pmeta{font-size:10px}
 }
