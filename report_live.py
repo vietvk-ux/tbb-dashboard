@@ -72,6 +72,15 @@ def _tt_cell(vg, vn):
     return "<span class='pill sm %s'>%s%%</span>" % (_cls(vp), vp)
 
 
+def _tt_inline(vg, vn):
+    """TikTok %GTC NV GỌN đặt kèm sau pill %GTC (🛍️nn%) — rỗng nếu không có đơn TikTok."""
+    if not vn:
+        return ""
+    vp = _pct(vg, vn)
+    return " <span class='ttn %s' title='%%GTC TikTok của NV (%s/%s)'>🛍️%s%%</span>" % (
+        _cls(vp), _n(vg), _n(vn), vp)
+
+
 def _tt_chip(vg, vn):
     """Chip TikTok ở dòng meta bưu cục/AM: 🛍️ %GTC (GTC/gán). Rỗng nếu không có đơn."""
     if not vn:
@@ -220,22 +229,23 @@ def _nv_snapshot(rows):
 _NV_AVG = {}
 
 
-def _nv_arrow(d):
-    """Mũi tên %GTC NV vs TB 7 ngày của chính NV — GỌN cho mobile (không nền, số nguyên điểm,
-    không chèn mất tên NV). ▲ xanh tốt hơn·▼ đỏ kém hơn. Tooltip có số đầy đủ."""
+def _nv_cmp_cell(d):
+    """Ô CỘT RIÊNG 'So TB7' — chênh %GTC NV vs TB 7 ngày của chính NV, cỡ chữ BẰNG các cột
+    số khác (dễ nhìn). ▲ xanh tốt hơn · ▼ đỏ kém hơn · ▬ bằng. '—' nếu chưa đủ dữ liệu."""
     yv = _NV_AVG.get(str(d.get("id"))) if d.get("id") else None
     if not (isinstance(yv, (list, tuple)) and len(yv) >= 2):
-        return ""
+        return "<span class='nvc fl'>—</span>"
     tp = _pct(d.get("gtc", 0), d.get("total", 0)); yp = _pct(yv[0], yv[1])
     if tp is None or yp is None:
-        return ""
+        return "<span class='nvc fl'>—</span>"
     dd = round(tp - yp, 1)
     if dd == 0:
-        return "<span class='nva fl' title='= TB 7 ngày của NV'>▬</span>"
+        return "<span class='nvc fl' title='= TB 7 ngày của NV'>▬</span>"
     up = dd > 0
-    return "<span class='nva %s' title='%s%sđ so TB 7 ngày của NV'>%s%d</span>" % (
-        "up" if up else "dn", "+" if up else "-", ("%.1f" % abs(dd)).replace(".", ","),
-        "▲" if up else "▼", round(abs(dd)))
+    return "<span class='nvc %s' title='%s%sđ so TB 7 ngày của NV'>%s%s</span>" % (
+        "up" if up else "dn", "+" if up else "-",
+        ("%.1f" % abs(dd)).replace(".", ","),
+        "▲" if up else "▼", ("%.1f" % abs(dd)).replace(".", ","))
 
 
 def _prune_bao_cao_gio():
@@ -696,7 +706,7 @@ def _drv_table(drv):
     if not drv:
         return "<div class='none'>Chưa có chuyến hôm nay.</div>"
     P = ["<table class='drv'><thead><tr><th>Nhân viên</th><th>Gán</th><th>GTC</th>"
-         "<th>LTC</th><th>%GTC</th><th>🛍️GTC</th></tr></thead><tbody>"]
+         "<th>LTC</th><th>%GTC</th><th>So TB7</th></tr></thead><tbody>"]
     for d in sorted(drv, key=lambda x: (-x["gtc"], -x["total"])):
         pc2 = _pct(d["gtc"], d["total"])
         ltc = d.get("ltc", 0)
@@ -712,10 +722,10 @@ def _drv_table(drv):
         # TÊN NV tô màu theo %GTC (giống bưu cục): đỏ<60 · vàng<70 · xanh≥70
         nmc = "nmc " + _cls(pc2)
         P.append("<tr%s><td class='nv'>%s<span class='%s'>%s</span>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                 "<td><span class='pill sm %s'>%s%%</span> %s</td><td>%s</td></tr>"
+                 "<td><span class='pill sm %s'>%s%%</span>%s</td><td>%s</td></tr>"
                  % (attr, cx, nmc, _esc(d["name"]), lb, _n(d["total"]), _n(d["gtc"]),
-                    ltc_cell, _cls(pc2), pc2 if pc2 is not None else "—", _nv_arrow(d),
-                    _tt_cell(d.get("vngh_gtc", 0), d.get("vngh", 0))))
+                    ltc_cell, _cls(pc2), pc2 if pc2 is not None else "—",
+                    _tt_inline(d.get("vngh_gtc", 0), d.get("vngh", 0)), _nv_cmp_cell(d)))
         if has:
             ws = sorted(wards.items(), key=lambda kv: -kv[1][0])
             cells = []
@@ -2154,13 +2164,17 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .ga.up{color:var(--good);background:rgba(23,201,131,.15)}
 .ga.dn{color:var(--bad);background:rgba(245,69,92,.15)}
 .ga.fl{color:var(--mut);background:rgba(255,255,255,.07)}
-/* mũi tên %GTC NV (GỌN — rộng cố định để pill %GTC thẳng hàng dọc, mũi tên thành cột riêng) */
-.nva{display:inline-block;min-width:30px;text-align:right;font-size:9px;font-weight:800;
- font-variant-numeric:tabular-nums;letter-spacing:-.03em;margin-left:4px;white-space:nowrap}
-.nva.up{color:var(--good)}.nva.dn{color:var(--bad)}.nva.fl{color:var(--mut)}
+/* CỘT RIÊNG "So TB7" — chênh %GTC NV vs TB 7 ngày, cỡ chữ BẰNG các cột số khác */
+.nvc{font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap}
+.nvc.up{color:var(--good)}.nvc.dn{color:var(--bad)}.nvc.fl{color:var(--mut)}
+/* TikTok %GTC NV GỌN đặt kèm sau pill %GTC */
+.ttn{font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap;margin-left:3px}
+.ttn.good{color:var(--good)}.ttn.warn{color:var(--warn)}.ttn.bad{color:var(--bad)}.ttn.na{color:var(--mut)}
 /* cột %GTC: pill min-width cố định + nowrap → số %GTC canh thẳng cột */
 table.drv td:nth-child(5){white-space:nowrap;text-align:right}
 table.drv td:nth-child(5) .pill{min-width:46px}
+/* cột So TB7: nowrap canh phải thẳng hàng dọc */
+table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 
 .eod{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--txt);
  background:linear-gradient(135deg,#20264a,#191f38);border:1px solid #313a63;border-radius:14px;
