@@ -99,6 +99,14 @@ def fetch_collectable(token):
         return None
 
 
+def _hm(h):
+    """Giờ thập phân → 'HH:MM', làm tròn phút CÓ nhớ sang giờ (tránh lỗi '19:60')."""
+    if h is None:
+        return "—"
+    mins = int(round(h * 60))
+    return "%02d:%02d" % (mins // 60, mins % 60)
+
+
 def _dph_cls(v):
     if v is None:
         return "na"
@@ -194,7 +202,7 @@ def gen_html(rows, collectable=None):
     reg_gtc = sum(m["gtc"] for m in drv); reg_tot = sum(m["total"] for m in drv)
     gtc_vung = round(reg_gtc * 100 / reg_tot) if reg_tot else None
     avg_h = sum(m["start_h"] for m in timed) / len(timed) if timed else None
-    xp_tb = ("%02d:%02d" % (int(avg_h), round((avg_h - int(avg_h)) * 60))) if avg_h is not None else "—"
+    xp_tb = _hm(avg_h)
     late_count = sum(1 for m in timed if m["late"])                     # NV xuất phát muộn (≥9h)
     on_road = sum(m["ot_tot"] - m["ot_done"] for m in dang_chay)        # đơn NV đang chạy chưa giao (trên đường)
 
@@ -365,10 +373,7 @@ def gen_html(rows, collectable=None):
     P.append("<section class='card' style='padding:2px 10px'>")
 
     def _xpfmt(sm, n):
-        if not n:
-            return "—"
-        h = sm / n
-        return "%02d:%02d" % (int(h), round((h - int(h)) * 60))
+        return _hm(sm / n) if n else "—"
 
     def _dcls(v):
         return "bad" if (v is None or v < DPH_MIN) else ("warn" if v < 4 else "good")
