@@ -2154,10 +2154,13 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .ga.up{color:var(--good);background:rgba(23,201,131,.15)}
 .ga.dn{color:var(--bad);background:rgba(245,69,92,.15)}
 .ga.fl{color:var(--mut);background:rgba(255,255,255,.07)}
-/* mũi tên %GTC NV (GỌN trong bảng NV — không nền, không chèn mất tên NV) */
-.nva{font-size:9px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em;margin-left:2px;white-space:nowrap}
+/* mũi tên %GTC NV (GỌN — rộng cố định để pill %GTC thẳng hàng dọc, mũi tên thành cột riêng) */
+.nva{display:inline-block;min-width:30px;text-align:right;font-size:9px;font-weight:800;
+ font-variant-numeric:tabular-nums;letter-spacing:-.03em;margin-left:4px;white-space:nowrap}
 .nva.up{color:var(--good)}.nva.dn{color:var(--bad)}.nva.fl{color:var(--mut)}
-table.drv td:nth-child(5){white-space:nowrap}   /* cột %GTC: pill + mũi tên không xuống dòng */
+/* cột %GTC: pill min-width cố định + nowrap → số %GTC canh thẳng cột */
+table.drv td:nth-child(5){white-space:nowrap;text-align:right}
+table.drv td:nth-child(5) .pill{min-width:46px}
 
 .eod{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--txt);
  background:linear-gradient(135deg,#20264a,#191f38);border:1px solid #313a63;border-radius:14px;
