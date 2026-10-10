@@ -69,9 +69,13 @@ def _cleanup_detail(url, key, keep_days):
         logger.warning("Dọn chi_tiet_don lỗi: %s", str(e)[:150])
 
 
-def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detail=True):
+def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detail=True,
+         preserve_backlog=False):
     """Lưu 1 ngày báo cáo vào Supabase.
-    date_iso: 'YYYY-MM-DD'; agg: kết quả report.aggregate(); orders: report.dedup_orders()."""
+    date_iso: 'YYYY-MM-DD'; agg: kết quả report.aggregate(); orders: report.dedup_orders().
+    preserve_backlog=True: KHÔNG đè `chua_gan` nếu ngày đó đã có số (bản EOD ~23:30 ghi trước).
+      → dùng cho job backup 23:35 để trang trend/eod khớp đúng số live chốt 23:30, tránh bị
+      đè bằng số 'chưa gán' phình lên sau khi đóng chuyến (~23:35)."""
     url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
     key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
     if not (url and key):
@@ -83,26 +87,45 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
     total_backlog = sum(v.get("deliver", 0) for v in backlog.values())
     total_cod = sum(x.get("gtb_cod", 0) for x in agg["drivers"])
 
+    # Chuẩn hoá thời điểm chốt `chua_gan` về bản EOD ~23:30 (khớp số live). Bản backup 23:35
+    # chỉ ghi khi ngày đó CHƯA có chua_gan (EOD lỡ chưa chạy); nếu đã có thì GIỮ nguyên.
+    skip_cg = False
+    if preserve_backlog:
+        try:
+            rr = requests.get(
+                "%s/rest/v1/bao_cao_vung?select=chua_gan&ngay=eq.%s" % (url, date_iso),
+                headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=20)
+            ex = rr.json() if rr.status_code == 200 else []
+            if ex and ex[0].get("chua_gan") is not None:
+                skip_cg = True
+                logger.info("Giữ chua_gan bản EOD 23:30 (đã có %s đơn) — backup 23:35 không đè.",
+                            ex[0]["chua_gan"])
+        except Exception as e:
+            logger.warning("Không đọc được chua_gan hiện có (%s) — ghi bình thường.", str(e)[:120])
+
     # Kỷ luật ra hàng: giờ xuất phát TB vùng + số NV muộn
     timed = [d for d in agg["drivers"] if d.get("start_h") is not None]
     gio_xp_tb = round(sum(d["start_h"] for d in timed) / len(timed), 2) if timed else None
     so_nv_muon = sum(1 for d in agg["drivers"] if d.get("late"))
 
     # 1) Toàn VÙNG (1 dòng/ngày)
-    _upsert(url, key, "bao_cao_vung", [{
+    vung_row = {
         "ngay": date_iso, "so_buu_cuc": agg["hub_count"], "so_chuyen": g["trips"],
         "don_giao": g["total"], "gtc": g["success"], "gtb": g["total"] - g["success"],
-        "pct_gtc": g["gtc"], "cod_gtb": round(total_cod), "chua_gan": total_backlog,
+        "pct_gtc": g["gtc"], "cod_gtb": round(total_cod),
         "ltc": g.get("ltc", 0), "ltb": g.get("ltb", 0),
         "vngh_don": g.get("vngh_total"), "vngh_gtc": g.get("vngh_gtc"),
         "gio_xuat_phat_tb": gio_xp_tb, "so_nv_muon": so_nv_muon,
-    }], "ngay")
+    }
+    if not skip_cg:
+        vung_row["chua_gan"] = total_backlog
+    _upsert(url, key, "bao_cao_vung", [vung_row], "ngay")
 
     # 2) Theo BƯU CỤC
     bc_rows = [{
         "ngay": date_iso, "buu_cuc": b["bc"], "tinh": b["prov"], "so_chuyen": b.get("trips", 0),
         "don_giao": b["total"], "gtc": b["success"], "gtb": b["total"] - b["success"],
-        "pct_gtc": b["gtc"], "chua_gan": backlog.get(b["bc"], {}).get("deliver", 0),
+        "pct_gtc": b["gtc"],
         "ltc": b.get("ltc", 0), "ltb": b.get("ltb", 0),
         # COD & TikTok theo bưu cục (để so sánh từng AM; cột thêm 2026-09-28,
         # _upsert tự bỏ cột nếu migration chưa chạy nên không vỡ sync)
@@ -111,6 +134,9 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         "vngh_gtc": (round(b["vngh_success"] / b["vngh_total"] * 100, 1)
                      if b.get("vngh_total") else None),
     } for b in agg["bcs"]]
+    if not skip_cg:
+        for row, b in zip(bc_rows, agg["bcs"]):
+            row["chua_gan"] = backlog.get(b["bc"], {}).get("deliver", 0)
     _upsert(url, key, "bao_cao_buu_cuc", bc_rows, "ngay,buu_cuc")
 
     # 3) Theo NHÂN VIÊN

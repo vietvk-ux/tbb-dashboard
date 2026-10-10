@@ -56,7 +56,9 @@ def main():
     except Exception as e:
         logger.warning("Không lấy được tồn chưa gán (bỏ qua field này): %s", str(e)[:120])
 
-    db_sync.sync(d.isoformat(), agg, report.dedup_orders(payload), backlog)
+    # Backup 23:35: GIỮ chua_gan do bản EOD ~23:30 đã ghi (khớp số live), không đè bằng
+    # số 'chưa gán' phình lên sau khi đóng chuyến. Chỉ ghi nếu ngày đó chưa có (EOD lỡ chạy).
+    db_sync.sync(d.isoformat(), agg, report.dedup_orders(payload), backlog, preserve_backlog=True)
     logger.info("XONG sync ngày %s · %d bưu cục · %d nhân viên · GTC %s%%.",
                 d, len(agg["bcs"]), len(agg["drivers"]), agg["grand"]["gtc"])
 
