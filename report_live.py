@@ -1811,9 +1811,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<details class='bc %s'>" % cls)
         P.append("<summary>")
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
-                 "%s<span class='pill %s'>%s%%</span></div>"
-                 % (cls, cls, _esc(amn), _gtc_arrow(v["gtc"], v["total"], _y_am.get(amn)),
-                    cls, pc if pc is not None else "—"))
+                 "<span class='bcmx'><span class='pill %s'>%s%%</span>%s</span></div>"
+                 % (cls, cls, _esc(amn), cls, pc if pc is not None else "—",
+                    _gtc_arrow(v["gtc"], v["total"], _y_am.get(amn))))
         P.append(_bar(pc, cls))
         _am_late = sum(_late_cnt(r) for r in am_rows.get(amn, []))
         _am_low = sum(_low_cnt(r) for r in am_rows.get(amn, []))
@@ -1839,9 +1839,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<details class='bc %s'>" % cls)
         P.append("<summary>")
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
-                 "%s<span class='pill %s'>%s%%</span></div>"
-                 % (cls, cls, _esc(PROV_NAME.get(pv, pv)), _gtc_arrow(v["gtc"], v["total"], _y_prov.get(pv)),
-                    cls, pc if pc is not None else "—"))
+                 "<span class='bcmx'><span class='pill %s'>%s%%</span>%s</span></div>"
+                 % (cls, cls, _esc(PROV_NAME.get(pv, pv)), cls, pc if pc is not None else "—",
+                    _gtc_arrow(v["gtc"], v["total"], _y_prov.get(pv))))
         P.append(_bar(pc, cls))
         _pv_late = sum(_late_cnt(r) for r in prov_rows.get(pv, []))
         _pv_low = sum(_low_cnt(r) for r in prov_rows.get(pv, []))
@@ -1869,9 +1869,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<details class='bc %s' data-k=\"%s\">" % (cls, _esc(keys)))
         P.append("<summary>")
         P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
-                 "%s<span class='pill %s'>%s%%</span></div>"
-                 % (cls, cls, _esc(r["name"]), _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"])),
-                    cls, pc if pc is not None else "—"))
+                 "<span class='bcmx'><span class='pill %s'>%s%%</span>%s</span></div>"
+                 % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—",
+                    _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"])))
+                 )
         P.append(_bar(pc, cls))
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
                  "<span class='w'>⏳ %s</span><span>✅ %s</span>"
@@ -2158,12 +2159,17 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .sd.dn{color:var(--bad);background:rgba(245,69,92,.14)}
 .sd.nt{color:var(--mut);background:rgba(255,255,255,.07)}
 .sd.fl{color:var(--mut);background:rgba(255,255,255,.05)}
-/* mũi tên %GTC so cùng giờ hôm qua trên thẻ AM / Tỉnh / Bưu cục (▲ xanh tốt hơn · ▼ đỏ kém) */
-.ga{flex:none;margin-right:7px;font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;
- letter-spacing:-.02em;padding:1px 6px;border-radius:7px;line-height:1.4}
+/* mũi tên %GTC so TB 7 ngày trên thẻ AM / Tỉnh / Bưu cục (▲ xanh tốt hơn · ▼ đỏ kém) */
+.ga{flex:none;font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;
+ letter-spacing:-.02em;padding:1px 6px;border-radius:7px;line-height:1.4;
+ min-width:40px;text-align:right}
 .ga.up{color:var(--good);background:rgba(23,201,131,.15)}
 .ga.dn{color:var(--bad);background:rgba(245,69,92,.15)}
 .ga.fl{color:var(--mut);background:rgba(255,255,255,.07)}
+/* Cụm chỉ số phải header thẻ: pill %GTC (dưới cột %GTC NV) + mũi tên So TB7 (dưới cột So TB7 NV),
+   neo phải trùng mép bảng drv để THẲNG CỘT với bảng nhân viên bên dưới. */
+.bcmx{flex:none;display:flex;align-items:center;width:123px;margin-right:-7px}
+.bcmx .pill{flex:none;margin-right:auto}
 /* CỘT RIÊNG "So TB7" — chênh %GTC NV vs TB 7 ngày, cỡ chữ BẰNG các cột số khác */
 .nvc{font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap}
 .nvc.up{color:var(--good)}.nvc.dn{color:var(--bad)}.nvc.fl{color:var(--mut)}
