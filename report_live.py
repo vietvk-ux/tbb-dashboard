@@ -1795,7 +1795,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         if d == 0:
             return "<span class='ga fl' title='= TB 7 ngày cùng giờ'>▬</span>"
         up = d > 0
-        return "<span class='ga %s' title='so TB 7 ngày cùng giờ'>%s%sđ</span>" % (
+        return "<span class='ga %s' title='so TB 7 ngày cùng giờ (điểm)'>%s%s</span>" % (
             "up" if up else "dn", "▲" if up else "▼", ("%.1f" % abs(d)).replace(".", ","))
 
     # ===== Theo AM (xếp hạng · bấm mở xem bưu cục) =====
@@ -2159,13 +2159,13 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .sd.dn{color:var(--bad);background:rgba(245,69,92,.14)}
 .sd.nt{color:var(--mut);background:rgba(255,255,255,.07)}
 .sd.fl{color:var(--mut);background:rgba(255,255,255,.05)}
-/* mũi tên %GTC so TB 7 ngày trên thẻ AM / Tỉnh / Bưu cục (▲ xanh tốt hơn · ▼ đỏ kém) */
-.ga{flex:none;font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;
- letter-spacing:-.02em;padding:1px 6px;border-radius:7px;line-height:1.4;
- min-width:40px;text-align:right}
-.ga.up{color:var(--good);background:rgba(23,201,131,.15)}
-.ga.dn{color:var(--bad);background:rgba(245,69,92,.15)}
-.ga.fl{color:var(--mut);background:rgba(255,255,255,.07)}
+/* mũi tên %GTC so TB 7 ngày trên thẻ AM / Tỉnh / Bưu cục — ĐỒNG BỘ cỡ/kiểu với cột So TB7 của
+   bảng NV (.nvc): chữ trần xanh/đỏ, KHÔNG nền chip, bỏ đuôi 'đ' (▲ xanh tốt hơn · ▼ đỏ kém) */
+.ga{flex:none;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;
+ letter-spacing:-.02em;line-height:1.4;min-width:40px;text-align:right}
+.ga.up{color:var(--good)}
+.ga.dn{color:var(--bad)}
+.ga.fl{color:var(--mut)}
 /* Cụm chỉ số phải header thẻ: pill %GTC (dưới cột %GTC NV) + mũi tên So TB7 (dưới cột So TB7 NV),
    neo phải trùng mép bảng drv để THẲNG CỘT với bảng nhân viên bên dưới. */
 .bcmx{flex:none;display:flex;align-items:center;width:123px;margin-right:-7px}
@@ -2295,6 +2295,7 @@ tr.wsub>td{padding:2px 6px 10px !important;text-align:left}
   table.drv th{font-size:8px;letter-spacing:0}
   td.nv{max-width:112px}
   .pill.sm{min-width:34px;font-size:10px;padding:2px 5px}
+  .ga{font-size:11px}   /* khớp cỡ số cột So TB7 bảng NV (11px mobile) */
   .bcm,.pmeta{font-size:10px}
 }
 
