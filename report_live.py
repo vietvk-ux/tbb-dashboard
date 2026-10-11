@@ -741,13 +741,17 @@ def _drv_table(drv):
     return "".join(P)
 
 
-def _bc_drv_details(r):
-    """1 bưu cục dạng <details> LỒNG (bấm mở ra bảng nhân viên) — dùng trong mục AM/tỉnh."""
+def _bc_drv_details(r, arrow=""):
+    """1 bưu cục dạng <details> LỒNG (bấm mở ra bảng nhân viên) — dùng trong mục AM/tỉnh.
+    arrow = mũi tên So TB7 (_gtc_arrow) truyền từ gen_html → BC con đồng bộ & THẲNG CỘT với
+    thẻ AM/BC cấp đầu và bảng NV (pill %GTC + So TB7 cùng cụm .bcmx + có thanh tiến độ)."""
     pc = _pct(r["gtc"], r["total"])
     cls = _cls(pc)
     P = ["<details class='bc sub %s'><summary>" % cls]
     P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
-             "<span class='pill %s'>%s%%</span></div>" % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
+             "<span class='bcmx'><span class='pill %s'>%s%%</span>%s</span></div>"
+             % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—", arrow))
+    P.append(_bar(pc, cls))
     P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
              "<span class='ltc'>LTC %s</span>%s%s%s</div>"
              % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]),
@@ -1817,15 +1821,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append(_bar(pc, cls))
         _am_late = sum(_late_cnt(r) for r in am_rows.get(amn, []))
         _am_low = sum(_low_cnt(r) for r in am_rows.get(amn, []))
-        P.append("<div class='pmeta'>🏤 %s BC·📥 %s·<span class='w'>⏳ %s</span>·✅ %s·<span class='ltc'>LTC %s</span>%s%s%s</div>"
+        P.append("<div class='pmeta'><span>🏤 %s BC</span><span>📥 %s</span><span class='w'>⏳ %s</span>"
+                 "<span>✅ %s</span><span class='ltc'>LTC %s</span>%s%s%s</div>"
                  % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["ltc"]),
-                    ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else "",
-                    ("·" + _late_badge(_am_late)) if _am_late else "",
-                    ("·" + _low_badge(_am_low)) if _am_low else ""))
+                    _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0)) if v.get("vngh") else "",
+                    _late_badge(_am_late) if _am_late else "",
+                    _low_badge(_am_low) if _am_low else ""))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
-            P.append(_bc_drv_details(r))
+            P.append(_bc_drv_details(r, _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"]))))
         P.append("</div></details>")
 
     # ===== Theo tỉnh (bấm mở xem bưu cục) =====
@@ -1845,16 +1850,17 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append(_bar(pc, cls))
         _pv_late = sum(_late_cnt(r) for r in prov_rows.get(pv, []))
         _pv_low = sum(_low_cnt(r) for r in prov_rows.get(pv, []))
-        P.append("<div class='pmeta'>🏃 %s·📥 %s·⏳ %s·✅ %s·<span class='ltc'>LTC %s</span>%s%s%s</div>"
+        P.append("<div class='pmeta'><span>🏃 %s</span><span>📥 %s</span><span class='w'>⏳ %s</span>"
+                 "<span>✅ %s</span><span class='ltc'>LTC %s</span>%s%s%s</div>"
                  % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _n(v["ltc"]),
-                    ("·" + _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0))) if v.get("vngh") else "",
-                    ("·" + _late_badge(_pv_late)) if _pv_late else "",
-                    ("·" + _low_badge(_pv_low)) if _pv_low else ""))
+                    _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0)) if v.get("vngh") else "",
+                    _late_badge(_pv_late) if _pv_late else "",
+                    _low_badge(_pv_low) if _pv_low else ""))
         P.append("</summary>")
         P.append("<div class='dtl'>")
         for r in sorted(prov_rows.get(pv, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
-            P.append(_bc_drv_details(r))
+            P.append(_bc_drv_details(r, _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"]))))
         P.append("</div></details>")
 
     # ===== Bưu cục =====
@@ -2174,7 +2180,7 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .nvc{font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap}
 .nvc.up{color:var(--good)}.nvc.dn{color:var(--bad)}.nvc.fl{color:var(--mut)}
 /* TikTok %GTC NV GỌN đặt kèm sau pill %GTC */
-.ttn{font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap;margin-left:3px}
+.ttn{font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap;margin-left:6px}
 .ttn.good{color:var(--good)}.ttn.warn{color:var(--warn)}.ttn.bad{color:var(--bad)}.ttn.na{color:var(--mut)}
 /* cột %GTC: pill min-width cố định + nowrap → số %GTC canh thẳng cột */
 table.drv td:nth-child(5){white-space:nowrap;text-align:right}
@@ -2219,7 +2225,7 @@ table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 .prow.good{border-left-color:var(--good)}.prow.warn{border-left-color:var(--warn)}.prow.bad{border-left-color:var(--bad)}
 .pl{display:flex;align-items:center;gap:9px;font-size:15px}
 .prow .bar{grid-column:1/-1}
-.pmeta{grid-column:1/-1;color:var(--mut);font-size:10.5px;letter-spacing:-.1px;font-variant-numeric:tabular-nums;line-height:1.5}
+.pmeta{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:3px 9px;align-items:center;color:var(--mut);font-size:10.5px;letter-spacing:-.1px;font-variant-numeric:tabular-nums;line-height:1.5}
 
 .dot{width:9px;height:9px;border-radius:50%;flex:none;background:#4b5168}
 .dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
