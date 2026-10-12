@@ -252,6 +252,14 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
  background:linear-gradient(160deg,rgba(242,69,92,.14),rgba(245,170,23,.05) 55%,transparent);
  border:1px solid rgba(242,69,92,.34)}
 .whead{font-weight:800;font-size:14px;letter-spacing:.02em;color:#ff7b81;margin-bottom:5px}
+details.watch>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px}
+details.watch>summary::-webkit-details-marker{display:none}
+details.watch>summary .whead{margin-bottom:0;flex:1;min-width:0}
+details.watch[open]>summary{margin-bottom:12px}
+.wcv{flex:none;color:#ff9aab;font-size:11.5px;font-weight:800;white-space:nowrap}
+.wcv .wvc{display:none}
+details.watch[open] .wcv .wvo{display:none}
+details.watch[open] .wcv .wvc{display:inline}
 .wsub{font-size:12px;color:var(--mut);line-height:1.5;margin-bottom:12px}
 .wsub b{color:var(--txt)}.wsub i{color:#d7b3b5;font-style:normal;font-size:11px}
 .wbc{position:relative;border:1px solid var(--line);border-radius:12px;background:var(--card);
@@ -397,8 +405,10 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=5, min_orders=40):
     recs.sort(key=lambda x: x["score"])
     top = recs[:topn]
 
-    P = ["<section class='watch'>"]
-    P.append("<div class='whead'>🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · VÙNG TBB</div>")
+    P = ["<details class='watch'>"]
+    P.append("<summary><span class='whead'>🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · VÙNG TBB</span>"
+             "<span class='wcv'><span class='wvo'>▾ Xem %d BC</span><span class='wvc'>▴ Thu gọn</span></span>"
+             "</summary>" % len(top))
     note6 = "6 tiêu chí" if has_noon else "5 tiêu chí <i>(tồn gán trước 12h đầy đủ từ ngày mai)</i>"
     P.append("<div class='wsub'>Top %d bưu cục tệ nhất vùng theo điểm tổng hợp %s: "
              "<b>%%GTC · năng suất NV · backlog &gt;120h · GTB · NV &lt;50%% · tồn gán trước 12h</b> "
@@ -416,7 +426,7 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=5, min_orders=40):
                  % (round(dd["ns"]), _n(dd["g120"]), _n(dd["gtb"]), _n(dd["nvlow"]), noon_txt))
         P.append("<div class='wtag'>🔥 %s</div>" % " · ".join(dd["_tags"]))
         P.append("</div>")
-    P.append("</section>")
+    P.append("</details>")
     return "".join(P)
 
 

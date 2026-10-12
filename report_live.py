@@ -2146,6 +2146,14 @@ details.diag[open] .dcv{transform:rotate(180deg)}
  background:linear-gradient(160deg,rgba(242,69,92,.14),rgba(245,170,23,.05) 55%,transparent);
  border:1px solid rgba(242,69,92,.34)}
 .whead{font-weight:800;font-size:14px;letter-spacing:.02em;color:#ff7b81;margin-bottom:5px}
+details.watch>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px}
+details.watch>summary::-webkit-details-marker{display:none}
+details.watch>summary .whead{margin-bottom:0;flex:1;min-width:0}
+details.watch[open]>summary{margin-bottom:12px}
+.wcv{flex:none;color:#ff9aab;font-size:11.5px;font-weight:800;white-space:nowrap}
+.wcv .wvc{display:none}
+details.watch[open] .wcv .wvo{display:none}
+details.watch[open] .wcv .wvc{display:inline}
 .wsub{font-size:12px;color:var(--mut);line-height:1.5;margin-bottom:12px}
 .wsub b{color:var(--txt)}.wsub i{color:#d7b3b5;font-style:normal;font-size:11px}
 .wbc{position:relative;border:1px solid var(--line);border-radius:12px;background:var(--card);
