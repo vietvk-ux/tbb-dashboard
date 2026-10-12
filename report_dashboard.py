@@ -382,15 +382,18 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=5, min_orders=40):
         for r, i in enumerate(order):
             pr[i] = r                 # 0 = tệ nhất
         return pr
-    crit = [("pct", False, "%GTC thấp"), ("ns", False, "năng suất NV thấp"),
-            ("g120", True, "backlog 120h cao"), ("gtb", True, "GTB nhiều"),
-            ("nvlow", True, "nhiều NV <50%")]
+    # Trọng số (user chốt 12/10): %GTC + TỒN CHƯA GÁN 12h NẶNG NHẤT (×2), còn lại ×1.
+    crit = [("pct", False, "%GTC thấp", 2.0), ("ns", False, "năng suất NV thấp", 1.0),
+            ("g120", True, "backlog 120h cao", 1.0), ("gtb", True, "GTB nhiều", 1.0),
+            ("nvlow", True, "nhiều NV <50%", 1.0)]
     if has_noon:
-        crit.append(("noon", True, "tồn gán trước 12h cao"))
-    ranks = {k: _rk(k, hb) for k, hb, _ in crit}
+        crit.append(("noon", True, "tồn gán trước 12h cao", 2.0))
+    ranks = {k: _rk(k, hb) for k, hb, _, _ in crit}
     for i, dd in enumerate(recs):
-        dd["score"] = sum(ranks[k][i] for k, _, _ in crit)
-        dd["_tags"] = [lbl for _, lbl in sorted((ranks[k][i], lbl) for k, _, lbl in crit)][:2]
+        # Điểm = Σ trọng_số × hạng (hạng 0 = tệ nhất) → điểm THẤP = nguy hiểm nhất.
+        dd["score"] = sum(ranks[k][i] * w for k, _, _, w in crit)
+        # Tag = 2 tiêu chí tệ nhất theo HẠNG ĐÃ CHIA TRỌNG SỐ (tiêu chí nặng xấu → nổi lên trước).
+        dd["_tags"] = [lbl for _, lbl in sorted((ranks[k][i] / w, lbl) for k, _, lbl, w in crit)][:2]
     recs.sort(key=lambda x: x["score"])
     top = recs[:topn]
 
@@ -399,7 +402,7 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=5, min_orders=40):
     note6 = "6 tiêu chí" if has_noon else "5 tiêu chí <i>(tồn gán trước 12h đầy đủ từ ngày mai)</i>"
     P.append("<div class='wsub'>Top %d bưu cục tệ nhất vùng theo điểm tổng hợp %s: "
              "<b>%%GTC · năng suất NV · backlog &gt;120h · GTB · NV &lt;50%% · tồn gán trước 12h</b> "
-             "(chốt cuối ngày).</div>" % (len(top), note6))
+             "(chốt cuối ngày · <b>%%GTC &amp; tồn 12h tính nặng điểm nhất</b>).</div>" % (len(top), note6))
     for i, dd in enumerate(top, 1):
         cls = _cls(dd["pct"])
         noon_txt = ("<span class='bd'>⏳12h <b>%s</b></span>" % _n(dd["noon"])) if dd["noon"] is not None else ""
