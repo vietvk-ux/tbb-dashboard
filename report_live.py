@@ -98,21 +98,26 @@ def _bar(pct, cls, target=None):
 
 def _khuvuc_ref():
     """Đọc khuvuc_data (file trong repo, 0 creds) → tham chiếu lịch sử:
-    {yp:%GTC hôm qua, avg7p:%GTC TB tuần, avg7t:đơn TB tuần, ndays}. None nếu thiếu."""
+    {yp:%GTC hôm qua, avg7p:%GTC TB tuần, avg7t:đơn TB tuần, ndays, avg30p:%GTC TB 30 ngày, ndays30}.
+    None nếu thiếu."""
     import glob
     try:
-        days = []
-        for f in sorted(glob.glob("khuvuc_data/*.json"))[-7:]:
+        alld = []
+        for f in sorted(glob.glob("khuvuc_data/*.json"))[-30:]:   # giữ 30 ngày
             d = json.load(open(f, encoding="utf-8"))
             if d.get("tot"):
-                days.append(d)
-        if not days:
+                alld.append(d)
+        if not alld:
             return None
+        days = alld[-7:]
         y = days[-1]
         st = sum(x["tot"] for x in days)
         sg = sum(x["gtc"] for x in days)
+        st30 = sum(x["tot"] for x in alld)
+        sg30 = sum(x["gtc"] for x in alld)
         return {"yp": _pct(y["gtc"], y["tot"]), "avg7p": _pct(sg, st),
-                "avg7t": round(st / len(days)), "ndays": len(days)}
+                "avg7t": round(st / len(days)), "ndays": len(days),
+                "avg30p": _pct(sg30, st30), "ndays30": len(alld)}
     except Exception:
         return None
 
@@ -1341,12 +1346,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         pcts = [t["pct"] for t in trend]
         P.append("<div class='sparkwrap'>%s</div>" % _spark(pcts, "#fbbf24", w=280, h=50, target=70))
     if ref:
-        # (Bỏ chip 'Còn X điểm tới 70%' 08/10 — trùng thanh bar + mục tiêu; giữ 3 mốc tham chiếu.)
+        # (Bỏ chip 'Còn X điểm tới 70%' 08/10 — trùng thanh bar + mục tiêu; giữ các mốc tham chiếu.)
+        # TB 30 ngày chỉ hiện khi CÓ hơn 7 ngày dữ liệu (nếu bằng 7 ngày thì trùng TB 7 ngày).
+        tb30 = ""
+        if ref.get("avg30p") is not None and ref.get("ndays30", 0) > ref["ndays"]:
+            tb30 = "<span class='rc'>TB %d ngày <b>%d%%</b></span>" % (ref["ndays30"], ref["avg30p"])
         P.append("<div class='href'>"
                  "<span class='rc'>🎯 Mục tiêu <b>70%%</b></span>"
                  "<span class='rc'>Hôm qua <b>%d%%</b></span>"
-                 "<span class='rc'>TB %d ngày <b>%d%%</b></span></div>"
-                 % (ref["yp"], ref["ndays"], ref["avg7p"]))
+                 "<span class='rc'>TB %d ngày <b>%d%%</b></span>%s</div>"
+                 % (ref["yp"], ref["ndays"], ref["avg7p"], tb30))
     P.append("</section>")
 
     # 🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT — bản CHỐT 23h30 (frozen cả ngày; report_dashboard ghi file)
