@@ -1971,7 +1971,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 _CSS = """<style>
 :root{
  --bg:#0a0e1a;--bg2:#10131f;--card:rgba(26,32,56,.9);--card2:rgba(36,44,72,.9);--line:rgba(255,255,255,.24);
- --mut:#c6cde6;--txt:#fbfcff;--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18;
+ --mut:#d4dbf0;--txt:#fbfcff;--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18;
  --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -2086,7 +2086,7 @@ table.amtab td b{font-weight:800}
 .vpct b{font-weight:800;font-size:26px;font-variant-numeric:tabular-nums}
 .vpct i{display:block;font-style:normal;font-size:8.5px;color:var(--mut);font-weight:600}
 /* CẦN LÀM NGAY */
-.sectitle{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);margin:14px 3px 8px}
+.sectitle{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#e3e8f7;margin:14px 3px 8px}
 /* ===== LƯỚI CHỈ SỐ (Phương án A) — ô gọn 2 cột, bấm bung full-width ===== */
 .prilist{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px;background:none;border:none;padding:0}
 .gt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px 10px;
@@ -2271,7 +2271,7 @@ table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 .eod{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:var(--txt);
  background:linear-gradient(135deg,#20264a,#191f38);border:1px solid #313a63;border-radius:14px;
  padding:14px 16px;margin-bottom:8px;font-weight:700;font-size:14px}
-.eod .arw{color:#aeb6e0;font-size:12px;font-weight:600}
+.eod .arw{color:#d4dbf0;font-size:12px;font-weight:600}
 .eod:active{transform:scale(.99)}
 .eod.tq{background:linear-gradient(135deg,#1e3a8a,#2563eb);border-color:#3b82f6;font-size:15px}
 .eod.tq .arw{color:#c7dbff}
@@ -2297,7 +2297,7 @@ table.drv td:nth-child(6){white-space:nowrap;text-align:right}
  font-variant-numeric:tabular-nums}
 .mtile.feat .mbig span{font-size:15px;color:rgba(var(--h),1);margin-left:2px}
 
-.sec{font-size:12px;font-weight:700;letter-spacing:.05em;color:#b9c0da;text-transform:uppercase;margin:20px 4px 10px}
+.sec{font-size:12.5px;font-weight:800;letter-spacing:.05em;color:#e3e8f7;text-transform:uppercase;margin:20px 4px 10px}
 
 .provs{display:flex;flex-direction:column;gap:8px}
 .prow{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:14px;padding:12px 14px;
