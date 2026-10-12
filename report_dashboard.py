@@ -247,6 +247,25 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .dsub{color:#d7b3b5;font-size:12.5px;line-height:1.5;margin-bottom:10px}
 .dsub b{color:#fff}.dsub .rd{color:var(--bad)}
 .ok{color:var(--good);font-size:13px;font-weight:600}
+/* 🔎 Bưu cục cần theo dõi sâu sát (ngay dưới hero) */
+.watch{border-radius:18px;padding:15px 14px 12px;margin:10px 0 14px;
+ background:linear-gradient(160deg,rgba(242,69,92,.14),rgba(245,170,23,.05) 55%,transparent);
+ border:1px solid rgba(242,69,92,.34)}
+.whead{font-weight:800;font-size:14px;letter-spacing:.02em;color:#ff7b81;margin-bottom:5px}
+.wsub{font-size:12px;color:var(--mut);line-height:1.5;margin-bottom:12px}
+.wsub b{color:var(--txt)}.wsub i{color:#d7b3b5;font-style:normal;font-size:11px}
+.wbc{position:relative;border:1px solid var(--line);border-radius:12px;background:var(--card);
+ padding:10px 12px 9px;margin-bottom:8px;overflow:hidden}
+.wbc:last-child{margin-bottom:0}
+.wbc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:rgb(var(--h,242,69,92))}
+.wbc.bad{--h:242,69,92}.wbc.warn{--h:245,170,23}.wbc.good{--h:23,201,131}
+.wbh{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.wrk{flex:none;width:22px;height:22px;border-radius:7px;background:rgba(242,69,92,.2);color:#ff9aab;
+ font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.wbn{flex:1;min-width:0;font-weight:800;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wbm{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--mut);margin-bottom:5px;font-variant-numeric:tabular-nums}
+.wbm b{color:var(--txt);font-weight:800}.wbm .bd b{color:#ff9aab}
+.wtag{font-size:10.5px;color:var(--warn);font-weight:700}
 
 .sec{font-size:12px;font-weight:700;letter-spacing:.05em;color:#b9c0da;text-transform:uppercase;margin:20px 4px 10px}
 
@@ -323,7 +342,82 @@ body{background:radial-gradient(130% 100% at 50% -10%,rgba(129,140,248,.10),tran
 </style></head><body>"""
 
 
-def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=None, bc_days=None, red_bc=None, red_giao_bc=None):
+def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=5, min_orders=40):
+    """🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · Top N tệ nhất vùng theo ĐIỂM TỔNG HỢP 6 tiêu chí:
+    %GTC thấp · năng suất NV (GTC/NV) thấp · backlog >120h cao · GTB nhiều · NV %GTC<50% nhiều ·
+    tồn chưa gán tại ~12h cao. Xếp hạng từng tiêu chí (0=tệ nhất) rồi cộng → điểm thấp = tệ nhất.
+    Tiêu chí 'tồn 12h' chỉ tính khi có log (noon_bl) — chưa có thì dùng 5 tiêu chí."""
+    from collections import defaultdict
+    red_giao_bc = red_giao_bc or {}
+    noon_bl = noon_bl or {}
+    # NV theo bưu cục: số NV đi làm (có đơn giao) + số NV %GTC<50% (≥20 đơn)
+    nv = defaultdict(lambda: [0, 0])
+    for dvr in agg["drivers"]:
+        if dvr.get("total", 0) <= 0:
+            continue
+        nv[dvr["bc"]][0] += 1
+        dp = dvr["success"] / dvr["total"] * 100 if dvr["total"] else 0
+        if dvr["total"] >= 20 and dp < 50:
+            nv[dvr["bc"]][1] += 1
+    recs = []
+    for b in agg["bcs"]:
+        bc = b["bc"]; tot = b["total"]; suc = b["success"]
+        g120 = red_giao_bc.get(bc, 0)
+        if tot < min_orders and g120 < 20:          # bỏ bưu cục quá nhỏ (nhiễu %GTC)
+            continue
+        ncnt = nv[bc][0] or 1
+        recs.append({"bc": bc, "pct": (suc / tot * 100) if tot else 0.0,
+                     "ns": suc / ncnt, "g120": g120, "gtb": tot - suc,
+                     "nvlow": nv[bc][1], "noon": noon_bl.get(bc),
+                     "tot": tot, "suc": suc, "nv": nv[bc][0]})
+    m = len(recs)
+    if m < 3:
+        return ""
+    has_noon = any(r["noon"] is not None for r in recs)
+
+    def _rk(key, higher_bad):
+        order = sorted(range(m), key=lambda i: (recs[i][key] if recs[i][key] is not None else 0),
+                       reverse=higher_bad)
+        pr = [0] * m
+        for r, i in enumerate(order):
+            pr[i] = r                 # 0 = tệ nhất
+        return pr
+    crit = [("pct", False, "%GTC thấp"), ("ns", False, "năng suất NV thấp"),
+            ("g120", True, "backlog 120h cao"), ("gtb", True, "GTB nhiều"),
+            ("nvlow", True, "nhiều NV <50%")]
+    if has_noon:
+        crit.append(("noon", True, "tồn gán trước 12h cao"))
+    ranks = {k: _rk(k, hb) for k, hb, _ in crit}
+    for i, dd in enumerate(recs):
+        dd["score"] = sum(ranks[k][i] for k, _, _ in crit)
+        dd["_tags"] = [lbl for _, lbl in sorted((ranks[k][i], lbl) for k, _, lbl in crit)][:2]
+    recs.sort(key=lambda x: x["score"])
+    top = recs[:topn]
+
+    P = ["<section class='watch'>"]
+    P.append("<div class='whead'>🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · VÙNG TBB</div>")
+    note6 = "6 tiêu chí" if has_noon else "5 tiêu chí <i>(tồn gán trước 12h đầy đủ từ ngày mai)</i>"
+    P.append("<div class='wsub'>Top %d bưu cục tệ nhất vùng theo điểm tổng hợp %s: "
+             "<b>%%GTC · năng suất NV · backlog &gt;120h · GTB · NV &lt;50%% · tồn gán trước 12h</b> "
+             "(chốt cuối ngày).</div>" % (len(top), note6))
+    for i, dd in enumerate(top, 1):
+        cls = _cls(dd["pct"])
+        noon_txt = ("<span class='bd'>⏳12h <b>%s</b></span>" % _n(dd["noon"])) if dd["noon"] is not None else ""
+        P.append("<div class='wbc %s'>" % cls)
+        P.append("<div class='wbh'><span class='wrk'>%d</span><span class='wbn'>%s</span>"
+                 "<span class='pill sm %s'>%d%%</span></div>" % (i, _esc(dd["bc"]), cls, round(dd["pct"])))
+        P.append("<div class='wbm'><span>🚚 <b>%s</b> đơn/NV</span>"
+                 "<span class='bd'>🔴 <b>%s</b> &gt;120h</span>"
+                 "<span class='bd'>❌ <b>%s</b> GTB</span>"
+                 "<span class='bd'>👤 <b>%s</b> NV&lt;50%%</span>%s</div>"
+                 % (round(dd["ns"]), _n(dd["g120"]), _n(dd["gtb"]), _n(dd["nvlow"]), noon_txt))
+        P.append("<div class='wtag'>🔥 %s</div>" % " · ".join(dd["_tags"]))
+        P.append("</div>")
+    P.append("</section>")
+    return "".join(P)
+
+
+def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=None, bc_days=None, red_bc=None, red_giao_bc=None, noon_bl=None):
     backlog = backlog or {}
     hist = hist or []
     bc_days = bc_days or []
@@ -369,6 +463,11 @@ def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=N
     P.append("<div class='hsub'>%s / %s đơn giao thành công · GTB %s đơn · LTC %s</div>"
              % (_n(g["success"]), _n(g["total"]), _n(total_gtb), _n(g.get("ltc", 0))))
     P.append("</section>")
+
+    # ===== 🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT (ngay dưới hero %GTC) =====
+    _watch = _build_watch_bc(agg, red_giao_bc, noon_bl)
+    if _watch:
+        P.append(_watch)
 
     # ===== Dải chỉ số =====
     P.append("<section class='strip'>")
@@ -901,6 +1000,33 @@ def _fetch_hist(d):
     return []
 
 
+def _fetch_bc_noon_backlog(d, noon_hour=12):
+    """Tồn CHƯA GÁN GIAO per bưu cục tại ~12h trưa ngày d (tiêu chí 'cần theo dõi sâu sát').
+    Nguồn: bao_cao_gio hàng gio=noon_hour → bcsnap {bc:[gtc,total,backlog]} (report_live log mỗi 30').
+    Trả {bc: backlog}. Chưa có (ngày cũ / phần tử backlog chưa log) → {} (tiêu chí tự ẩn)."""
+    import requests
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return {}
+    try:
+        r = requests.get(url + "/rest/v1/bao_cao_gio",
+                         params=[("select", "gio,bcsnap"),
+                                 ("ngay", "eq." + d.isoformat()), ("gio", "eq.%d" % noon_hour)],
+                         headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=30)
+        if r.ok and r.json():
+            bcsnap = r.json()[0].get("bcsnap") or {}
+            out = {}
+            for bc, v in bcsnap.items():
+                if isinstance(v, (list, tuple)) and len(v) >= 3 and v[2] is not None:
+                    out[bc] = v[2]
+            return out
+    except Exception as e:
+        logger.warning("Không đọc được tồn chưa gán 12h (bỏ qua tiêu chí này): %s", str(e)[:120])
+    return {}
+
+
 def _fetch_bc_days(d, n=7):
     """bao_cao_buu_cuc n ngày TRƯỚC ngày d (để so từng AM: hôm qua + TB 7 ngày).
     Trả list rows có 'ngay'. Lỗi → []."""
@@ -1071,12 +1197,14 @@ def main():
         red_giao_bc = {n: r["DELIVER"] for n, r in _reds.items()}   # Giao >120h (đơn đỏ SLA)
     except Exception as e:
         logger.warning("Không lấy được tồn đỏ theo bưu cục (bỏ qua): %s", str(e)[:120])
+    # Tồn chưa gán giao per bưu cục lúc ~12h trưa (tiêu chí 6 'cần theo dõi sâu sát') — từ bao_cao_gio
+    noon_bl = _fetch_bc_noon_backlog(d)
     # URL bí mật: ghi vào docs/<slug>/index.html (URL gốc sẽ 404)
     slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
     outdir = os.path.join("docs", slug)
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
-        f.write(gen_html(agg, backlog, backlog_time, ontrip, hist, bc_days, red_bc, red_giao_bc))
+        f.write(gen_html(agg, backlog, backlog_time, ontrip, hist, bc_days, red_bc, red_giao_bc, noon_bl))
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],

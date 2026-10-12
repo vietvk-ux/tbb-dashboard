@@ -209,9 +209,11 @@ def _region_snapshot(rows, giao_120h=None):
 
 
 def _bc_snapshot(rows):
-    """Snapshot [gtc,total] TỪNG BƯU CỤC (để so %GTC cùng giờ hôm qua). AM/Tỉnh = tổng BC con."""
-    return {r["name"]: [r.get("gtc", 0), r.get("total", 0)]
-            for r in rows if r.get("total", 0) > 0}
+    """Snapshot [gtc,total,backlog] TỪNG BƯU CỤC. [gtc,total] = so %GTC cùng giờ hôm qua
+    (AM/Tỉnh = tổng BC con; reader chỉ đọc [0],[1]); phần tử thứ 3 `backlog` (chưa gán giao)
+    để báo cáo cuối ngày lấy 'tồn chưa gán tại ~12h' (bưu cục cần theo dõi sâu sát)."""
+    return {r["name"]: [r.get("gtc", 0), r.get("total", 0), r.get("backlog", 0)]
+            for r in rows if r.get("total", 0) > 0 or r.get("backlog", 0) > 0}
 
 
 def _nv_snapshot(rows):
