@@ -698,7 +698,7 @@ def _ai_hotspot(rows, bc_avg, now):
     else:
         act = ("Tối muộn → chốt backlog %d BC trên, nặng nhất <b>%s</b>, kế hoạch xử lý sớm mai."
                % (nbc, _esc(b["name"])))
-    head = ("🤖 <b>Phân tích điểm nóng</b> · %s %dh · Top %d bưu cục cần chú ý nhất" % (phase, hr, nbc))
+    head = ("🤖 <b>Phân tích Top %d bưu cục điểm nóng nhất vùng TBB</b> · %s %dh" % (nbc, phase, hr))
     body = "<div class='aibd'>%s<div class='airow aiact'>👉 %s</div></div>" % ("".join(rrows), act)
     return "<details class='aidx'><summary>%s<span class='dcv'>▾</span></summary>%s</details>" % (head, body)
 
