@@ -1141,22 +1141,29 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # ===== Hero %GTC + dải đánh giá + đường xu hướng 14 ngày (chốt cuối ngày) =====
     P.append("<section class='hero %s'>" % _cls(reg_pct))
     P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG · TỚI HIỆN TẠI</div>")
+    # Số %GTC to BÊN TRÁI + ⚖️ Tồn kho (kg thực) BÊN PHẢI, cùng 1 hàng (desktop); mobile tự xuống dòng.
+    P.append("<div class='htop'>")
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
+    if lgt_w:
+        _lc = ""
+        if lgt_w.get("lc_giao") or lgt_w.get("lc_tra"):
+            _lc = ("<div class='hwi'><span>🔁 LC giao</span><b>%s</b></div>"
+                   "<div class='hwi'><span>🔁 LC trả</span><b>%s</b></div>"
+                   % (_kgfmt(lgt_w.get("lc_giao", 0) / 1000.0), _kgfmt(lgt_w.get("lc_tra", 0) / 1000.0)))
+        P.append("<div class='hwh'><div class='hwh-t'>⚖️ Tồn kho <i>(kg thực)</i></div>"
+                 "<div class='hwh-g'>"
+                 "<div class='hwi'><span>📥 Lấy</span><b>%s</b></div>"
+                 "<div class='hwi'><span>🚚 Giao</span><b>%s</b></div>"
+                 "<div class='hwi'><span>↩️ Trả</span><b>%s</b></div>%s"
+                 "</div></div>"
+                 % (_kgfmt(lgt_w.get("lay", 0) / 1000.0), _kgfmt(lgt_w.get("giao", 0) / 1000.0),
+                    _kgfmt(lgt_w.get("tra", 0) / 1000.0), _lc))
+    P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     P.append("<div class='hsub'><b class='hn'>%s</b> / <b class='hn'>%s</b> đơn giao thành công · "
              "LTC <b class='hn'>%s</b> · cần giao <b class='hn'>%s</b></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
-    # ⚖️ Khối lượng TỒN ĐỌNG toàn vùng (kg thực) — ngay dưới subtext %GTC (08/10). Thêm LC (09/10).
-    if lgt_w:
-        _lc = ""
-        if lgt_w.get("lc_giao") or lgt_w.get("lc_tra"):
-            _lc = (" · 🔁 LC giao <b>%s</b> · 🔁 LC trả <b>%s</b>"
-                   % (_kgfmt(lgt_w.get("lc_giao", 0) / 1000.0), _kgfmt(lgt_w.get("lc_tra", 0) / 1000.0)))
-        P.append("<div class='hlgt'><span class='hvi'>⚖️</span> Tồn kho <i>(kg thực)</i> · "
-                 "📥 Lấy <b>%s</b> · 🚚 Giao <b>%s</b> · ↩️ Trả <b>%s</b>%s</div>"
-                 % (_kgfmt(lgt_w.get("lay", 0) / 1000.0), _kgfmt(lgt_w.get("giao", 0) / 1000.0),
-                    _kgfmt(lgt_w.get("tra", 0) / 1000.0), _lc))
     # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
     # (Bỏ dòng đánh giá thường ngày '🟡 CẦN CHÚ Ý · còn X điểm' 08/10 — trùng số %GTC + bar + chips.)
     if _oprisk:
@@ -1967,17 +1974,21 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hero.warn{--h:247,185,85;box-shadow:0 8px 26px -16px rgba(247,185,85,.2)}
 .hero.bad{--h:242,88,95;box-shadow:0 8px 26px -16px rgba(242,88,95,.2)}
 .hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.hpct{font-size:64px;font-weight:850;line-height:1;margin:8px 0 12px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-shadow:0 0 14px rgba(var(--h),.16)}
+/* Hàng trên hero: số %GTC to (trái) + ⚖️ Tồn kho kg thực (phải); mobile flex-wrap xuống dòng */
+.htop{display:flex;align-items:center;gap:10px 22px;flex-wrap:wrap;margin:8px 0 12px}
+.hpct{font-size:64px;font-weight:850;line-height:1;margin:0;font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-shadow:0 0 14px rgba(var(--h),.16)}
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
 .hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
+.hwh{flex:1 1 220px;min-width:210px;padding:9px 12px;border-radius:12px;
+ border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.hwh-t{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin-bottom:8px}
+.hwh-t i{font-style:normal;text-transform:none;font-weight:500;opacity:.7}
+.hwh-g{display:flex;flex-wrap:wrap;gap:9px 16px}
+.hwi{display:flex;flex-direction:column;gap:1px;min-width:56px}
+.hwi span{font-size:10px;color:var(--mut);font-weight:600;white-space:nowrap}
+.hwi b{font-family:Sora,sans-serif;font-size:17px;font-weight:800;color:var(--txt);font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.1;white-space:nowrap}
 .hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
 .hsub b.hn{color:#18c07a;font-weight:800;font-size:13.5px}
-.hlgt{margin-top:8px;font-size:11.5px;font-weight:600;color:var(--mut);line-height:1.5;
- padding:7px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035);
- font-variant-numeric:tabular-nums}
-.hlgt .hvi{font-size:13px}
-.hlgt i{font-style:normal;color:var(--mut);font-size:10px}
-.hlgt b{font-family:Sora,sans-serif;color:var(--txt);font-weight:800;font-size:12.5px;margin-left:1px}
 .hsub .ld{color:var(--txt);font-weight:700}
 .href{display:flex;flex-wrap:wrap;gap:6px 7px;margin-top:12px}
 .rc{font-size:11px;color:var(--mut);background:rgba(255,255,255,.05);border:1px solid var(--line);
