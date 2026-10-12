@@ -50,6 +50,19 @@ def _kgfmt(kg):
     return "%s kg" % _n(round(kg))
 
 
+def _w_arrow(today_g, yest_g):
+    """Mũi tên khối lượng TỒN KHO today vs CÙNG GIỜ HÔM QUA (gram). ▲ đỏ = tồn TĂNG (xấu) ·
+    ▼ xanh = GIẢM (tốt). Thiếu số hôm qua / nền quá nhỏ (<100kg) → rỗng."""
+    if not yest_g or yest_g < 100000 or today_g is None:
+        return ""
+    pc = (today_g - yest_g) / yest_g * 100
+    if abs(pc) < 1:
+        return "<span class='hwa fl' title='≈ cùng giờ hôm qua'>▬</span>"
+    up = pc > 0
+    return ("<span class='hwa %s' title='so cùng giờ hôm qua'>%s%d%%</span>"
+            % ("up" if up else "dn", "▲" if up else "▼", min(round(abs(pc)), 999)))
+
+
 def _prov(name):
     return name[name.find("(") + 1:name.find(")")] if "(" in name else "?"
 
@@ -189,9 +202,10 @@ def _store_weight(kg):
         pass
 
 
-def _region_snapshot(rows, giao_120h=None):
+def _region_snapshot(rows, giao_120h=None, lgt_w=None):
     """Snapshot toàn bộ chỉ số DẢI của vùng (để lưu theo giờ → so cùng giờ hôm qua).
-    Khớp đúng cách tính trong gen_html (R + on_road/late/nv_low/vpct)."""
+    Khớp đúng cách tính trong gen_html (R + on_road/late/nv_low/vpct). lgt_w (gram) để so
+    khối lượng TỒN KHO cùng giờ hôm qua (mũi tên ▲/▼ trên hero)."""
     tot = gtc = vngh = vgtc = cod = ltc = ltb = ontrip = chua_gan = 0
     ot_tot = ot_done = late = nv_low = 0
     for r in rows:
@@ -207,10 +221,15 @@ def _region_snapshot(rows, giao_120h=None):
                 p = _pct(d.get("gtc", 0), d["total"])
                 if p is not None and p < 50:
                     nv_low += 1
-    return {"total": tot, "ontrip": ontrip, "on_road": max(ot_tot - ot_done, 0), "gtc": gtc,
-            "late": late, "vngh": vngh, "vngh_gtc": vgtc, "vpct": _pct(vgtc, vngh),
-            "cod_gtb": cod, "ltc": ltc, "ltb": ltb, "nv_low": nv_low, "g120": giao_120h,
-            "chua_gan": chua_gan}
+    s = {"total": tot, "ontrip": ontrip, "on_road": max(ot_tot - ot_done, 0), "gtc": gtc,
+         "late": late, "vngh": vngh, "vngh_gtc": vgtc, "vpct": _pct(vgtc, vngh),
+         "cod_gtb": cod, "ltc": ltc, "ltb": ltb, "nv_low": nv_low, "g120": giao_120h,
+         "chua_gan": chua_gan}
+    if lgt_w:   # khối lượng tồn kho (gram) → so cùng giờ hôm qua
+        s["w_lay"] = lgt_w.get("lay", 0); s["w_giao"] = lgt_w.get("giao", 0)
+        s["w_tra"] = lgt_w.get("tra", 0); s["w_lcg"] = lgt_w.get("lc_giao", 0)
+        s["w_lct"] = lgt_w.get("lc_tra", 0)
+    return s
 
 
 def _bc_snapshot(rows):
@@ -1166,19 +1185,19 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
     if lgt_w:
+        _ysnap = (cmp_y.get("snap") or {}) if cmp_y else {}   # khối lượng tồn kho CÙNG GIỜ HÔM QUA
+
+        def _wi(icon, lbl, key, ykey):
+            return ("<div class='hwi'><span>%s %s</span><b>%s</b>%s</div>"
+                    % (icon, lbl, _kgfmt(lgt_w.get(key, 0) / 1000.0),
+                       _w_arrow(lgt_w.get(key, 0), _ysnap.get(ykey))))
         _lc = ""
         if lgt_w.get("lc_giao") or lgt_w.get("lc_tra"):
-            _lc = ("<div class='hwi'><span>🔁 LC giao</span><b>%s</b></div>"
-                   "<div class='hwi'><span>🔁 LC trả</span><b>%s</b></div>"
-                   % (_kgfmt(lgt_w.get("lc_giao", 0) / 1000.0), _kgfmt(lgt_w.get("lc_tra", 0) / 1000.0)))
+            _lc = _wi("🔁", "LC giao", "lc_giao", "w_lcg") + _wi("🔁", "LC trả", "lc_tra", "w_lct")
         P.append("<div class='hwh'><div class='hwh-t'>⚖️ Tồn kho <i>(kg thực)</i></div>"
-                 "<div class='hwh-g'>"
-                 "<div class='hwi'><span>📥 Lấy</span><b>%s</b></div>"
-                 "<div class='hwi'><span>🚚 Giao</span><b>%s</b></div>"
-                 "<div class='hwi'><span>↩️ Trả</span><b>%s</b></div>%s"
-                 "</div></div>"
-                 % (_kgfmt(lgt_w.get("lay", 0) / 1000.0), _kgfmt(lgt_w.get("giao", 0) / 1000.0),
-                    _kgfmt(lgt_w.get("tra", 0) / 1000.0), _lc))
+                 "<div class='hwh-g'>%s%s%s%s</div></div>"
+                 % (_wi("📥", "Lấy", "lay", "w_lay"), _wi("🚚", "Giao", "giao", "w_giao"),
+                    _wi("↩️", "Trả", "tra", "w_tra"), _lc))
     P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     P.append("<div class='hsub'><b class='hn'>%s</b> / <b class='hn'>%s</b> đơn giao thành công · "
@@ -2016,6 +2035,8 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hwi{display:flex;flex-direction:column;gap:1px;min-width:56px}
 .hwi span{font-size:10.5px;color:#cdd4ea;font-weight:600;white-space:nowrap}
 .hwi b{font-family:Sora,sans-serif;font-size:18.5px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.1;white-space:nowrap}
+.hwa{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
+.hwa.up{color:#ff6274}.hwa.dn{color:#2ee88c}.hwa.fl{color:var(--mut)}
 .hsub{color:#cfd6ec;font-size:13.5px;margin-top:11px;font-variant-numeric:tabular-nums;line-height:1.55}
 .hsub b.hn{color:#24d680;font-weight:800;font-size:15px}
 .hsub .ld{color:var(--txt);font-weight:700}
@@ -2480,7 +2501,7 @@ def main():
         _gtc_now = sum(r["gtc"] for r in rows)
         _tot_now = sum(r["total"] for r in rows)
         _rp_now = _pct(_gtc_now, _tot_now)
-        _snap_now = _region_snapshot(rows, giao_120h)
+        _snap_now = _region_snapshot(rows, giao_120h, lgt_w)
         _bcsnap_now = _bc_snapshot(rows)
         _nvsnap_now = _nv_snapshot(rows)
         _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now, g120=giao_120h,
