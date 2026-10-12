@@ -1525,15 +1525,22 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                              "</summary><div class='dtl'>" % (_esc(amn), _n(a_dg), _n(a_cg), _n(a_dg + a_cg)))
                     for r in sorted(brows, key=lambda x: -x.get("total", 0)):
                         b_dg = r.get("total", 0); b_cg = r.get("backlog", 0)
-                        # Đã gán theo xã (gộp từ drivers' wards[xã][0]) + chưa gán theo xã (backlog_wards)
+                        # Đã gán theo xã (gộp từ drivers' wards[xã][0]) + chưa gán theo xã (backlog_wards).
+                        # CHUẨN HOÁ tên xã về phần gốc (bỏ đuôi ", Thành phố…/Huyện…") vì nguồn ĐÃ GÁN
+                        # (get-trip-items) dùng tên ngắn còn CHƯA GÁN (get-detail-by-status) dùng tên đầy đủ
+                        # → nếu không gộp sẽ bị TÁCH 1 xã thành 2 dòng (đã gán riêng, chưa gán riêng).
+                        def _wbase(nm):
+                            return nm.split(",")[0].strip()
                         w_dg = {}
                         for d in r.get("drivers", []):
                             for ward, gv in d.get("wards", {}).items():
                                 if gv and gv[0] > 0:
-                                    w_dg[ward] = w_dg.get(ward, 0) + gv[0]
+                                    k = _wbase(ward)
+                                    w_dg[k] = w_dg.get(k, 0) + gv[0]
                         w_cg = {}
                         for ward, cnt in r.get("backlog_wards", []):
-                            w_cg[ward] = w_cg.get(ward, 0) + cnt
+                            k = _wbase(ward)
+                            w_cg[k] = w_cg.get(k, 0) + cnt
                         allw = set(w_dg) | set(w_cg)
                         inner = ""
                         if allw:
