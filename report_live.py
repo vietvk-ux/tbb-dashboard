@@ -1990,39 +1990,39 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hsub{color:var(--mut);font-size:12.5px;margin-top:10px;font-variant-numeric:tabular-nums}
 .hsub b.hn{color:#18c07a;font-weight:800;font-size:13.5px}
 .hsub .ld{color:var(--txt);font-weight:700}
-.href{display:flex;flex-wrap:wrap;gap:6px 7px;margin-top:12px}
-.rc{font-size:11px;color:var(--mut);background:rgba(255,255,255,.05);border:1px solid var(--line);
- border-radius:99px;padding:3px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.href{display:flex;flex-wrap:wrap;gap:8px 9px;margin-top:14px}
+.rc{font-size:12.5px;color:var(--mut);background:rgba(255,255,255,.05);border:1px solid var(--line);
+ border-radius:99px;padding:6px 13px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rc b{color:var(--txt);font-weight:800}
 .sparkwrap{margin-top:10px}
 .spklbl{font-size:9.5px;color:var(--mut);font-weight:600;letter-spacing:.02em;margin-bottom:3px}
 svg.spk{display:block}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
-.hverd{margin-top:11px;font-size:11.5px;font-weight:600;color:var(--mut);line-height:1.4;
- padding:7px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
-.hverd .hvi{font-size:13px}
-.hverd b{font-family:Sora,sans-serif;font-size:12px;letter-spacing:.01em;color:var(--txt)}
+.hverd{margin-top:10px;font-size:13px;font-weight:600;color:var(--mut);line-height:1.6;
+ padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.hverd .hvi{font-size:15px}
+.hverd b{font-family:Sora,sans-serif;font-size:13.5px;letter-spacing:.01em;color:var(--txt)}
 .hverd.good{border-color:rgba(23,201,131,.42);background:rgba(23,201,131,.09)}.hverd.good b{color:var(--good)}
 .hverd.warn{border-color:rgba(245,170,23,.42);background:rgba(245,170,23,.09)}.hverd.warn b{color:var(--warn)}
 .hverd.bad{border-color:rgba(245,69,92,.42);background:rgba(245,69,92,.09)}.hverd.bad b{color:var(--bad)}
-.hverd b.rk{color:var(--bad)!important;background:rgba(245,69,92,.16);padding:1px 7px;border-radius:7px;
- font-size:11px;white-space:nowrap}
+.hverd b.rk{color:var(--bad)!important;background:rgba(245,69,92,.16);padding:1px 8px;border-radius:7px;
+ font-size:12.5px;white-space:nowrap}
 /* 🎯 NHỊP ĐỘ CÁN ĐÍCH — dòng điều hành (cần X đơn/giờ) */
-.hpace{margin-top:8px;font-size:11.5px;font-weight:600;color:var(--mut);line-height:1.45;
- padding:8px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
-.hpace .hvi{font-size:13px}
-.hpace b{font-family:Sora,sans-serif;font-size:12px;letter-spacing:.01em;color:var(--txt)}
+.hpace{margin-top:10px;font-size:13px;font-weight:600;color:var(--mut);line-height:1.6;
+ padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.hpace .hvi{font-size:15px}
+.hpace b{font-family:Sora,sans-serif;font-size:13.5px;letter-spacing:.01em;color:var(--txt)}
 .hpace i{font-style:normal;color:var(--mut);font-weight:500}
 .hpace.good{border-color:rgba(23,201,131,.45);background:rgba(23,201,131,.10)}.hpace.good b{color:var(--good)}
 .hpace.warn{border-color:rgba(245,170,23,.45);background:rgba(245,170,23,.10)}.hpace.warn b{color:var(--warn)}
 .hpace.bad{border-color:rgba(245,69,92,.45);background:rgba(245,69,92,.10)}.hpace.bad b{color:var(--bad)}
 /* ⏱ SO CÙNG GIỜ HÔM QUA — dòng đánh giá vùng theo mốc giờ */
-.hcmp{margin-top:8px;font-size:11px;font-weight:600;color:var(--mut);line-height:1.6;
- padding:8px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
-.hcmp .hvi{font-size:13px}
-.hcmp b{font-family:Sora,sans-serif;font-size:11px;letter-spacing:.01em;color:var(--txt)}
-.hcmp i{font-style:normal;color:var(--mut);font-weight:400;font-size:10px}
-.hcmp .cq{display:inline-block;padding:0 6px;border-radius:7px;font-weight:800;font-size:10.5px;
+.hcmp{margin-top:10px;font-size:13px;font-weight:600;color:var(--mut);line-height:1.65;
+ padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.hcmp .hvi{font-size:15px}
+.hcmp b{font-family:Sora,sans-serif;font-size:13px;letter-spacing:.01em;color:var(--txt)}
+.hcmp i{font-style:normal;color:var(--mut);font-weight:400;font-size:11.5px}
+.hcmp .cq{display:inline-block;padding:1px 7px;border-radius:7px;font-weight:800;font-size:12px;
  font-variant-numeric:tabular-nums;margin-left:1px}
 .hcmp .cq.up{color:var(--good);background:rgba(23,201,131,.14)}
 .hcmp .cq.dn{color:var(--bad);background:rgba(245,69,92,.14)}
@@ -2031,7 +2031,7 @@ svg.spk{display:block}
 /* ⏱ bấm xổ ra bảng chi tiết SO CÙNG GIỜ HÔM QUA theo từng AM */
 details.hcmp.cx>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px}
 details.hcmp.cx>summary::-webkit-details-marker{display:none}
-details.hcmp.cx .hcv{position:absolute;right:9px;top:8px;color:var(--mut);font-size:11px;transition:transform .2s}
+details.hcmp.cx .hcv{position:absolute;right:11px;top:11px;color:var(--mut);font-size:12px;transition:transform .2s}
 details.hcmp.cx[open] .hcv{transform:rotate(180deg)}
 .amwrap{margin-top:9px;border-top:1px solid var(--line);padding-top:9px;overflow-x:auto}
 .amnote{font-size:10px;color:var(--mut);margin-bottom:6px}
@@ -2088,26 +2088,26 @@ details.gt>summary:active{transform:scale(.997)}
 details.gt[open]{grid-column:1/-1}          /* bung → chiếm cả 2 cột */
 details.gt[open] .gtcar{transform:rotate(90deg);color:var(--txt)}
 .diag{background:rgba(255,255,255,.04);
- border:1px solid var(--line);border-radius:11px;padding:8px 11px;margin:8px 0 0;
- font-size:11.5px;line-height:1.55;color:var(--mut)}
+ border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin:10px 0 0;
+ font-size:13px;line-height:1.65;color:var(--mut)}
 /* 🤖 Phân tích điểm nóng theo khung giờ */
-.aidx{margin:8px 0 0;border-radius:11px;padding:9px 11px;font-size:11.5px;line-height:1.55;color:var(--mut);
+.aidx{margin:10px 0 0;border-radius:12px;padding:11px 13px;font-size:13px;line-height:1.65;color:var(--mut);
  border:1px solid rgba(245,170,23,.38);background:linear-gradient(120deg,rgba(245,170,23,.1),rgba(255,255,255,.03))}
 details.aidx>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px;color:var(--txt);font-weight:600}
 details.aidx>summary::-webkit-details-marker{display:none}
 .aidx summary b{color:var(--warn)}
-.aidx .dcv{position:absolute;right:0;top:1px;color:var(--mut);font-size:12px;transition:transform .2s}
+.aidx .dcv{position:absolute;right:0;top:2px;color:var(--mut);font-size:13px;transition:transform .2s}
 details.aidx[open] .dcv{transform:rotate(180deg)}
-.aibd{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;display:flex;flex-direction:column;gap:5px}
+.aibd{margin-top:9px;border-top:1px solid rgba(255,255,255,.08);padding-top:9px;display:flex;flex-direction:column;gap:7px}
 .aibd b{color:var(--txt);font-weight:800}
-.airow.aiact{color:var(--txt);font-weight:600;border-top:1px solid rgba(255,255,255,.08);padding-top:6px;margin-top:2px}
+.airow.aiact{color:var(--txt);font-weight:600;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;margin-top:2px}
 .aibd b.rk{color:var(--bad)}
-.airk{color:var(--txt);font-size:12px}.airk i{color:var(--mut);font-weight:400;font-size:10.5px;font-style:normal}
-.aiis{margin-top:2px;padding-left:2px;font-size:11px}
+.airk{color:var(--txt);font-size:13.5px}.airk i{color:var(--mut);font-weight:400;font-size:11.5px;font-style:normal}
+.aiis{margin-top:3px;padding-left:2px;font-size:12.5px;line-height:1.55}
 .diag b{color:var(--txt);font-weight:800}
 details.diag>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px}
 details.diag>summary::-webkit-details-marker{display:none}
-.dcv{position:absolute;right:0;top:0;color:var(--mut);font-size:12px;transition:transform .2s}
+.dcv{position:absolute;right:0;top:2px;color:var(--mut);font-size:13px;transition:transform .2s}
 details.diag[open] .dcv{transform:rotate(180deg)}
 .ddtl{margin-top:11px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:12px}
 .dnote{font-size:10.5px;color:#6d7492;line-height:1.5;margin:-2px 0 -2px}
