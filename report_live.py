@@ -1036,6 +1036,21 @@ async def fetch_live(token):
         return rows, giao_120h, lgt_w
 
 
+def _read_watch_chot():
+    """Đọc khối 'Bưu cục cần theo dõi sâu sát' đã CHỐT 23h30 (report_dashboard ghi watch_chot.json)
+    → trang trực tiếp hiển thị FROZEN cả ngày (KHÔNG cập nhật live). Thiếu file → ''."""
+    slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
+    try:
+        with open(os.path.join("docs", slug, "watch_chot.json"), encoding="utf-8") as f:
+            w = json.load(f)
+        if w.get("html"):
+            return ("<div class='wchot-hdr'><span class='hvi'>📌</span> Chốt <b>23h30 · %s</b> · giữ nguyên cả ngày</div>%s"
+                    % (_esc(str(w.get("date", ""))), w["html"]))
+    except Exception:
+        pass
+    return ""
+
+
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
              fc_uplift=None, pace=None, cmp_y=None, bc_avg=None, lgt_w=None, nv_avg=None):
@@ -1333,6 +1348,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  "<span class='rc'>TB %d ngày <b>%d%%</b></span></div>"
                  % (ref["yp"], ref["ndays"], ref["avg7p"]))
     P.append("</section>")
+
+    # 🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT — bản CHỐT 23h30 (frozen cả ngày; report_dashboard ghi file)
+    _wchot = _read_watch_chot()
+    if _wchot:
+        P.append(_wchot)
 
     # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
     nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
@@ -2109,6 +2129,28 @@ details.diag>summary{cursor:pointer;list-style:none;display:block;position:relat
 details.diag>summary::-webkit-details-marker{display:none}
 .dcv{position:absolute;right:0;top:2px;color:var(--mut);font-size:13px;transition:transform .2s}
 details.diag[open] .dcv{transform:rotate(180deg)}
+/* 🔎 Bưu cục cần theo dõi sâu sát — bản CHỐT 23h30 (frozen, đọc từ watch_chot.json) */
+.wchot-hdr{font-size:11.5px;color:var(--mut);font-weight:600;margin:12px 2px 0;letter-spacing:.01em}
+.wchot-hdr .hvi{font-size:13px}.wchot-hdr b{color:var(--warn);font-weight:800}
+.wchot-hdr + .watch{margin-top:5px}
+.watch{border-radius:18px;padding:15px 14px 12px;margin:10px 0 14px;
+ background:linear-gradient(160deg,rgba(242,69,92,.14),rgba(245,170,23,.05) 55%,transparent);
+ border:1px solid rgba(242,69,92,.34)}
+.whead{font-weight:800;font-size:14px;letter-spacing:.02em;color:#ff7b81;margin-bottom:5px}
+.wsub{font-size:12px;color:var(--mut);line-height:1.5;margin-bottom:12px}
+.wsub b{color:var(--txt)}.wsub i{color:#d7b3b5;font-style:normal;font-size:11px}
+.wbc{position:relative;border:1px solid var(--line);border-radius:12px;background:var(--card);
+ padding:10px 12px 9px;margin-bottom:8px;overflow:hidden}
+.wbc:last-child{margin-bottom:0}
+.wbc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:rgb(var(--h,242,69,92))}
+.wbc.bad{--h:242,69,92}.wbc.warn{--h:245,170,23}.wbc.good{--h:23,201,131}
+.wbh{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.wrk{flex:none;width:22px;height:22px;border-radius:7px;background:rgba(242,69,92,.2);color:#ff9aab;
+ font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.wbn{flex:1;min-width:0;font-weight:800;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wbm{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--mut);margin-bottom:5px;font-variant-numeric:tabular-nums}
+.wbm b{color:var(--txt);font-weight:800}.wbm .bd b{color:#ff9aab}
+.wtag{font-size:10.5px;color:var(--warn);font-weight:700}
 .ddtl{margin-top:11px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:12px}
 .dnote{font-size:10.5px;color:#6d7492;line-height:1.5;margin:-2px 0 -2px}
 .dgrp{display:flex;flex-direction:column;gap:5px}

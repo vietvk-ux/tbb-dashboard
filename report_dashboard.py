@@ -1205,6 +1205,15 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
         f.write(gen_html(agg, backlog, backlog_time, ontrip, hist, bc_days, red_bc, red_giao_bc, noon_bl))
+    # CHỐT 'Bưu cục cần theo dõi sâu sát' → trang trực tiếp đọc lại, hiển thị FROZEN cả ngày.
+    try:
+        _watch_html = _build_watch_bc(agg, red_giao_bc, noon_bl)
+        if _watch_html:
+            with open(os.path.join(outdir, "watch_chot.json"), "w", encoding="utf-8") as f:
+                json.dump({"date": d.strftime("%d/%m"), "html": _watch_html}, f, ensure_ascii=False)
+            logger.info("Đã ghi watch_chot.json (chốt bưu cục cần theo dõi sâu sát %s).", d)
+    except Exception as e:
+        logger.warning("Không ghi watch_chot.json (bỏ qua): %s", str(e)[:120])
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],

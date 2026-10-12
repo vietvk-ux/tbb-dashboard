@@ -57,6 +57,12 @@ jobs:
           cache: 'pip'
       - name: Install deps
         run: pip install -r requirements.txt
+      - name: Lấy bản CHỐT 'Bưu cục cần theo dõi sâu sát' (watch_chot.json) từ Pages → trang trực tiếp đọc (frozen cả ngày)
+        run: |
+          mkdir -p docs/9c7e4b21a6f0
+          F=docs/9c7e4b21a6f0/watch_chot.json
+          curl -sf "https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/watch_chot.json" -o "$F" \
+            || echo "chưa có watch_chot.json (sẽ có sau bản EOD 23:30 đầu tiên)"
       - name: Tạo trang realtime (index.html + live.html)
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
