@@ -1819,8 +1819,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
     # ===== MENU BÁO CÁO · Bento grid (Mẫu 3) =====
     #        href, icon, tên, phụ đề, màu RGB, [7 cột mini-nhịp]
+    # Ô '%GTC cuối ngày' (eod.html) ĐÃ BỎ 13/10 (user) — thay bằng card lớn 'BẢNG TỔNG QUÁT BƯU CỤC'
+    # ở ngay trên lưới này (eod.html vẫn sinh ra phục vụ watch_chot, chỉ không link ở menu).
     _menu = [
-        ("eod.html", "📊", "%GTC cuối ngày", "chi tiết nhân viên", "47,208,122", [45, 60, 52, 74, 66, 88, 80]),
         ("backlog.html", "📦", "Tồn Lấy·Giao·Trả", "theo khung giờ", "247,185,85", [70, 55, 80, 48, 66, 40, 58]),
         ("trend.html", "📈", "Xu hướng theo ngày", "biểu đồ %GTC", "55,211,232", [30, 42, 50, 62, 58, 76, 90]),
         ("nhanvien.html", "⚡", "Năng suất Nhân viên", "xếp hạng GTC/ngày", "169,112,255", [60, 72, 55, 84, 66, 90, 78]),
@@ -1831,13 +1832,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     ]
     P.append("<div class='menu'>")
     # (Ô 'Báo cáo tổng quan' đã BỎ 03/10 theo yêu cầu — trang tongquan.html cũng ngưng tạo)
-    for href, ic, nm, sub, rgb, bars in _menu:
+    # Số ô LẺ (7, sau khi bỏ %GTC cuối ngày) → ô CUỐI span full-width (feat) cho cân đối, không lẻ 1 ô.
+    _last = len(_menu) - 1
+    for _i, (href, ic, nm, sub, rgb, bars) in enumerate(_menu):
         spark = "".join("<i style='height:%d%%'></i>" % b for b in bars)
-        P.append("<a class='mtile' href='%s' style='--h:%s'>"
+        _wide = " feat" if (len(_menu) % 2 == 1 and _i == _last) else ""
+        P.append("<a class='mtile%s' href='%s' style='--h:%s'>"
                  "<div class='mic'>%s</div>"
                  "<div class='mtx'><div class='mn'>%s</div><div class='ms'>%s</div></div>"
                  "<div class='mspark'>%s</div></a>"
-                 % (href, rgb, ic, nm, sub, spark))
+                 % (_wide, href, rgb, ic, nm, sub, spark))
     P.append("</div>")
 
     # ===== Mũi tên %GTC SO TB CÙNG GIỜ 7 NGÀY cho thẻ AM / Tỉnh / Bưu cục =====
@@ -2316,6 +2320,8 @@ table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 .mtile.feat .mn{font-size:16px}
 .mtile.feat .mbig{font-family:inherit;font-weight:800;font-size:30px;line-height:1;color:#fff;flex:none;
  font-variant-numeric:tabular-nums}
+.mtile.feat .mspark{width:66px;flex:none;margin-top:0;align-self:center;height:20px}
+.mtile.feat .mn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mtile.feat .mbig span{font-size:15px;color:rgba(var(--h),1);margin-left:2px}
 
 .sec{font-size:12.5px;font-weight:800;letter-spacing:.05em;color:#e3e8f7;text-transform:uppercase;margin:20px 4px 10px}
