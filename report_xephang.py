@@ -131,7 +131,7 @@ def fetch(offset=0):
     cg12_by_bc, cg12_day = {}, None
     try:
         cg_rows = _get_all(url, key, "bao_cao_gio?gio=eq.12&ngay=gte.%s&ngay=lte.%s&select=ngay,bcsnap"
-                           % (td_since, until))
+                           % (td_since, until), order="ngay.desc")   # bao_cao_gio KHÔNG có cột id
         cg_rows = [r for r in cg_rows if isinstance(r.get("bcsnap"), dict)
                    and any(isinstance(v, (list, tuple)) and len(v) >= 3 for v in r["bcsnap"].values())]
         if cg_rows:
