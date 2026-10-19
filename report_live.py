@@ -1276,14 +1276,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             return d, ("+%d%%" % d if d > 0 else ("%d%%" % d if d < 0 else "±0%"))
 
         parts = []
-        # ĐỒNG NHẤT MÀU (user 19/10): MỌI chỉ số so cùng giờ → TĂNG = ĐỎ (dn) · GIẢM = XANH (up).
+        # MÀU (user 19/10): Đã gán/GTC/Backlog → TĂNG=ĐỎ (dn)·GIẢM=XANH (up). %GTC GIỮ KIỂU CHẤT LƯỢNG.
         def _dir(d):
             return "dn" if d > 0 else ("up" if d < 0 else "fl")
-        # %GTC (chênh điểm)
+        # %GTC (chênh điểm) — TĂNG=XANH (tốt) · GIẢM=ĐỎ (xấu) — giữ nguyên kiểu cũ
         if "pct" in cmp_y:
             d, s = _dpp(reg_pct, cmp_y["pct"])
+            _cp = "up" if d > 0 else ("dn" if d < 0 else "fl")
             parts.append("<b>%%GTC</b> %d%% <span class='cq %s'>%s đ</span> <i>(hôm qua %s%%)</i>"
-                         % (reg_pct, _dir(d), s, ("%g" % cmp_y["pct"]).replace(".", ",")))
+                         % (reg_pct, _cp, s, ("%g" % cmp_y["pct"]).replace(".", ",")))
         # Đã gán (total)
         if "total" in cmp_y:
             d, s = _dpc(R["total"], cmp_y["total"])
@@ -1334,7 +1335,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                     _R2.append("<tr><td class='aml'>%s</td><td><b>%s%%</b> %s</td>"
                                "<td>%s %s</td><td>%s %s</td></tr>"
                                % (_esc(_amn), ("%g" % _tp).replace(".", ","),
-                                  _cqd(_dp, _sp, False, suffix="đ"),
+                                  _cqd(_dp, _sp, True, suffix="đ"),
                                   _n(_v["total"]), _cqd(_dg, _sg, False),
                                   _n(_v["gtc"]), _cqd(_dv, _sv, False)))
                 _R2.append("</tbody></table>")
