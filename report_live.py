@@ -1276,26 +1276,26 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             return d, ("+%d%%" % d if d > 0 else ("%d%%" % d if d < 0 else "±0%"))
 
         parts = []
-        # %GTC — màu theo tốt/xấu (cao hơn hôm qua = tốt)
+        # ĐỒNG NHẤT MÀU (user 19/10): MỌI chỉ số so cùng giờ → TĂNG = ĐỎ (dn) · GIẢM = XANH (up).
+        def _dir(d):
+            return "dn" if d > 0 else ("up" if d < 0 else "fl")
+        # %GTC (chênh điểm)
         if "pct" in cmp_y:
             d, s = _dpp(reg_pct, cmp_y["pct"])
-            c = "up" if d > 0 else ("dn" if d < 0 else "fl")
             parts.append("<b>%%GTC</b> %d%% <span class='cq %s'>%s đ</span> <i>(hôm qua %s%%)</i>"
-                         % (reg_pct, c, s, ("%g" % cmp_y["pct"]).replace(".", ",")))
-        # Đã gán (total) — nhiều hơn = trung tính (volume)
+                         % (reg_pct, _dir(d), s, ("%g" % cmp_y["pct"]).replace(".", ",")))
+        # Đã gán (total)
         if "total" in cmp_y:
             d, s = _dpc(R["total"], cmp_y["total"])
-            parts.append("<b>Đã gán</b> %s <span class='cq nt'>%s</span>" % (_n(R["total"]), s))
-        # GTC (đơn giao TC) — nhiều hơn = tốt
+            parts.append("<b>Đã gán</b> %s <span class='cq %s'>%s</span>" % (_n(R["total"]), _dir(d), s))
+        # GTC (đơn giao TC)
         if "gtc" in cmp_y:
             d, s = _dpc(R["gtc"], cmp_y["gtc"])
-            c = "up" if d > 0 else ("dn" if d < 0 else "fl")
-            parts.append("<b>GTC</b> %s <span class='cq %s'>%s</span>" % (_n(R["gtc"]), c, s))
-        # Backlog 120h — nhiều hơn = XẤU (đảo màu)
+            parts.append("<b>GTC</b> %s <span class='cq %s'>%s</span>" % (_n(R["gtc"]), _dir(d), s))
+        # Backlog 120h
         if "g120" in cmp_y and giao_120h is not None:
             d, s = _dpc(giao_120h, cmp_y["g120"])
-            c = "dn" if d > 0 else ("up" if d < 0 else "fl")
-            parts.append("<b>Backlog</b> %s <span class='cq %s'>%s</span>" % (_n(giao_120h), c, s))
+            parts.append("<b>Backlog</b> %s <span class='cq %s'>%s</span>" % (_n(giao_120h), _dir(d), s))
         _miss = "" if ("total" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
                 " · <i>(Đã gán/GTC/Backlog đủ từ mai)</i>"
         # CHI TIẾT THEO AM (bấm dòng ⏱ để xổ): %GTC + Đã gán + GTC từng AM vs cùng giờ hôm qua.
@@ -1334,9 +1334,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                     _R2.append("<tr><td class='aml'>%s</td><td><b>%s%%</b> %s</td>"
                                "<td>%s %s</td><td>%s %s</td></tr>"
                                % (_esc(_amn), ("%g" % _tp).replace(".", ","),
-                                  _cqd(_dp, _sp, True, suffix="đ"),
-                                  _n(_v["total"]), _cqd(_dg, _sg, neutral=True),
-                                  _n(_v["gtc"]), _cqd(_dv, _sv, True)))
+                                  _cqd(_dp, _sp, False, suffix="đ"),
+                                  _n(_v["total"]), _cqd(_dg, _sg, False),
+                                  _n(_v["gtc"]), _cqd(_dv, _sv, False)))
                 _R2.append("</tbody></table>")
                 _am_tbl = "".join(_R2)
 
