@@ -3,8 +3,10 @@ TRANG XẾP HẠNG TỔNG HỢP (scorecard) — đánh giá AM → Bưu cục �
 Điểm tổng hợp 0-100 từ ma trận chỉ số (Supabase — THÁNG dương lịch hiện tại, tự
 reset đầu mỗi tháng). Xếp TỆ→TỐT mỗi cấp; màu NHÓM 3 (tỉ lệ): 1/3 cuối 🔴 · giữa 🟡 · 1/3 đầu 🟢.
 
-Trọng số: %GTC 35 · Năng suất 20 · Tồn đỏ 20 · COD 15 · Kỷ luật 10 (dict W).
-Cấp NV không có Tồn đỏ → chuẩn hoá lại 4 chỉ số còn lại.
+Trọng số: %GTC 35 · Năng suất 20 · Tồn đỏ 20 · [ô 15%] · Kỷ luật 10 (dict W).
+Ô 15% KHÁC theo cấp (19/10): AM/BC = CHƯA GÁN GIAO 12h (snapshot bao_cao_gio.bcsnap[bc][2]
+tại gio=12, ngày mới nhất; _composite bc_level=True); NHÂN VIÊN giữ nguyên COD.
+Cấp NV không có Tồn đỏ → chuẩn hoá lại 4 chỉ số còn lại (gtc·ns·cod·kỷ luật).
 
 Đọc Supabase (như report_trend). report_trend.main() gọi gen_html() → docs/<slug>/xephang.html.
 """
@@ -36,8 +38,9 @@ PROV_NAME = {"LCA": "Lào Cai", "YBA": "Yên Bái", "SLA": "Sơn La",
 W = {"gtc": .35, "ns": .20, "kyluat": .10, "red": .20, "cod": .15}
 WINDOW_DAYS = 30              # cửa sổ đánh giá (ngày gần nhất)
 NS_HI, NS_LO = 120, 30        # năng suất GTC/ngày làm: ≥120→100, ≤30→0
-COD_CAP = 2_000_000            # COD kẹt/đơn ≥2 triệu → 0 điểm
+COD_CAP = 2_000_000            # COD kẹt/đơn ≥2 triệu → 0 điểm (dùng cho NHÂN VIÊN)
 RED_CAP = 0.5                  # đơn đỏ / (đơn giao TB ngày) ≥0.5 → 0 điểm
+CG12_CAP = 0.5                 # chưa gán giao 12h / (đơn giao TB ngày) ≥0.5 → 0 điểm (AM/BC, thay COD)
 
 
 def _n(x):
@@ -52,8 +55,9 @@ def _clamp(v):
     return max(0.0, min(100.0, v))
 
 
-def _sub(a, red=None, days=WINDOW_DAYS):
-    """Chấm điểm con 0-100 từ số liệu gộp. a: don,gtc,gtb,cod,wd,xp,ontime."""
+def _sub(a, red=None, days=WINDOW_DAYS, cg12=None):
+    """Chấm điểm con 0-100 từ số liệu gộp. a: don,gtc,gtb,cod,wd,xp,ontime.
+    cg12 (tồn chưa gán giao khung 12h, snapshot) chỉ truyền cho AM/BC → điểm con 'cg12' thay 'cod'."""
     don, gtc, gtb, cod, wd = a["don"], a["gtc"], a["gtb"], a["cod"], a["wd"]
     xp, ontime = a["xp"], a["ontime"]
     s = {}
@@ -63,17 +67,23 @@ def _sub(a, red=None, days=WINDOW_DAYS):
     s["kyluat"] = _clamp(ontime / xp * 100) if xp else None
     codper = (cod / gtb) if gtb else 0
     s["cod"] = _clamp(100 - min(codper / COD_CAP, 1) * 100)
+    daily = don / max(days, 1)              # đơn giao TB ngày (theo số ngày dữ liệu thật)
     if red is not None:
-        daily = don / max(days, 1)          # đơn giao TB ngày (theo số ngày dữ liệu thật)
         ratio = (red / daily) if daily else 0
         s["red"] = _clamp(100 - min(ratio / RED_CAP, 1) * 100)
+    if cg12 is not None:                    # chưa gán 12h ÷ đơn giao TB ngày (nhiều = kém)
+        ratio = (cg12 / daily) if daily else 0
+        s["cg12"] = _clamp(100 - min(ratio / CG12_CAP, 1) * 100)
     return s, ns, codper
 
 
-def _composite(sub, has_red):
+def _composite(sub, has_red, bc_level=False):
+    """bc_level=True (AM/BC): ô 15% dùng 'cg12' (chưa gán 12h) thay 'cod'. NV giữ 'cod'."""
     w = dict(W)
     if not has_red:
         w.pop("red")
+    if bc_level:
+        w["cg12"] = w.pop("cod")            # giữ nguyên 15%, chỉ đổi tiêu chí
     num = den = 0.0
     for k, wt in w.items():
         v = sub.get(k)
@@ -116,8 +126,24 @@ def fetch(offset=0):
         if r["ngay"] != latest:
             continue
         red_by_bc[r["buu_cuc"]] = red_by_bc.get(r["buu_cuc"], 0) + (r.get("g_red") or 0)
-    return {"nv": nv, "red_by_bc": red_by_bc, "since": since, "td_day": latest,
-            "month": m, "year": y}
+    # Chưa gán giao khung 12h = SNAPSHOT bcsnap[bc][2] (phần tử backlog) tại gio=12, ngày mới nhất
+    # CÓ dữ liệu (bắt đầu log ~13/10). Thay COD cho AM/BC.
+    cg12_by_bc, cg12_day = {}, None
+    try:
+        cg_rows = _get_all(url, key, "bao_cao_gio?gio=eq.12&ngay=gte.%s&ngay=lte.%s&select=ngay,bcsnap"
+                           % (td_since, until))
+        cg_rows = [r for r in cg_rows if isinstance(r.get("bcsnap"), dict)
+                   and any(isinstance(v, (list, tuple)) and len(v) >= 3 for v in r["bcsnap"].values())]
+        if cg_rows:
+            cg12_day = max(r["ngay"] for r in cg_rows)
+            snap = next(r["bcsnap"] for r in cg_rows if r["ngay"] == cg12_day)
+            for bc, v in snap.items():
+                if isinstance(v, (list, tuple)) and len(v) >= 3 and v[2] is not None:
+                    cg12_by_bc[bc] = v[2]
+    except Exception:
+        pass
+    return {"nv": nv, "red_by_bc": red_by_bc, "cg12_by_bc": cg12_by_bc, "cg12_day": cg12_day,
+            "since": since, "td_day": latest, "month": m, "year": y}
 
 
 def _agg0(tinh=None, bc=None):
@@ -128,6 +154,7 @@ def _agg0(tinh=None, bc=None):
 def build(data):
     """→ danh sách AM (mỗi AM có bcs, mỗi bc có nvs), đã chấm điểm + màu nhóm-3."""
     red_by_bc = data["red_by_bc"]
+    cg12_by_bc = data.get("cg12_by_bc") or {}
     ndays = len({r["ngay"] for r in data["nv"]}) or WINDOW_DAYS  # số ngày dữ liệu thật
     # 1) Gộp theo NHÂN VIÊN (cửa sổ đánh giá)
     nvagg = {}
@@ -176,22 +203,24 @@ def build(data):
         x = amagg.get(am)
         if x is None:
             x = amagg[am] = {"am": am, "don": 0, "gtc": 0, "gtb": 0, "cod": 0.0,
-                             "wd": 0, "xp": 0, "ontime": 0, "red": 0, "bcs": []}
+                             "wd": 0, "xp": 0, "ontime": 0, "red": 0, "cg12": 0, "bcs": []}
         for f in ("don", "gtc", "gtb", "cod", "wd", "xp", "ontime"):
             x[f] += b[f]
         x["red"] += red_by_bc.get(bc, 0)
-        sub, ns, codper = _sub(b, red=red_by_bc.get(bc, 0), days=ndays)
+        x["cg12"] += cg12_by_bc.get(bc, 0)
+        sub, ns, codper = _sub(b, red=red_by_bc.get(bc, 0), days=ndays, cg12=cg12_by_bc.get(bc))
         b["sub"] = sub; b["ns"] = ns; b["codper"] = codper
         b["red"] = red_by_bc.get(bc, 0)
-        b["comp"] = _composite(sub, True)
+        b["cg12"] = cg12_by_bc.get(bc)
+        b["comp"] = _composite(sub, True, bc_level=True)
         b["am"] = am
         x["bcs"].append(b)
 
     ams = []
     for am, x in amagg.items():
-        sub, ns, codper = _sub(x, red=x["red"], days=ndays)
+        sub, ns, codper = _sub(x, red=x["red"], days=ndays, cg12=x.get("cg12"))
         x["sub"] = sub; x["ns"] = ns; x["codper"] = codper
-        x["comp"] = _composite(sub, True)
+        x["comp"] = _composite(sub, True, bc_level=True)
         # màu nhóm-3 cho BC trong AM
         bcs = sorted([b for b in x["bcs"] if b["comp"] is not None], key=lambda b: b["comp"])
         for i, b in enumerate(bcs):
@@ -285,7 +314,8 @@ def write_pages(outdir):
         f.write(gen_html(fetch(-1), lp))
 
 
-def _mx(sub, ns, codper, red=None, don=None):
+def _mx(sub, ns, codper, red=None, don=None, cg12=None):
+    """Dòng chỉ số AM/BC. Ô 15% nay là CHƯA GÁN 12h (thay COD) — khớp điểm con 'cg12'."""
     def g(k):
         v = sub.get(k)
         return "—" if v is None else "%.0f" % v
@@ -294,7 +324,7 @@ def _mx(sub, ns, codper, red=None, don=None):
              "🕗 Kỷ luật <b>%s</b>" % g("kyluat")]
     if red is not None:
         parts.append("🔴 đỏ <b>%s</b>" % _n(red))
-    parts.append("💰 COD/đơn <b>%s</b>" % (("%.1ftr" % (codper / 1e6)).replace(".", ",") if codper else "0"))
+    parts.append("⏳ Chưa gán 12h <b>%s</b>" % (_n(cg12) if cg12 is not None else "—"))
     return "<div class='mx'>" + " · ".join(parts) + "</div>"
 
 
@@ -343,7 +373,7 @@ def gen_html(data, links=None):
     P.append("<section class='hero'>")
     P.append("<div class='hlbl'>THẺ ĐIỂM ĐÁNH GIÁ · %s (từ %s đến nay)</div>" % (mlabel, dstr))
     P.append("<div class='htitle'>%d AM · %d bưu cục · %d nhân viên</div>" % (len(ams), n_bc, n_nv))
-    P.append("<div class='hsub'>Điểm tổng hợp 0–100 · %GTC 35 · Năng suất 20 · Tồn đỏ 20 · COD 15 · Kỷ luật 10</div>")
+    P.append("<div class='hsub'>Điểm tổng hợp 0–100 · %GTC 35 · Năng suất 20 · Tồn đỏ 20 · Chưa gán 12h 15 · Kỷ luật 10 <span style='opacity:.7'>(NV: COD 15)</span></div>")
     P.append("<div class='leg'><span><b style='background:var(--bad)'></b>Tệ nhất (1/3 cuối)</span>"
              "<span><b style='background:var(--warn)'></b>Chấp nhận (giữa)</span>"
              "<span><b style='background:var(--good)'></b>Tốt (1/3 đầu)</span></div>")
@@ -358,7 +388,7 @@ def gen_html(data, links=None):
                  % (a["color"], i, _esc(a["am"]), len(a["bcs_sorted"]), _n(a["don"]),
                     a["color"], a["comp"]))
         P.append("<div class='body'>")
-        P.append(_mx(a["sub"], a["ns"], a["codper"], red=a["red"]))
+        P.append(_mx(a["sub"], a["ns"], a["codper"], red=a["red"], cg12=a.get("cg12")))
         # BC trong AM (tệ→tốt)
         for j, b in enumerate(a["bcs_sorted"], 1):
             prov = PROV_NAME.get(b.get("tinh"), b.get("tinh") or "")
@@ -369,7 +399,7 @@ def gen_html(data, links=None):
                      % (b["color"], j, _esc(b["bc"]), _esc(prov), len(b["nvs_sorted"]),
                         _n(b["don"]), b["color"], b["comp"]))
             P.append("<div class='body'>")
-            P.append(_mx(b["sub"], b["ns"], b["codper"], red=b.get("red")))
+            P.append(_mx(b["sub"], b["ns"], b["codper"], red=b.get("red"), cg12=b.get("cg12")))
             P.append(_nv_block(b["nvs_sorted"]))          # NV trong BC (tệ→tốt)
             P.append("</div></details>")
         P.append("</div></details>")
@@ -388,7 +418,7 @@ def gen_html(data, links=None):
                  % (b["gcolor"], i, _esc(b["bc"]), _esc(b.get("am") or "—"), _esc(prov),
                     len(b["nvs_sorted"]), _n(b["don"]), b["gcolor"], b["comp"]))
         P.append("<div class='body'>")
-        P.append(_mx(b["sub"], b["ns"], b["codper"], red=b.get("red")))
+        P.append(_mx(b["sub"], b["ns"], b["codper"], red=b.get("red"), cg12=b.get("cg12")))
         P.append(_nv_block(b["nvs_sorted"]))
         P.append("</div></details>")
 
