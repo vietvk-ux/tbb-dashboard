@@ -1,0 +1,43 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# TBB auto reports · 19 báo cáo + sync
+# Timezone: Asia/Ho_Chi_Minh (crond phải support CRON_TZ, Oracle Ubuntu OK)
+# Cài: crontab /home/ubuntu/tbb-dashboard/deploy/vm/crontab-tbb.txt
+# Xem: crontab -l
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CRON_TZ=Asia/Ho_Chi_Minh
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# ─── Repo tbb-dashboard ───
+30 7 * * *   /home/ubuntu/run-report.sh tbb-dashboard report_morning.py
+30 7 * * 1   /home/ubuntu/run-report.sh tbb-dashboard report_bc_weekly.py
+0 8 * * *    /home/ubuntu/run-report.sh tbb-dashboard report_bc_hotspot.py
+0 8 * * *    /home/ubuntu/run-report.sh tbb-dashboard report_khochuyentiep.py
+30 8 * * 1   /home/ubuntu/run-report.sh tbb-dashboard report_bc_by_am.py
+30 8 1 * *   /home/ubuntu/run-report.sh tbb-dashboard report_monthly.py
+0 13 * * *   /home/ubuntu/run-report.sh tbb-dashboard report_overview.py
+0 16 * * *   /home/ubuntu/run-report.sh tbb-dashboard report_sla_alert.py
+0 16 * * *   /home/ubuntu/run-report.sh tbb-dashboard report_khochuyentiep.py
+0 17 * * *   /home/ubuntu/run-report.sh tbb-dashboard report_overview.py
+0 21 * * *   /home/ubuntu/run-report.sh tbb-dashboard report_overview.py
+0 22 * * *   /home/ubuntu/run-report.sh tbb-dashboard report_alert_drop.py
+0 22 * * *   /home/ubuntu/run-report.sh tbb-dashboard report_khochuyentiep.py
+
+# ─── Repo bao-cao-trip-tbb ───
+30 10 * * *  /home/ubuntu/run-report.sh bao-cao-trip-tbb report_backlog.py
+0 14 * * *   /home/ubuntu/run-report.sh bao-cao-trip-tbb report_midshift.py
+0 18 * * *   /home/ubuntu/run-report.sh bao-cao-trip-tbb report_endshift.py
+0 19 * * *   /home/ubuntu/run-report.sh bao-cao-trip-tbb report_abnormal_trips.py
+30 21 * * *  /home/ubuntu/run-report.sh bao-cao-trip-tbb report_pre_eod.py
+0 23 * * *   /home/ubuntu/run-report.sh bao-cao-trip-tbb report_eod.py
+
+# ─── Sync Supabase cuối ngày (giữ Supabase cập nhật) ───
+35 23 * * *  /home/ubuntu/run-report.sh tbb-dashboard db_sync.py
+
+# ─── Pull code mới mỗi ngày lúc 6:00 (để fix/update tự áp dụng không cần SSH) ───
+0 6 * * *    cd /home/ubuntu/tbb-dashboard && git pull >> /home/ubuntu/tbb-reports-logs/gitpull.log 2>&1
+5 6 * * *    cd /home/ubuntu/bao-cao-trip-tbb && git pull >> /home/ubuntu/tbb-reports-logs/gitpull.log 2>&1
+
+# ─── Dọn log cũ > 14 ngày hàng tuần ───
+0 4 * * 0    find /home/ubuntu/tbb-reports-logs -name "*.log" -mtime +14 -delete
