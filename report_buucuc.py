@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 
 from am_map import AM_OF
 from report_live import (_CSS, _n, _esc, _codm, _kgfmt, _pct, _cls, _bar, _tt_chip,
-                         _drv_table, _late_cnt, _low_cnt, PROV_NAME)
+                         _drv_table, _late_cnt, _low_cnt, _spark, PROV_NAME)
 
 VN = timezone(timedelta(hours=7))   # dùng stdlib (requirements KHÔNG có pytz) — khớp report_live
 logger = logging.getLogger("buucuc")
@@ -98,7 +98,74 @@ def _on_road(r):
     return max(sum(d.get("ot_tot", 0) - d.get("ot_done", 0) for d in r.get("drivers", [])), 0)
 
 
-def _bc_scorecard(r, collectable, dkattr="data-k"):
+_BC_TREND_CACHE = {}        # cache theo tiến trình (report chạy 1 lần/lượt) → fetch DB đúng 1 lần
+
+
+def bc_pct_trend(days=14):
+    """%GTC CUỐI NGÀY của TỪNG bưu cục trong `days` ngày gần nhất (chốt = snapshot gio lớn
+    nhất mỗi ngày trong bao_cao_gio.bcsnap=[gtc,total,backlog]).
+    Trả (dates, by_bc): dates=list ISO cũ→mới (gồm hôm nay); by_bc[bc]={ngay: %GTC}.
+    Dữ liệu per-BC chỉ bắt đầu ghi ~12/10 → ngày trước đó khuyết (None) là bình thường.
+    Thiếu creds/lỗi → (None, {})."""
+    if "v" in _BC_TREND_CACHE:
+        return _BC_TREND_CACHE["v"]
+    out = (None, {})
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if url and key:
+        try:
+            import requests
+            since = (datetime.now(VN).date() - timedelta(days=days + 4)).isoformat()
+            h = {"apikey": key, "Authorization": "Bearer " + key}
+            r = requests.get("%s/rest/v1/bao_cao_gio?select=ngay,gio,bcsnap"
+                             "&ngay=gte.%s&order=ngay.desc&limit=800" % (url, since),
+                             headers=h, timeout=20)
+            if r.ok:
+                best = {}                       # ngay -> (gio_max, bcsnap)
+                for x in r.json():
+                    ng, g = x["ngay"], x.get("gio") or 0
+                    if ng not in best or g > best[ng][0]:
+                        best[ng] = (g, x.get("bcsnap") or {})
+                dates = sorted(best)[-days:]
+                by_bc = {}
+                for ng in dates:
+                    for bc, v in (best[ng][1] or {}).items():
+                        if isinstance(v, list) and len(v) >= 2 and v[1]:
+                            by_bc.setdefault(bc, {})[ng] = round(v[0] / v[1] * 100, 1)
+                if dates:
+                    out = (dates, by_bc)
+        except Exception as e:
+            logger.warning("Lấy xu hướng %%GTC bưu cục lỗi (bỏ qua): %s", str(e)[:120])
+    _BC_TREND_CACHE["v"] = out
+    return out
+
+
+def _bc_spark(bc_name, live_pc, trend):
+    """Đường %GTC 14 ngày của 1 bưu cục. Điểm cuối (hôm nay) ghi đè bằng %GTC live để khớp
+    đúng số lớn trên thẻ. '' nếu không đủ dữ liệu (<2 điểm)."""
+    if not trend:
+        return ""
+    dates, by_bc = trend
+    if not dates:
+        return ""
+    series = [by_bc.get(bc_name, {}).get(d) for d in dates]
+    today = datetime.now(VN).date().isoformat()
+    if dates[-1] == today and live_pc is not None:
+        series[-1] = live_pc
+    if len([v for v in series if v is not None]) < 2:
+        return ""
+    cur = next((v for v in reversed(series) if v is not None), None)
+    col = "#17c983" if (cur or 0) >= 70 else "#fbbf24" if (cur or 0) >= 50 else "#ff6274"
+    sp = _spark(series, col, w=280, h=42, target=70)
+    lo = min(v for v in series if v is not None)
+    hi = max(v for v in series if v is not None)
+    return ("<div class='scgrp bcspk'><div class='scgt'>📈 %%GTC 14 ngày gần nhất "
+            "<span class='spkrng'>thấp %.0f%% · cao %.0f%% · vạch mục tiêu 70%%</span></div>"
+            "<div class='spkwrap'>%s</div></div>" % (lo, hi, sp))
+
+
+def _bc_scorecard(r, collectable, dkattr="data-k", trend=None):
     """1 bưu cục = 1 scorecard đầy đủ (dạng <details> bấm mở).
     dkattr: tên attribute khoá tìm kiếm (data-k ở trang riêng, data-kb khi NHÚNG để
     không đụng ô tìm kiếm chính của trang trực tiếp)."""
@@ -126,6 +193,9 @@ def _bc_scorecard(r, collectable, dkattr="data-k"):
              % (_n(r["total"]), _n(r["backlog"]), _n(r["gtc"]), _n(nv),
                 _late_badge(late), _low_badge(low)))
     P.append("</summary><div class='dtl scbody'>")
+
+    # 📈 ĐƯỜNG %GTC 14 NGÀY (chốt cuối ngày; điểm cuối = hôm nay live)
+    P.append(_bc_spark(r["name"], pc, trend))
 
     # 📦 GIAO HÔM NAY
     P.append(_grp("📦 Giao hôm nay", [
@@ -178,7 +248,7 @@ def _bc_scorecard(r, collectable, dkattr="data-k"):
     return "".join(P)
 
 
-def _am_blocks(rows, collectable, dkattr="data-k", am_open=True):
+def _am_blocks(rows, collectable, dkattr="data-k", am_open=True, trend=None):
     """Dựng các khối AM → bưu cục (scorecard). Trả chuỗi HTML. Dùng chung trang riêng +
     nhúng trên trang trực tiếp (dkattr='data-kb', am_open=False để gọn)."""
     am_rows = {}
@@ -212,7 +282,7 @@ def _am_blocks(rows, collectable, dkattr="data-k", am_open=True):
                     ("·" + _low_badge(a_low)) if a_low else ""))
         P.append("</summary><div class='dtl'>")
         for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
-            P.append(_bc_scorecard(r, collectable, dkattr))
+            P.append(_bc_scorecard(r, collectable, dkattr, trend))
         P.append("</div></details>")
     return "".join(P)
 
@@ -225,7 +295,7 @@ def embed(rows, collectable=None, label=None):
     P = ["<div id='bcmwrap'>"]
     if label:
         P.append("<div class='chotbn'>📌 Số CHỐT cuối ngày · <b>%s</b> · giữ nguyên cả ngày hôm sau</div>" % _esc(label))
-    P.append(_am_blocks(rows, collectable, dkattr="data-kb", am_open=False))
+    P.append(_am_blocks(rows, collectable, dkattr="data-kb", am_open=False, trend=bc_pct_trend()))
     P.append("</div>")
     return {"n": n, "html": "".join(P), "css": _EXTRA_CSS_INNER, "label": label}
 
@@ -254,7 +324,7 @@ def gen_html(rows, collectable=None, label=None):
         P.append("<div class='chotbn'>📌 Số CHỐT cuối ngày · <b>%s</b> · giữ nguyên cả ngày hôm sau</div>" % _esc(label))
     P.append("<div class='sec'>🧑‍💼 Theo AM · %GTC thấp → cao · bấm mở bưu cục → mở scorecard</div>")
 
-    P.append(_am_blocks(rows, collectable, dkattr="data-k", am_open=True))
+    P.append(_am_blocks(rows, collectable, dkattr="data-k", am_open=True, trend=bc_pct_trend()))
 
     P.append("<div class='foot'><b>📖 Bảng điều khiển bưu cục</b><br>"
              "Gom TẤT CẢ chỉ số live của từng bưu cục (giao·tồn·khối lượng·TikTok·tiền·nhân sự) vào 1 scorecard. "
@@ -287,5 +357,11 @@ details.bc.am>summary{padding:12px 14px}
 .chotbn{margin:2px 0 10px;padding:9px 12px;border-radius:11px;font-size:12px;font-weight:600;color:#cfe0ff;
  background:rgba(99,179,237,.14);border:1px solid rgba(99,179,237,.4)}
 .chotbn b{color:#fff;font-weight:800}
+.bcspk{margin:8px 0 10px}
+.bcspk .scgt{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.spkrng{font-size:10px;font-weight:600;color:var(--mut);text-transform:none;letter-spacing:0;opacity:.85}
+.spkwrap{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.1);border-radius:11px;
+ padding:8px 10px 4px}
+.spkwrap svg.spk{width:100%;height:42px}
 """
 _EXTRA_CSS = "<style>" + _EXTRA_CSS_INNER + "</style>"
