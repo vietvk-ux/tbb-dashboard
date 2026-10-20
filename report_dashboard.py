@@ -350,11 +350,11 @@ body{background:radial-gradient(130% 100% at 50% -10%,rgba(129,140,248,.10),tran
 </style></head><body>"""
 
 
-def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=5, min_orders=40):
-    """🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · Top N tệ nhất vùng theo ĐIỂM TỔNG HỢP 6 tiêu chí:
-    %GTC thấp · năng suất NV (GTC/NV) thấp · backlog >120h cao · GTB nhiều · NV %GTC<50% nhiều ·
-    tồn chưa gán tại ~12h cao. Xếp hạng từng tiêu chí (0=tệ nhất) rồi cộng → điểm thấp = tệ nhất.
-    Tiêu chí 'tồn 12h' chỉ tính khi có log (noon_bl) — chưa có thì dùng 5 tiêu chí."""
+def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=6, min_orders=40):
+    """🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · Top N tệ nhất vùng theo ĐIỂM TỔNG HỢP 3 tiêu chí
+    (user chốt 20/10, cho dễ nhìn): %GTC thấp · backlog >120h cao · tồn gán trước 12h cao.
+    Xếp hạng từng tiêu chí (0=tệ nhất) rồi cộng → điểm thấp = tệ nhất.
+    Tiêu chí 'tồn 12h' chỉ tính khi có log (noon_bl) — chưa có thì dùng 2 tiêu chí còn lại."""
     from collections import defaultdict
     red_giao_bc = red_giao_bc or {}
     noon_bl = noon_bl or {}
@@ -390,12 +390,11 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=5, min_orders=40):
         for r, i in enumerate(order):
             pr[i] = r                 # 0 = tệ nhất
         return pr
-    # Trọng số (user chốt 12/10): %GTC + TỒN CHƯA GÁN 12h NẶNG NHẤT (×2), còn lại ×1.
-    crit = [("pct", False, "%GTC thấp", 2.0), ("ns", False, "năng suất NV thấp", 1.0),
-            ("g120", True, "backlog 120h cao", 1.0), ("gtb", True, "GTB nhiều", 1.0),
-            ("nvlow", True, "nhiều NV <50%", 1.0)]
+    # 3 tiêu chí ngang trọng số (user chốt 20/10): %GTC · backlog >120h · tồn gán trước 12h.
+    crit = [("pct", False, "%GTC thấp", 1.0),
+            ("g120", True, "backlog >120h cao", 1.0)]
     if has_noon:
-        crit.append(("noon", True, "tồn gán trước 12h cao", 2.0))
+        crit.append(("noon", True, "tồn gán trước 12h cao", 1.0))
     ranks = {k: _rk(k, hb) for k, hb, _, _ in crit}
     for i, dd in enumerate(recs):
         # Điểm = Σ trọng_số × hạng (hạng 0 = tệ nhất) → điểm THẤP = nguy hiểm nhất.
@@ -409,21 +408,17 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=5, min_orders=40):
     P.append("<summary><span class='whead'>🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · VÙNG TBB</span>"
              "<span class='wcv'><span class='wvo'>▾ Xem %d BC</span><span class='wvc'>▴ Thu gọn</span></span>"
              "</summary>" % len(top))
-    note6 = "6 tiêu chí" if has_noon else "5 tiêu chí <i>(tồn gán trước 12h đầy đủ từ ngày mai)</i>"
-    P.append("<div class='wsub'>Top %d bưu cục tệ nhất vùng theo điểm tổng hợp %s: "
-             "<b>%%GTC · năng suất NV · backlog &gt;120h · GTB · NV &lt;50%% · tồn gán trước 12h</b> "
-             "(chốt cuối ngày · <b>%%GTC &amp; tồn 12h tính nặng điểm nhất</b>).</div>" % (len(top), note6))
+    note3 = "3 tiêu chí" if has_noon else "2 tiêu chí <i>(tồn gán trước 12h đầy đủ từ ngày mai)</i>"
+    P.append("<div class='wsub'>Top %d bưu cục tệ nhất vùng theo %s: "
+             "<b>%%GTC thấp · backlog &gt;120h cao · tồn gán trước 12h cao</b>.</div>" % (len(top), note3))
     for i, dd in enumerate(top, 1):
         cls = _cls(dd["pct"])
-        noon_txt = ("<span class='bd'>⏳12h <b>%s</b></span>" % _n(dd["noon"])) if dd["noon"] is not None else ""
+        noon_txt = ("<span class='bd'>⏳ <b>%s</b> tồn 12h</span>" % _n(dd["noon"])) if dd["noon"] is not None else ""
         P.append("<div class='wbc %s'>" % cls)
         P.append("<div class='wbh'><span class='wrk'>%d</span><span class='wbn'>%s</span>"
                  "<span class='pill sm %s'>%d%%</span></div>" % (i, _esc(dd["bc"]), cls, round(dd["pct"])))
-        P.append("<div class='wbm'><span>🚚 <b>%s</b> đơn/NV</span>"
-                 "<span class='bd'>🔴 <b>%s</b> &gt;120h</span>"
-                 "<span class='bd'>❌ <b>%s</b> GTB</span>"
-                 "<span class='bd'>👤 <b>%s</b> NV&lt;50%%</span>%s</div>"
-                 % (round(dd["ns"]), _n(dd["g120"]), _n(dd["gtb"]), _n(dd["nvlow"]), noon_txt))
+        P.append("<div class='wbm'><span class='bd'>🔴 <b>%s</b> &gt;120h</span>%s</div>"
+                 % (_n(dd["g120"]), noon_txt))
         P.append("<div class='wtag'>🔥 %s</div>" % " · ".join(dd["_tags"]))
         P.append("</div>")
     P.append("</details>")
