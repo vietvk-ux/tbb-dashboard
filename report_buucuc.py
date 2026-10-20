@@ -153,6 +153,12 @@ def _bc_spark(bc_name, live_pc, trend):
     today = datetime.now(VN).date().isoformat()
     if dates[-1] == today and live_pc is not None:
         series[-1] = live_pc
+    # Cắt các ngày KHUYẾT ở đầu chuỗi (BC mới có dữ liệu ~12/10) để đường trải đều hết bề ngang.
+    first = next((i for i, v in enumerate(series) if v is not None), None)
+    if first is None:
+        return ""
+    series = series[first:]
+    ndays = len(series)
     if len([v for v in series if v is not None]) < 2:
         return ""
     cur = next((v for v in reversed(series) if v is not None), None)
@@ -160,9 +166,9 @@ def _bc_spark(bc_name, live_pc, trend):
     sp = _spark(series, col, w=280, h=42, target=70)
     lo = min(v for v in series if v is not None)
     hi = max(v for v in series if v is not None)
-    return ("<div class='scgrp bcspk'><div class='scgt'>📈 %%GTC 14 ngày gần nhất "
+    return ("<div class='scgrp bcspk'><div class='scgt'>📈 %%GTC %d ngày gần nhất "
             "<span class='spkrng'>thấp %.0f%% · cao %.0f%% · vạch mục tiêu 70%%</span></div>"
-            "<div class='spkwrap'>%s</div></div>" % (lo, hi, sp))
+            "<div class='spkwrap'>%s</div></div>" % (ndays, lo, hi, sp))
 
 
 def _bc_scorecard(r, collectable, dkattr="data-k", trend=None):
