@@ -274,6 +274,18 @@ details.watch[open] .wcv .wvc{display:inline}
 .wbm{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--mut);margin-bottom:5px;font-variant-numeric:tabular-nums}
 .wbm b{color:var(--txt);font-weight:800}.wbm .bd b{color:#ff9aab}
 .wtag{font-size:10.5px;color:var(--warn);font-weight:700}
+details.wbc>summary{list-style:none;cursor:pointer}
+details.wbc>summary::-webkit-details-marker{display:none}
+details.wbc .wtag{margin-bottom:0}
+.wcar{flex:none;color:rgb(var(--h,242,69,92));font-size:12px;transition:transform .2s;margin-left:2px}
+details.wbc[open] .wcar{transform:rotate(180deg)}
+.wdet{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:9px}
+.wdet.wempty{font-size:11px;color:var(--mut)}
+.wsrow{display:flex;flex-direction:column;gap:4px}
+.wsl{font-size:11px;color:var(--mut);font-weight:600}
+.wsl b{color:var(--txt);font-weight:800;margin-left:3px;font-variant-numeric:tabular-nums}
+.wsk{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:9px;padding:6px 8px 3px}
+svg.spk{display:block}.wsk svg.spk{width:100%;height:34px}
 
 .sec{font-size:12px;font-weight:700;letter-spacing:.05em;color:#b9c0da;text-transform:uppercase;margin:20px 4px 10px}
 
@@ -350,6 +362,108 @@ body{background:radial-gradient(130% 100% at 50% -10%,rgba(129,140,248,.10),tran
 </style></head><body>"""
 
 
+_WATCH_TREND_CACHE = {}        # cache theo tiến trình (report chạy 1 lần/lượt)
+
+
+def _fetch_watch_crit_trend(d, days=14):
+    """Lịch sử `days` ngày/BC cho 3 tiêu chí khối theo dõi:
+      pct  = %GTC CUỐI NGÀY  (bao_cao_gio, snapshot gio lớn nhất mỗi ngày: gtc/total)
+      noon = tồn gán trước 12h (bao_cao_gio gio=12, bcsnap[bc][2])
+      g120 = backlog giao >120h CUỐI NGÀY (bao_cao_ton_dong order_type=DELIVER, g_gt120)
+    Trả (dates, by_bc): dates=list ISO cũ→mới (gồm ngày d); by_bc[bc]={'pct':{ngay:v},
+    'noon':{ngay:v},'g120':{ngay:v}}. Thiếu creds/lỗi → (None, {})."""
+    if d is None:
+        return (None, {})
+    ck = d.isoformat()
+    if ck in _WATCH_TREND_CACHE:
+        return _WATCH_TREND_CACHE[ck]
+    import requests
+    out = (None, {})
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if url and key:
+        try:
+            hdr = {"apikey": key, "Authorization": "Bearer " + key}
+            since = (d - timedelta(days=days + 4)).isoformat()
+            until = d.isoformat()
+            # --- bao_cao_gio: EOD (gio lớn nhất) + gio=12 mỗi ngày ---
+            dgio = {}
+            r = requests.get(url + "/rest/v1/bao_cao_gio",
+                             params=[("select", "ngay,gio,bcsnap"),
+                                     ("ngay", "gte." + since), ("ngay", "lte." + until),
+                                     ("order", "ngay.desc"), ("limit", "900")],
+                             headers=hdr, timeout=30)
+            if r.ok:
+                for row in r.json():
+                    ng, g = row["ngay"], row.get("gio") or 0
+                    slot = dgio.setdefault(ng, {"maxg": -1, "max": {}, "noon": None})
+                    if g > slot["maxg"]:
+                        slot["maxg"] = g; slot["max"] = row.get("bcsnap") or {}
+                    if g == 12:
+                        slot["noon"] = row.get("bcsnap") or {}
+            # --- bao_cao_ton_dong: backlog giao >120h cuối ngày per BC ---
+            g120d, off = {}, 0
+            while True:
+                r = requests.get(url + "/rest/v1/bao_cao_ton_dong",
+                                 params=[("select", "ngay,buu_cuc,g_gt120"),
+                                         ("order_type", "eq.DELIVER"),
+                                         ("ngay", "gte." + since), ("ngay", "lte." + until),
+                                         ("order", "id.asc"), ("limit", "1000"), ("offset", str(off))],
+                                 headers=hdr, timeout=30)
+                if not r.ok:
+                    break
+                c = r.json()
+                for row in c:
+                    bc = row.get("buu_cuc")
+                    if bc:
+                        g120d.setdefault(row["ngay"], {})[bc] = (
+                            g120d.get(row["ngay"], {}).get(bc, 0) + (row.get("g_gt120") or 0))
+                if len(c) < 1000:
+                    break
+                off += 1000
+            dates = sorted(set(dgio) | set(g120d))[-days:]
+            by_bc = {}
+            for ng in dates:
+                mx = (dgio.get(ng) or {}).get("max") or {}
+                nn = (dgio.get(ng) or {}).get("noon") or {}
+                for bc, v in mx.items():
+                    if isinstance(v, list) and len(v) >= 2 and v[1]:
+                        by_bc.setdefault(bc, {}).setdefault("pct", {})[ng] = round(v[0] / v[1] * 100, 1)
+                for bc, v in nn.items():
+                    if isinstance(v, list) and len(v) >= 3 and v[2] is not None:
+                        by_bc.setdefault(bc, {}).setdefault("noon", {})[ng] = v[2]
+                for bc, val in (g120d.get(ng) or {}).items():
+                    by_bc.setdefault(bc, {}).setdefault("g120", {})[ng] = val
+            if dates:
+                out = (dates, by_bc)
+        except Exception as e:
+            logger.warning("Lấy xu hướng 3 tiêu chí watch lỗi (bỏ qua sparkline): %s", str(e)[:120])
+    _WATCH_TREND_CACHE[ck] = out
+    return out
+
+
+def _watch_spark(trend, bc, field, color, live_val=None, target=None):
+    """1 đường xu hướng của 1 tiêu chí cho 1 BC (cắt ngày khuyết đầu chuỗi, điểm cuối=live).
+    '' nếu <2 điểm."""
+    if not trend:
+        return ""
+    from report_live import _spark
+    dates, by_bc = trend
+    if not dates:
+        return ""
+    series = [(by_bc.get(bc, {}).get(field, {})).get(dd) for dd in dates]
+    if live_val is not None:
+        series[-1] = live_val
+    first = next((k for k, v in enumerate(series) if v is not None), None)
+    if first is None:
+        return ""
+    series = series[first:]
+    if len([v for v in series if v is not None]) < 2:
+        return ""
+    return _spark(series, color, w=300, h=34, target=target, pad=4)
+
+
 def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=6, min_orders=40):
     """🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · Top N tệ nhất vùng theo ĐIỂM TỔNG HỢP 3 tiêu chí
     (user chốt 20/10, cho dễ nhìn): %GTC thấp · backlog >120h cao · tồn gán trước 12h cao.
@@ -410,19 +524,49 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=6, min_orders=40):
              "</summary>" % len(top))
     note3 = "3 tiêu chí" if has_noon else "2 tiêu chí <i>(tồn gán trước 12h đầy đủ từ ngày mai)</i>"
     P.append("<div class='wsub'>Top %d bưu cục tệ nhất vùng theo %s: "
-             "<b>%%GTC thấp · backlog &gt;120h cao · tồn gán trước 12h cao</b>.</div>" % (len(top), note3))
+             "<b>%%GTC thấp · backlog &gt;120h cao · tồn gán trước 12h cao</b>. "
+             "<span style='opacity:.75'>Bấm 1 bưu cục để xem đường 14 ngày.</span></div>" % (len(top), note3))
+    trend = _fetch_watch_crit_trend(agg.get("date"))
     for i, dd in enumerate(top, 1):
         cls = _cls(dd["pct"])
         noon_txt = ("<span class='bd'>⏳ <b>%s</b> tồn 12h</span>" % _n(dd["noon"])) if dd["noon"] is not None else ""
-        P.append("<div class='wbc %s'>" % cls)
+        P.append("<details class='wbc %s'><summary>" % cls)
         P.append("<div class='wbh'><span class='wrk'>%d</span><span class='wbn'>%s</span>"
-                 "<span class='pill sm %s'>%d%%</span></div>" % (i, _esc(dd["bc"]), cls, round(dd["pct"])))
+                 "<span class='pill sm %s'>%d%%</span><span class='wcar'>▾</span></div>"
+                 % (i, _esc(dd["bc"]), cls, round(dd["pct"])))
         P.append("<div class='wbm'><span class='bd'>🔴 <b>%s</b> &gt;120h</span>%s</div>"
                  % (_n(dd["g120"]), noon_txt))
         P.append("<div class='wtag'>🔥 %s</div>" % " · ".join(dd["_tags"]))
-        P.append("</div>")
+        P.append("</summary>")
+        # 3 đường xu hướng 14 ngày (cắt ngày khuyết đầu chuỗi; điểm cuối = số cuối ngày)
+        rows_spark = [
+            ("🎯 %GTC", "%d%%" % round(dd["pct"]),
+             _watch_spark(trend, dd["bc"], "pct", _tcol(dd["pct"]), live_val=round(dd["pct"], 1), target=70)),
+            ("🔴 Backlog >120h", _n(dd["g120"]),
+             _watch_spark(trend, dd["bc"], "g120", "#ff6274", live_val=dd["g120"])),
+        ]
+        if dd["noon"] is not None:
+            rows_spark.append(("⏳ Tồn gán trước 12h", _n(dd["noon"]),
+                               _watch_spark(trend, dd["bc"], "noon", "#fbbf24", live_val=dd["noon"])))
+        inner = []
+        for lbl, val, sp in rows_spark:
+            if not sp:
+                continue
+            inner.append("<div class='wsrow'><div class='wsl'>%s <b>%s</b></div>"
+                         "<div class='wsk'>%s</div></div>" % (lbl, val, sp))
+        if inner:
+            P.append("<div class='wdet'>" + "".join(inner) + "</div>")
+        else:
+            P.append("<div class='wdet wempty'>Chưa đủ dữ liệu lịch sử để vẽ đường.</div>")
+        P.append("</details>")
     P.append("</details>")
     return "".join(P)
+
+
+def _tcol(pct):
+    """Màu đường %GTC theo mức: xanh ≥70 · vàng ≥50 · đỏ <50."""
+    p = pct or 0
+    return "#17c983" if p >= 70 else "#fbbf24" if p >= 50 else "#ff6274"
 
 
 def gen_html(agg, backlog=None, backlog_time="hiện tại", ontrip=None, hist=None, bc_days=None, red_bc=None, red_giao_bc=None, noon_bl=None):

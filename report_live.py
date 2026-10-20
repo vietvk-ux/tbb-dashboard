@@ -587,7 +587,12 @@ def _spark(vals, color, w=240, h=46, target=None, pad=6):
     area = ("M%.1f,%.1f " % pl[0] + " ".join("L%.1f,%.1f" % p for p in pl[1:])
             + " L%.1f,%.1f L%.1f,%.1f Z" % (pl[-1][0], h, pl[0][0], h))
     _spark._i = getattr(_spark, "_i", 0) + 1
-    gid = "sg%d" % _spark._i
+    # Tiền tố NGẪU NHIÊN theo tiến trình → id gradient không trùng khi khối do tiến trình khác
+    # (report_dashboard sinh khối watch) được NHÚNG cạnh sparkline của trang trực tiếp.
+    if not getattr(_spark, "_pfx", None):
+        import random
+        _spark._pfx = "sg%04x" % random.randrange(0x10000)
+    gid = "%s_%d" % (_spark._pfx, _spark._i)
     tline = ""
     if target is not None:
         ty = Y(target)
@@ -2194,6 +2199,18 @@ details.watch[open] .wcv .wvc{display:inline}
 .wbm{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--mut);margin-bottom:5px;font-variant-numeric:tabular-nums}
 .wbm b{color:var(--txt);font-weight:800}.wbm .bd b{color:#ff9aab}
 .wtag{font-size:10.5px;color:var(--warn);font-weight:700}
+details.wbc>summary{list-style:none;cursor:pointer}
+details.wbc>summary::-webkit-details-marker{display:none}
+details.wbc .wtag{margin-bottom:0}
+.wcar{flex:none;color:rgb(var(--h,242,69,92));font-size:12px;transition:transform .2s;margin-left:2px}
+details.wbc[open] .wcar{transform:rotate(180deg)}
+.wdet{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:9px}
+.wdet.wempty{font-size:11px;color:var(--mut)}
+.wsrow{display:flex;flex-direction:column;gap:4px}
+.wsl{font-size:11px;color:var(--mut);font-weight:600}
+.wsl b{color:var(--txt);font-weight:800;margin-left:3px;font-variant-numeric:tabular-nums}
+.wsk{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:9px;padding:6px 8px 3px}
+.wsk svg.spk{width:100%;height:34px;display:block}
 .ddtl{margin-top:11px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:12px}
 .dnote{font-size:10.5px;color:#6d7492;line-height:1.5;margin:-2px 0 -2px}
 .dgrp{display:flex;flex-direction:column;gap:5px}
