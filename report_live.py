@@ -1251,18 +1251,22 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _pc = [t["pct"] for t in trend][-14:]
         _lv = _lastnn(_pc)
         _tri.append(("🎯 %GTC", ("%s%%" % _n(round(_lv))) if _lv is not None else "—",
-                     _spark(_pc, "#fbbf24", w=300, h=40, target=70)))
+                     _spark(_pc, "#fbbf24", w=300, h=40, target=70), "MT 70%"))
     if g120_trend and len(g120_trend) >= 2:
         _g = g120_trend[-14:]
-        _tri.append(("🔴 Backlog &gt;120h", _n(_lastnn(_g)), _spark(_g, "#fb7185", w=300, h=40)))
+        _tri.append(("🔴 Backlog &gt;120h", _n(_lastnn(_g)),
+                     _spark(_g, "#fb7185", w=300, h=40, target=500), "MT 500"))
     if noon12_trend and len(noon12_trend) >= 2:
         _nn = noon12_trend[-14:]
-        _tri.append(("⏳ Tồn gán 12h", _n(_lastnn(_nn)), _spark(_nn, "#f5aa17", w=300, h=40)))
+        _tri.append(("⏳ Tồn gán 12h", _n(_lastnn(_nn)),
+                     _spark(_nn, "#f5aa17", w=300, h=40, target=3000), "MT 3.000"))
     if _tri:
         _cells = "".join("<div class='htl'><div class='htll'>%s</div>"
-                         "<div class='htlv'>%s</div><div class='htlk'>%s</div></div>"
-                         % (l, v, s) for l, v, s in _tri)
-        P.append("<div class='htri'><div class='htri-h'>📈 Xu hướng 14 ngày chốt</div>"
+                         "<div class='htlv'>%s</div><div class='htlk'>%s</div>"
+                         "<div class='htlt'>⌁ %s</div></div>"
+                         % (l, v, s, mt) for l, v, s, mt in _tri)
+        P.append("<div class='htri'><div class='htri-h'>📈 Xu hướng 14 ngày chốt "
+                 "<span class='htri-s'>(nét đứt = mục tiêu)</span></div>"
                  "<div class='htri-g'>%s</div></div>" % _cells)
 
     # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
@@ -2115,12 +2119,14 @@ svg.spk{display:block}
 /* 3 ĐƯỜNG XU HƯỚNG 14 NGÀY ngay dưới số %GTC (%GTC · Backlog>120h · Tồn gán 12h) */
 .htri{margin-top:13px}
 .htri-h{font-size:10.5px;color:var(--mut);font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:7px}
+.htri-h .htri-s{font-weight:500;text-transform:none;letter-spacing:0;opacity:.75}
 .htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.htl{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:8px 9px 4px;min-width:0}
+.htl{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:8px 9px 6px;min-width:0}
 .htll{font-size:10.5px;color:var(--mut);font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .htlv{color:var(--txt);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;margin:1px 0 3px}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
-@media(max-width:430px){.htri-g{gap:6px}.htl{padding:7px 7px 3px}.htll{font-size:10px}.htlv{font-size:14px}}
+.htlt{font-size:9.5px;color:#a78bfa;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums;white-space:nowrap}
+@media(max-width:430px){.htri-g{gap:6px}.htl{padding:7px 7px 5px}.htll{font-size:10px}.htlv{font-size:14px}.htlt{font-size:9px}}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
