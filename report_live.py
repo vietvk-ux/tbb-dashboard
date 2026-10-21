@@ -2181,7 +2181,7 @@ svg.spk{display:block}
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hverd .hvi{font-size:16px}
-.hverd b{font-family:'Geist Mono','Geist',monospace;font-size:15px;font-weight:800;letter-spacing:.01em;color:#fff}
+.hverd b{font-family:'Geist',sans-serif;font-size:15px;font-weight:800;letter-spacing:.01em;color:#fff}
 .hverd.good{border-color:rgba(23,201,131,.42);background:rgba(23,201,131,.09)}.hverd.good b{color:var(--good)}
 .hverd.warn{border-color:rgba(245,170,23,.42);background:rgba(245,170,23,.09)}.hverd.warn b{color:var(--warn)}
 .hverd.bad{border-color:rgba(245,69,92,.42);background:rgba(245,69,92,.09)}.hverd.bad b{color:var(--bad)}
@@ -2191,7 +2191,7 @@ svg.spk{display:block}
 .hpace{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hpace .hvi{font-size:16px}
-.hpace b{font-family:'Geist Mono','Geist',monospace;font-size:15px;font-weight:800;letter-spacing:.01em;color:#fff}
+.hpace b{font-family:'Geist',sans-serif;font-size:15px;font-weight:800;letter-spacing:.01em;color:#fff}
 .hpace i{font-style:normal;color:var(--mut);font-weight:500}
 .hpace.good{border-color:rgba(23,201,131,.45);background:rgba(23,201,131,.10)}.hpace.good b{color:var(--good)}
 .hpace.warn{border-color:rgba(245,170,23,.45);background:rgba(245,170,23,.10)}.hpace.warn b{color:var(--warn)}
@@ -2200,7 +2200,7 @@ svg.spk{display:block}
 .hcmp{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.7;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hcmp .hvi{font-size:16px}
-.hcmp b{font-family:'Geist Mono','Geist',monospace;font-size:14.5px;font-weight:800;letter-spacing:.01em;color:#fff}
+.hcmp b{font-family:'Geist',sans-serif;font-size:14.5px;font-weight:800;letter-spacing:.01em;color:#fff}
 .hcmp i{font-style:normal;color:var(--mut);font-weight:400;font-size:12px}
 .hcmp .cq{display:inline-block;padding:2px 8px;border-radius:7px;font-weight:800;font-size:13px;
  font-variant-numeric:tabular-nums;margin-left:1px}
