@@ -565,7 +565,7 @@ def _fetch_giao120h_trend(days=8):
 
 
 def _fetch_region_noon12_trend(days=14, noon_hour=12):
-    """Tồn CHƯA GÁN GIAO CẤP VÙNG tại ~12h trưa, N ngày CHỐT gần nhất (tới hôm qua) =
+    """Tồn CHƯA GÁN GIAO CẤP VÙNG tại ~12h trưa, N ngày gần nhất (GỒM hôm nay nếu đã qua 12h) =
     Σ bcsnap[bc][2] của hàng gio=12 mỗi ngày trong bao_cao_gio. List cũ→mới; None nếu
     thiếu creds/lỗi/<2 điểm. (bao_cao_gio KHÔNG có cột id → order theo ngay.)"""
     url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
@@ -579,8 +579,8 @@ def _fetch_region_noon12_trend(days=14, noon_hour=12):
         since = (today - timedelta(days=days + 4)).isoformat()
         h = {"apikey": key, "Authorization": "Bearer " + key}
         r = requests.get("%s/rest/v1/bao_cao_gio?select=ngay,bcsnap&gio=eq.%d"
-                         "&ngay=gte.%s&ngay=lt.%s&order=ngay.desc&limit=%d"
-                         % (url, noon_hour, since, today.isoformat(), days + 6),
+                         "&ngay=gte.%s&order=ngay.desc&limit=%d"
+                         % (url, noon_hour, since, days + 6),
                          headers=h, timeout=20)
         if not r.ok:
             return None
@@ -1282,14 +1282,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     _tri.append(("🔴 Backlog &gt;120h", _n(giao_120h) if giao_120h is not None else "—",
                  _spark(_g, "#fb7185", w=300, h=40, target=500) if _g else "",
                  "⌁ MT 500", _st2, _c2, _t2))
-    # 3) Tồn CHƯA GÁN GIAO — live R["backlog"] (khớp tile Tổng quan), đường 14 ngày chốt (chua_gan)
-    _cg = [t["chuagan"] for t in trend][-14:] if (trend and len(trend) >= 2) else None
-    _c3, _t3 = _cmp_hq(R["backlog"], _hq_cg, False)
-    _st3 = _c3 if _c3 in ("cbad", "cok") else "na"
-    _st3 = "gbad" if _st3 == "cbad" else ("gok" if _st3 == "cok" else "na")
-    _tri.append(("⏳ Chưa gán giao", _n(R["backlog"]),
-                 _spark(_cg, "#f5aa17", w=300, h=40) if _cg else "",
-                 "⌁ 14 ngày chốt", _st3, _c3, _t3))
+    # 3) Tồn chưa gán tại MỐC 12h (để ĐÁNH GIÁ — chuẩn như xếp hạng/theo dõi sâu sát): giá trị =
+    #    12h HÔM NAY, so 12h HÔM QUA, đường 14 ngày, MT 3.000. (noon12_trend gồm hôm nay nếu >12h.)
+    _nn = noon12_trend[-14:] if (noon12_trend and len(noon12_trend) >= 2) else None
+    _nv = _nn[-1] if _nn else None
+    _nprev = _nn[-2] if (_nn and len(_nn) >= 2) else None
+    _c3, _t3 = _cmp_hq(_nv, _nprev, False)
+    _st3 = "na" if _nv is None else ("gok" if _nv <= 3000 else "gbad")
+    _tri.append(("⏳ Chưa gán 12h", _n(_nv) if _nv is not None else "—",
+                 _spark(_nn, "#f5aa17", w=300, h=40, target=3000) if _nn else "",
+                 "⌁ MT 3.000", _st3, _c3, _t3))
     if _tri:
         _cells = "".join(
             "<div class='htl %s'><div class='htll'>%s</div>"
