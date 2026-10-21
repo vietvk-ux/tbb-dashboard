@@ -597,6 +597,86 @@ def _fetch_region_noon12_trend(days=14, noon_hour=12):
         return None
 
 
+def _fetch_am_crit_trend(days=14):
+    """14 ngày/AM cho 3 chỉ số điều hành (drill từ 3 card hero):
+      pct  = %GTC CUỐI NGÀY per AM (Σgtc/Σtotal các BC trong AM, snapshot gio lớn nhất mỗi ngày)
+      noon = tồn chưa gán 12h per AM (Σ bcsnap[bc][2] gio=12)
+      g120 = backlog giao >120h per AM (Σ g_gt120 DELIVER từ bao_cao_ton_dong)
+    Trả (dates, {am:{'pct':{ngay:v},'noon':{ngay:v},'g120':{ngay:v}}}). Thiếu creds/lỗi → (None, {})."""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return (None, {})
+    try:
+        import requests
+        today = datetime.now(VN).date()
+        since = (today - timedelta(days=days + 4)).isoformat()
+        hdr = {"apikey": key, "Authorization": "Bearer " + key}
+        # bao_cao_gio: EOD (gio lớn nhất) + gio=12 mỗi ngày
+        dgio = {}
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=ngay,gio,bcsnap&ngay=gte.%s"
+                         "&order=ngay.desc&limit=900" % (url, since), headers=hdr, timeout=30)
+        if r.ok:
+            for row in r.json():
+                ng, g = row["ngay"], row.get("gio") or 0
+                slot = dgio.setdefault(ng, {"maxg": -1, "max": {}, "noon": None})
+                if g > slot["maxg"]:
+                    slot["maxg"] = g; slot["max"] = row.get("bcsnap") or {}
+                if g == 12:
+                    slot["noon"] = row.get("bcsnap") or {}
+        # bao_cao_ton_dong: backlog giao >120h per BC
+        g120d, off = {}, 0
+        while True:
+            r = requests.get("%s/rest/v1/bao_cao_ton_dong?select=ngay,buu_cuc,g_gt120"
+                             "&order_type=eq.DELIVER&ngay=gte.%s&order=id.asc&limit=1000&offset=%d"
+                             % (url, since, off), headers=hdr, timeout=30)
+            if not r.ok:
+                break
+            c = r.json()
+            for row in c:
+                bc = row.get("buu_cuc")
+                if bc:
+                    g120d.setdefault(row["ngay"], {})[bc] = (
+                        g120d.get(row["ngay"], {}).get(bc, 0) + (row.get("g_gt120") or 0))
+            if len(c) < 1000:
+                break
+            off += 1000
+        dates = sorted(set(dgio) | set(g120d))[-days:]
+        res = {}
+        for ng in dates:
+            mx = (dgio.get(ng) or {}).get("max") or {}
+            nn = (dgio.get(ng) or {}).get("noon") or {}
+            acc = {}                                 # am -> [gtc,total] cho %GTC
+            for bc, v in mx.items():
+                if isinstance(v, list) and len(v) >= 2:
+                    am = AM_OF.get(bc)
+                    if am:
+                        a = acc.setdefault(am, [0, 0]); a[0] += v[0]; a[1] += v[1]
+            for am, (gtc, tot) in acc.items():
+                if tot:
+                    res.setdefault(am, {}).setdefault("pct", {})[ng] = round(gtc / tot * 100, 1)
+            accn = {}
+            for bc, v in nn.items():
+                if isinstance(v, list) and len(v) >= 3 and v[2] is not None:
+                    am = AM_OF.get(bc)
+                    if am:
+                        accn[am] = accn.get(am, 0) + v[2]
+            for am, sm in accn.items():
+                res.setdefault(am, {}).setdefault("noon", {})[ng] = sm
+            accg = {}
+            for bc, val in (g120d.get(ng) or {}).items():
+                am = AM_OF.get(bc)
+                if am:
+                    accg[am] = accg.get(am, 0) + val
+            for am, sm in accg.items():
+                res.setdefault(am, {}).setdefault("g120", {})[ng] = sm
+        return (dates, res) if dates else (None, {})
+    except Exception as e:
+        logger.warning("Lấy xu hướng 3 chỉ số theo AM lỗi (bỏ qua drill): %s", str(e)[:120])
+        return (None, {})
+
+
 def _spark(vals, color, w=240, h=46, target=None, pad=6):
     """Đường xu hướng (SVG) RÕ NÉT: đường crisp 2px (non-scaling-stroke, không méo khi kéo giãn)
     + vùng tô gradient dưới đường + điểm cuối nổi bật. target = vạch mục tiêu. '' nếu <2 điểm."""
@@ -1118,7 +1198,7 @@ def _read_watch_chot():
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
              fc_uplift=None, pace=None, cmp_y=None, bc_avg=None, lgt_w=None, nv_avg=None,
-             noon12_trend=None):
+             noon12_trend=None, am_ctrend=None):
     now = datetime.now(VN)
     # SO CÙNG GIỜ HÔM QUA / TB 7 NGÀY chỉ hiện từ ~10h sáng (ENV CMP_MIN_HOUR): trước đó %GTC
     # luỹ kế biến động mạnh do 'sóng gán đơn' đầu ngày (mẫu số nhảy vọt) → so sánh dễ hiểu nhầm.
@@ -1268,20 +1348,47 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     def _st_pct(p):
         return "na" if p is None else "gok" if p >= 70 else "gwarn" if p >= 60 else "gbad"
 
+    def _trim_lead(xs):
+        i = next((k for k, x in enumerate(xs) if x is not None), None)
+        return xs[i:] if i is not None else xs
+
+    def _am_drill(field, hb, tgt, color):
+        """Bấm 1 card → biểu đồ 14 ngày của TỪNG AM cho chỉ số đó (xếp tệ→tốt)."""
+        if not (am_ctrend and am_ctrend[0]):
+            return ""
+        adates, amap = am_ctrend
+        rr = []
+        for am, dd in amap.items():
+            ser = [dd.get(field, {}).get(x) for x in adates]
+            last = next((x for x in reversed(ser) if x is not None), None)
+            if last is not None:
+                rr.append((am, last, ser))
+        if not rr:
+            return ""
+        rr.sort(key=lambda r: r[1], reverse=(not hb))     # tệ nhất lên đầu
+        P2 = ["<div class='amdr'><div class='amdr-h'>📊 Theo AM · 14 ngày (tệ → tốt)</div>"]
+        for am, last, ser in rr:
+            vv = ("%s%%" % _n(round(last))) if field == "pct" else _n(round(last))
+            sp = _spark(_trim_lead(ser), color, w=320, h=30, target=tgt)
+            P2.append("<div class='amdrow'><div class='amdn'>%s<b>%s</b></div>"
+                      "<div class='amdk'>%s</div></div>" % (_esc(am), vv, sp))
+        P2.append("</div>")
+        return "".join(P2)
+
     _tri = []
     # 1) %GTC — live reg_pct (khớp số to Hero), đường 14 ngày chốt, MT 70
     _pc = [t["pct"] for t in trend][-14:] if (trend and len(trend) >= 2) else None
     _c1, _t1 = _cmp_hq(reg_pct, _hq_pct, True, pct=True)
     _tri.append(("🎯 %GTC", ("%s%%" % _n(round(reg_pct))) if reg_pct is not None else "—",
                  _spark(_pc, "#fbbf24", w=300, h=40, target=70) if _pc else "",
-                 "⌁ MT 70%", _st_pct(reg_pct), _c1, _t1))
+                 "⌁ MT 70%", _st_pct(reg_pct), _c1, _t1, "pct", True, 70, "#fbbf24"))
     # 2) Backlog >120h — live giao_120h (khớp tile), đường 14 ngày, MT 500
     _g = g120_trend[-14:] if (g120_trend and len(g120_trend) >= 2) else None
     _c2, _t2 = _cmp_hq(giao_120h, _hq_g120, False)
     _st2 = "na" if giao_120h is None else ("gok" if giao_120h <= 500 else "gbad")
     _tri.append(("🔴 Backlog &gt;120h", _n(giao_120h) if giao_120h is not None else "—",
                  _spark(_g, "#fb7185", w=300, h=40, target=500) if _g else "",
-                 "⌁ MT 500", _st2, _c2, _t2))
+                 "⌁ MT 500", _st2, _c2, _t2, "g120", False, 500, "#fb7185"))
     # 3) Tồn chưa gán tại MỐC 12h (để ĐÁNH GIÁ — chuẩn như xếp hạng/theo dõi sâu sát): giá trị =
     #    12h HÔM NAY, so 12h HÔM QUA, đường 14 ngày, MT 3.000. (noon12_trend gồm hôm nay nếu >12h.)
     _nn = noon12_trend[-14:] if (noon12_trend and len(noon12_trend) >= 2) else None
@@ -1291,17 +1398,18 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     _st3 = "na" if _nv is None else ("gok" if _nv <= 3000 else "gbad")
     _tri.append(("⏳ Chưa gán 12h", _n(_nv) if _nv is not None else "—",
                  _spark(_nn, "#f5aa17", w=300, h=40, target=3000) if _nn else "",
-                 "⌁ MT 3.000", _st3, _c3, _t3))
+                 "⌁ MT 3.000", _st3, _c3, _t3, "noon", False, 3000, "#f5aa17"))
     if _tri:
         _cells = "".join(
-            "<div class='htl %s'><div class='htll'>%s</div>"
+            "<details class='htl %s'><summary><div class='htll'>%s<span class='htcar'>▾</span></div>"
             "<div class='htlv'>%s</div>%s"
-            "<div class='htlf'>%s<span class='htlt'>%s</span></div></div>"
+            "<div class='htlf'>%s<span class='htlt'>%s</span></div></summary>%s</details>"
             % (gc, l, v, ("<div class='htlk'>%s</div>" % s) if s else "<div class='htlk'></div>",
-               ("<span class='htld %s'>%s</span>" % (cc, ct)) if ct else "", mt)
-            for l, v, s, mt, gc, cc, ct in _tri)
+               ("<span class='htld %s'>%s</span>" % (cc, ct)) if ct else "", mt,
+               _am_drill(fld, hb, tgt, col))
+            for l, v, s, mt, gc, cc, ct, fld, hb, tgt, col in _tri)
         P.append("<div class='htri'><div class='htri-h'>🎯 3 chỉ số điều hành "
-                 "<span class='htri-s'>· số LIVE · so cùng giờ HQ · đường 14 ngày</span></div>"
+                 "<span class='htri-s'>· số LIVE · bấm xem từng AM 14 ngày</span></div>"
                  "<div class='htri-g'>%s</div></div>" % _cells)
 
     # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
@@ -1309,55 +1417,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if _oprisk:
         P.append("<div class='hverd bad'><span class='hvi'>⚠️</span> "
                  "<b>RỦI RO VẬN HÀNH</b> · %s</div>" % " · ".join(_oprisk))
-
-    # ===== 🎯 NHỊP ĐỘ CÁN ĐÍCH — tốc độ thực + "cần X đơn/giờ để chạm 70%" + dự phóng chốt =====
-    # Cùng base với %GTC Hero (R["total"]). Chỉ hiện trong giờ vận hành (9h30 → giờ giao cao
-    # điểm kết thúc, mặc định 22h; ENV PACE_CUTOFF_HOUR). Đòn bẩy điều hành số 1: biết nhịp
-    # thực, theo đà này sẽ chốt bao nhiêu %, và cần đẩy mạnh cỡ nào để chạm mục tiêu.
-    _cutoff_h = float(os.environ.get("PACE_CUTOFF_HOUR", "22"))
-    _now_t = now.hour + now.minute / 60.0
-    if R["total"] > 0 and reg_pct is not None and 9.5 <= _now_t < _cutoff_h:
-        _need = int(round(0.70 * R["total"])) - R["gtc"]
-        _hleft = max(_cutoff_h - _now_t, 0.1)
-        if _need <= 0:
-            P.append("<div class='hpace good'><span class='hvi'>🎯</span> "
-                     "<b>ĐÃ CHẠM MỐC 70%</b> · giữ nhịp tới hết ngày</div>")
-        else:
-            _rneed = _need / _hleft
-            # Sát giờ cutoff (<45') → "cần X/giờ" nổ số (chia khoảng rất nhỏ) → vô nghĩa, bỏ vế đó.
-            _show_need = _hleft >= 0.75
-            _need_cl = (" · cần <b>%s/giờ</b> để đạt 70%%" % _n(int(round(_rneed)))) if _show_need else ""
-            # Dự phóng chốt ngày = %GTC hiện tại + độ bứt tốc LỊCH SỬ (median eod−giờ này),
-            # chính xác hơn nhiều so với kéo dài tuyến tính tốc độ (giao giảm dần cuối ngày).
-            _proj = None
-            if fc_uplift is not None and reg_pct is not None:
-                _proj = min(100, max(reg_pct, int(round(reg_pct + fc_uplift))))
-            if pace is not None and pace > 0:
-                # Màu theo DỰ PHÓNG chốt (nếu có) — thước đo thực tế nhất.
-                if _proj is not None:
-                    if _proj >= 70:
-                        pk, pic, pst = "good", "✅", "ĐÚNG ĐÀ ĐẠT MỤC TIÊU"
-                    elif yp is not None and _proj >= yp:
-                        pk, pic, pst = "warn", "🎯", "TRÊN NHỊP HÔM QUA"
-                    else:
-                        pk, pic, pst = "bad", "🔴", "DƯỚI ĐÀ MỤC TIÊU"
-                    _body = ("thực <b>%s đơn/giờ</b> · theo đà chốt <b>~%d%%</b>%s"
-                             % (_n(int(round(pace))), _proj, _need_cl))
-                else:
-                    pk, pic, pst = "warn", "🎯", "NHỊP ĐỘ GIAO"
-                    _tail = (_need_cl + (" <i>(còn %s đơn · %.1fh)</i>" % (_n(_need), _hleft)
-                                         if _show_need else " <i>(còn %s đơn tới 70%%)</i>" % _n(_need)))
-                    _body = "thực <b>%s đơn/giờ</b>%s" % (_n(int(round(pace))), _tail)
-            else:
-                pk, pic, pst = "warn", "🎯", "NHỊP CẦN ĐẠT"
-                if _show_need:
-                    _body = ("cần <b>%s đơn/giờ</b> <i>(còn %s đơn · %.1fh tới %dh)</i> để chạm 70%% "
-                             "· đang đo tốc độ thực…" % (_n(int(round(_rneed))), _n(_need),
-                                                         _hleft, int(_cutoff_h)))
-                else:
-                    _body = ("còn <b>%s đơn</b> tới mốc 70%% · đang đo tốc độ thực…" % _n(_need))
-            P.append("<div class='hpace %s'><span class='hvi'>%s</span> <b>%s</b> · %s</div>"
-                     % (pk, pic, pst, _body))
 
     # ===== ⏱ SO CÙNG GIỜ HÔM QUA — đánh giá vùng theo mốc giờ (07/10) =====
     # So số HÔM NAY (live) với bản ghi bao_cao_gio của HÔM QUA tại GIỜ này. %GTC có ngay;
@@ -2158,13 +2217,26 @@ svg.spk{display:block}
 .htri{margin-top:14px}
 .htri-h{font-size:10.5px;color:var(--mut);font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
 .htri-h .htri-s{font-weight:500;text-transform:none;letter-spacing:0;opacity:.7}
-.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:stretch}
-.htl{display:flex;flex-direction:column;background:rgba(255,255,255,.04);border:1px solid var(--line);
- border-radius:13px;padding:9px 10px 7px;min-width:0}
+.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:start}
+.htl{position:relative;background:rgba(255,255,255,.04);border:1px solid var(--line);
+ border-radius:13px;padding:0;min-width:0;overflow:hidden}
+.htl>summary{display:flex;flex-direction:column;list-style:none;cursor:pointer;padding:9px 10px 7px}
+.htl>summary::-webkit-details-marker{display:none}
+.htl[open]{grid-column:1/-1}
+.htcar{position:absolute;top:8px;right:9px;font-size:10px;color:var(--mut);transition:transform .2s;z-index:1}
+.htl[open] .htcar{transform:rotate(180deg)}
+/* Drill TỪNG AM 14 ngày (bấm card mở) */
+.amdr{padding:0 10px 10px;border-top:1px solid var(--line)}
+.amdr-h{font-size:10px;color:var(--mut);font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin:9px 0 6px}
+.amdrow{display:flex;align-items:center;gap:10px;padding:3px 0}
+.amdn{flex:0 0 38%;font-size:11.5px;color:#cdd4ea;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.amdn b{color:#fff;font-weight:800;font-family:'Geist Mono','Geist',monospace;margin-left:6px;letter-spacing:-.02em}
+.amdk{flex:1;min-width:0;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:3px 6px 1px}
+.amdk svg.spk{width:100%;height:30px;display:block}
 .htl.gbad{background:rgba(242,88,95,.1);border-color:rgba(242,88,95,.32)}
 .htl.gwarn{background:rgba(249,181,52,.1);border-color:rgba(249,181,52,.32)}
 .htl.gok{background:rgba(23,201,131,.09);border-color:rgba(23,201,131,.3)}
-.htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;
+.htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;padding-right:14px;
  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .htlv{font-family:'Geist Mono','Geist',monospace;font-weight:700;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1.05;margin:2px 0 4px;color:#fff}
 .htl.gbad .htlv{color:#ff7b81}.htl.gwarn .htlv{color:#f9b534}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
@@ -2622,6 +2694,7 @@ def main():
         trend = _fetch_region_trend(14)
         g120_trend = _fetch_giao120h_trend(14)         # Giao>120h chốt ngày (bao_cao_ton_dong)
         noon12_trend = _fetch_region_noon12_trend(14)  # Tồn gán 12h cấp vùng (bao_cao_gio gio=12)
+        am_ctrend = _fetch_am_crit_trend(14)           # 3 chỉ số điều hành theo AM (drill từ 3 card)
         try:
             import report_nvxuly as _rnx
             cx_trend = _rnx.canxuly_trend(14)          # NV cần xử lý chốt ngày (rolling 14 ngày)
@@ -2708,7 +2781,7 @@ def main():
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
                  fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg, lgt_w=lgt_w,
-                 nv_avg=nv_avg, noon12_trend=noon12_trend)
+                 nv_avg=nv_avg, noon12_trend=noon12_trend, am_ctrend=am_ctrend)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
