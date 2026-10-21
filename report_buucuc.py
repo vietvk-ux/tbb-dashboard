@@ -321,7 +321,7 @@ def gen_html(rows, collectable=None, label=None):
     P.append("<link rel='preconnect' href='https://fonts.googleapis.com'>")
     P.append("<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>")
     P.append("<link rel='stylesheet' href='https://fonts.googleapis.com/css2?"
-             "family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap'>")
+             "family=Geist:wght@400;500;600;700;800;900&family=Geist+Mono:wght@500;600;700;800&display=swap'>")
     P.append("<title>Bảng tổng quát Bưu cục · %s</title>" % now.strftime("%H:%M"))
     P.append(_CSS)
     P.append(_EXTRA_CSS)
@@ -361,7 +361,7 @@ details.bc.am>summary{padding:12px 14px}
 .scgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:7px}
 .sc{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:8px 10px}
 .scl{font-size:11px;color:var(--mut);font-weight:600;margin-bottom:3px;line-height:1.25}
-.scv{font-size:17px;font-weight:800;color:var(--txt);font-family:Sora,sans-serif}
+.scv{font-size:17px;font-weight:700;color:var(--txt);font-family:'Geist Mono','Geist',monospace;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .scv.good{color:var(--good)}.scv.warn{color:var(--warn)}.scv.bad{color:var(--bad)}.scv.na{color:var(--mut)}
 @media(max-width:430px){.scgrid{grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px}.scv{font-size:15px}}
 .chotbn{margin:2px 0 10px;padding:9px 12px;border-radius:11px;font-size:12px;font-weight:600;color:#cfe0ff;

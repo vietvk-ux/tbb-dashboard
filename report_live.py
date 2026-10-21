@@ -1168,7 +1168,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<link rel='preconnect' href='https://fonts.googleapis.com'>")
     P.append("<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>")
     P.append("<link rel='stylesheet' href='https://fonts.googleapis.com/css2?"
-             "family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap'>")
+             "family=Geist:wght@400;500;600;700;800;900&family=Geist+Mono:wght@500;600;700;800&display=swap'>")
     P.append("<title>TBB trực tiếp · %s</title>" % now.strftime("%H:%M"))
     P.append(_CSS)
     if nvm is not None:
@@ -2096,17 +2096,19 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
 
 _CSS = """<style>
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Geist+Mono:wght@500;600;700;800&display=swap');
 :root{
  --bg:#0a0e1a;--bg2:#10131f;--card:#171c2e;--card2:#212840;--line:rgba(255,255,255,.08);
  --mut:#dce2f6;--txt:#ffffff;--good:#25dd90;--warn:#f9b534;--bad:#ff5668;--ink:#0a0d18;
  --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
  color:var(--txt);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.4;
  background:#0a0e1a}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));padding-bottom:calc(30px + env(safe-area-inset-bottom))}
 /* DARK MATTE: thẻ đặc, KHÔNG backdrop-blur (bỏ hiệu ứng kính/bóng gương) — số liệu sắc, không nhoè */
-.brand,.hpct,.sv,.mbig,.vst,.vpct b,.ttv,.hh,.amn{font-family:'Sora','Manrope',sans-serif}
+.brand,.hh,.amn{font-family:'Geist',sans-serif;letter-spacing:-.01em}
+.hpct,.sv,.mbig,.vst,.vpct b,.ttv{font-family:'Geist Mono','Geist',monospace;font-feature-settings:'tnum' 1}
 
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
  padding:calc(12px + env(safe-area-inset-top)) 2px 10px;background:var(--bg);margin-bottom:4px}
@@ -2135,7 +2137,7 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hwh-g{display:grid;grid-template-columns:repeat(3,1fr);gap:9px 12px}
 .hwi{display:flex;flex-direction:column;gap:1px;min-width:0}
 .hwi span{font-size:10px;color:var(--mut);font-weight:500;white-space:nowrap}
-.hwi b{font-family:Sora,sans-serif;font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.15;white-space:nowrap}
+.hwi b{font-family:'Geist Mono','Geist',monospace;font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.15;white-space:nowrap}
 .hwa{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
 .hwa.up{color:#ff6274}.hwa.dn{color:#2ee88c}.hwa.fl{color:var(--mut)}
 .hsub{color:#cfd6ec;font-size:13.5px;margin-top:11px;font-variant-numeric:tabular-nums;line-height:1.7}
@@ -2164,7 +2166,7 @@ svg.spk{display:block}
 .htl.gok{background:rgba(23,201,131,.09);border-color:rgba(23,201,131,.3)}
 .htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;
  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.htlv{font-weight:850;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05;margin:2px 0 4px;color:#fff}
+.htlv{font-family:'Geist Mono','Geist',monospace;font-weight:700;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1.05;margin:2px 0 4px;color:#fff}
 .htl.gbad .htlv{color:#ff7b81}.htl.gwarn .htlv{color:#f9b534}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
 .htlf{margin-top:4px;display:flex;flex-direction:column;gap:1px}
@@ -2179,7 +2181,7 @@ svg.spk{display:block}
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hverd .hvi{font-size:16px}
-.hverd b{font-family:Sora,sans-serif;font-size:15px;font-weight:800;letter-spacing:.01em;color:#fff}
+.hverd b{font-family:'Geist Mono','Geist',monospace;font-size:15px;font-weight:800;letter-spacing:.01em;color:#fff}
 .hverd.good{border-color:rgba(23,201,131,.42);background:rgba(23,201,131,.09)}.hverd.good b{color:var(--good)}
 .hverd.warn{border-color:rgba(245,170,23,.42);background:rgba(245,170,23,.09)}.hverd.warn b{color:var(--warn)}
 .hverd.bad{border-color:rgba(245,69,92,.42);background:rgba(245,69,92,.09)}.hverd.bad b{color:var(--bad)}
@@ -2189,7 +2191,7 @@ svg.spk{display:block}
 .hpace{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hpace .hvi{font-size:16px}
-.hpace b{font-family:Sora,sans-serif;font-size:15px;font-weight:800;letter-spacing:.01em;color:#fff}
+.hpace b{font-family:'Geist Mono','Geist',monospace;font-size:15px;font-weight:800;letter-spacing:.01em;color:#fff}
 .hpace i{font-style:normal;color:var(--mut);font-weight:500}
 .hpace.good{border-color:rgba(23,201,131,.45);background:rgba(23,201,131,.10)}.hpace.good b{color:var(--good)}
 .hpace.warn{border-color:rgba(245,170,23,.45);background:rgba(245,170,23,.10)}.hpace.warn b{color:var(--warn)}
@@ -2198,7 +2200,7 @@ svg.spk{display:block}
 .hcmp{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.7;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hcmp .hvi{font-size:16px}
-.hcmp b{font-family:Sora,sans-serif;font-size:14.5px;font-weight:800;letter-spacing:.01em;color:#fff}
+.hcmp b{font-family:'Geist Mono','Geist',monospace;font-size:14.5px;font-weight:800;letter-spacing:.01em;color:#fff}
 .hcmp i{font-style:normal;color:var(--mut);font-weight:400;font-size:12px}
 .hcmp .cq{display:inline-block;padding:2px 8px;border-radius:7px;font-weight:800;font-size:13px;
  font-variant-numeric:tabular-nums;margin-left:1px}
@@ -2250,7 +2252,7 @@ table.amtab td b{font-weight:800}
 .gt.vi .gti{background:rgba(167,139,250,.16);border-color:rgba(167,139,250,.4)}
 .gt .gtl{font-size:11.5px;font-weight:700;color:var(--mut);line-height:1.2}
 .gt .gtcar{margin-left:auto;color:var(--mut);font-size:11px;flex:none;transition:transform .2s}
-.gt .gtv{font-family:Sora,sans-serif;font-weight:800;font-size:24px;letter-spacing:-.01em;line-height:1;
+.gt .gtv{font-family:'Geist Mono','Geist',monospace;font-weight:800;font-size:24px;letter-spacing:-.01em;line-height:1;
  font-variant-numeric:tabular-nums}
 .gt.bd .gtv{color:var(--bad)} .gt.wn .gtv{color:var(--warn)}
 .gt svg.spk{width:100%;height:26px;display:block;margin-top:auto}

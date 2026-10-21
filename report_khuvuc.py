@@ -456,10 +456,11 @@ window.addEventListener('resize',draw);draw();
 
 
 _CSS = """<style>
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Geist+Mono:wght@500;600;700;800&display=swap');
 :root{--bg:#0a0d18;--card:#131829;--line:#1f2740;--txt:#ffffff;--mut:#dce2f6;
 --good:#25dd90;--warn:#f9b534;--bad:#ff5668;--accent:#3b82f6}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);
-font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+font:14px/1.5 'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 .wrap{max-width:760px;margin:0 auto;padding:12px}
 .top{display:flex;justify-content:space-between;align-items:center;padding:6px 2px 10px}
 .brand{font-weight:800;font-size:16px;letter-spacing:.02em}.ts{color:var(--mut);font-size:12px}
