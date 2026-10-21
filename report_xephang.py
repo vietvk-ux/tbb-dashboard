@@ -296,7 +296,7 @@ details[open]{background:var(--card2)}
 .mt{flex:1;text-align:center;padding:10px;border-radius:12px;text-decoration:none;font-weight:700;font-size:13px;
 color:var(--mut);background:var(--card);border:1px solid var(--line)}
 .mt.on{color:var(--txt);background:linear-gradient(135deg,#20264a,#191f38);border-color:#3a4470}
-body{background:radial-gradient(130% 100% at 50% -10%,rgba(167,139,250,.11),transparent 65%),#191238 !important;background-attachment:fixed}
+body{background:#130f24 !important}
 .top{background:linear-gradient(180deg,#191238 62%,rgba(25,18,56,0)) !important}
 </style></head><body>"""
 

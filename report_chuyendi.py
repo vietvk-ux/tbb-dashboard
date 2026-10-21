@@ -33,7 +33,7 @@ table.drv td.win{font-size:11px;color:var(--mut);white-space:nowrap}
 .bc summary .ammet{color:var(--mut);font-size:11.5px;font-weight:500}
 b.warn,.tx.warn{color:var(--warn)}b.good{color:var(--good)}b.bad{color:var(--bad)}
 table.drv td.money{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:700}
-body{background:radial-gradient(130% 100% at 50% -10%,rgba(45,212,191,.10),transparent 65%),#0c2521 !important;background-attachment:fixed}
+body{background:#0b1a17 !important}
 .top{background:linear-gradient(180deg,#0c2521 62%,rgba(12,37,33,0)) !important}
 </style>"""
 

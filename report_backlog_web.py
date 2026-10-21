@@ -202,7 +202,7 @@ _CSS = """<style>
 body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx);-webkit-text-size-adjust:100%}
 .wrap{max-width:820px;margin:0 auto;padding:0 12px 40px;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));padding-bottom:calc(40px + env(safe-area-inset-bottom))}
 .top{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;
-padding:calc(12px + env(safe-area-inset-top)) 4px 12px;background:linear-gradient(180deg,var(--bg) 70%,transparent);backdrop-filter:blur(6px)}
+padding:calc(12px + env(safe-area-inset-top)) 4px 12px;background:var(--bg)}
 .brand{font-weight:800;letter-spacing:.02em;font-size:15px}
 .brand .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-right:7px;animation:pl 1.6s infinite}
 @keyframes pl{0%,100%{opacity:1}50%{opacity:.25}}
@@ -255,7 +255,7 @@ border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:12px;
 .eod .arw{color:var(--mut);font-size:12.5px;font-weight:500}
 .foot{color:var(--mut);font-size:11px;text-align:center;margin:22px 0 8px;line-height:1.6}
 .muted{color:var(--mut)}
-body{background:radial-gradient(130% 100% at 50% -10%,rgba(251,146,60,.10),transparent 65%),#241804 !important;background-attachment:fixed}
+body{background:#17130a !important}
 .top{background:linear-gradient(180deg,#241804 62%,rgba(36,24,4,0)) !important}
 </style>"""
 

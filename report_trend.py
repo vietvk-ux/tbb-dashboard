@@ -544,10 +544,8 @@ def _bucket_chips(buckets):
 
 # ---------- Trang ----------
 
-_TREND_BG = ("<style>body{background:"
-             "radial-gradient(130% 100% at 50% -10%,rgba(34,211,238,.10),transparent 65%),"
-             "#0c2430 !important;background-attachment:fixed}"
-             ".top{background:linear-gradient(180deg,#0c2430 62%,rgba(12,36,48,0)) !important}</style>")
+_TREND_BG = ("<style>body{background:#0c1a22 !important}"
+             ".top{background:#0c1a22 !important}</style>")
 
 
 def gen_html(data):
@@ -688,10 +686,8 @@ def gen_html(data):
     return "\n".join(P)
 
 
-_NV_BG = ("<style>body{background:"
-          "radial-gradient(130% 100% at 50% -10%,rgba(251,191,36,.10),transparent 65%),"
-          "#241a06 !important;background-attachment:fixed}"
-          ".top{background:linear-gradient(180deg,#241a06 62%,rgba(36,26,6,0)) !important}</style>")
+_NV_BG = ("<style>body{background:#171205 !important}"
+          ".top{background:#171205 !important}</style>")
 
 
 def gen_nhanvien_html(data):
@@ -723,10 +719,8 @@ def gen_nhanvien_html(data):
     return "\n".join(P)
 
 
-_KHO_BG = ("<style>body{background:"
-           "radial-gradient(130% 100% at 50% -10%,rgba(225,60,90,.10),transparent 65%),"  # đỏ đô
-           "#2e1114 !important;background-attachment:fixed}"                               # nền đỏ đô tối dịu
-           ".top{background:linear-gradient(180deg,#2e1114 62%,rgba(46,17,20,0)) !important}</style>")
+_KHO_BG = ("<style>body{background:#1a0e10 !important}"
+           ".top{background:#1a0e10 !important}</style>")
 
 
 def gen_transit_html(transit):

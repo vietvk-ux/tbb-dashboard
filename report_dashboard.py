@@ -357,7 +357,7 @@ td.rd{color:var(--bad);font-weight:700}
 .fl{font-size:10.5px;color:var(--mut);margin-top:3px;line-height:1.35}
 .mh{font-weight:700;font-size:12.5px;margin:8px 2px 5px}.mh.up{color:var(--good)}
 .foot{color:#6d7492;font-size:11px;text-align:center;line-height:1.7;margin:24px 0 4px}
-body{background:radial-gradient(130% 100% at 50% -10%,rgba(129,140,248,.10),transparent 65%),#171640 !important;background-attachment:fixed}
+body{background:#11122a !important}
 .top{background:linear-gradient(180deg,#171640 62%,rgba(23,22,64,0)) !important}
 </style></head><body>"""
 

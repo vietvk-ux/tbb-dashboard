@@ -2082,26 +2082,19 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 
 _CSS = """<style>
 :root{
- --bg:#0a0e1a;--bg2:#10131f;--card:rgba(26,32,56,.9);--card2:rgba(36,44,72,.9);--line:rgba(255,255,255,.24);
- --mut:#d4dbf0;--txt:#fbfcff;--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18;
+ --bg:#0a0e1a;--bg2:#10131f;--card:#171c2e;--card2:#212840;--line:rgba(255,255,255,.08);
+ --mut:#cfd6ec;--txt:#fbfcff;--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18;
  --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
  color:var(--txt);-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.4;
- background:
-  radial-gradient(80% 34% at 12% -6%,rgba(99,91,245,.56) 0%,transparent 50%),
-  radial-gradient(76% 32% at 96% 3%,rgba(168,96,236,.42) 0%,transparent 48%),
-  radial-gradient(110% 46% at 60% 105%,rgba(16,170,154,.4) 0%,transparent 56%),
-  radial-gradient(62% 32% at 84% 66%,rgba(116,120,248,.3) 0%,transparent 54%),#0b0f1c;
- background-attachment:fixed}
+ background:#0a0e1a}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));padding-bottom:calc(30px + env(safe-area-inset-bottom))}
-/* Kính mờ dùng chung — đọc rõ cả nơi nền tối lẫn nơi có ánh sáng */
-.hero,.verdict,.prilist,.diag,.st,.cgbento,.bc,.mtile,.foot{
- backdrop-filter:blur(8px) saturate(1.35) contrast(1.06);-webkit-backdrop-filter:blur(8px) saturate(1.35) contrast(1.06)}
+/* DARK MATTE: thẻ đặc, KHÔNG backdrop-blur (bỏ hiệu ứng kính/bóng gương) — số liệu sắc, không nhoè */
 .brand,.hpct,.sv,.mbig,.vst,.vpct b,.ttv,.hh,.amn{font-family:'Sora','Manrope',sans-serif}
 
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
- padding:calc(12px + env(safe-area-inset-top)) 2px 10px;background:linear-gradient(180deg,rgba(8,10,22,.85) 66%,rgba(8,10,22,0));backdrop-filter:blur(8px);margin-bottom:4px}
+ padding:calc(12px + env(safe-area-inset-top)) 2px 10px;background:var(--bg);margin-bottom:4px}
 .brand{font-weight:800;letter-spacing:.04em;font-size:15px;display:flex;align-items:center;gap:8px}
 .ts{color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
 .live{width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(47,208,122,.6);animation:pulse 1.8s infinite}

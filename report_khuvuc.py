@@ -533,7 +533,7 @@ details.bc.sub{margin:6px 0;border-radius:10px;background:rgba(255,255,255,.02)}
   .bcn{font-size:13px}
   .eod{padding:11px 12px;font-size:14px}
 }
-body{background:radial-gradient(130% 100% at 50% -10%,rgba(244,114,182,.10),transparent 65%),#26121d !important;background-attachment:fixed}
+body{background:#180f15 !important}
 .top{background:linear-gradient(180deg,#26121d 62%,rgba(38,18,29,0)) !important}
 </style></head><body>"""
 
