@@ -1239,34 +1239,52 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                     _wi("↩️", "Trả", "tra", "w_tra"), _lc))
     P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
-    P.append("<div class='hsub'><b class='hn'>%s</b> / <b class='hn'>%s</b> đơn giao thành công · "
-             "LTC <b class='hn'>%s</b> · cần giao <b class='hn'>%s</b></div>"
+    P.append("<div class='hsub'><b class='hn'>%s</b><span class='hsl'>/%s giao thành công</span> "
+             "<span class='hsep'>·</span> <span class='hsl'>LTC</span> <b class='hnn'>%s</b> "
+             "<span class='hsep'>·</span> <span class='hsl'>cần giao</span> <b class='hnw'>%s</b></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
 
     # ===== 3 ĐƯỜNG XU HƯỚNG 14 NGÀY CHỐT (ngay dưới số %GTC): %GTC · Backlog>120h · Tồn gán 12h =====
+    # Giá trị ĐỔI MÀU theo mục tiêu (đạt = xanh · chưa đạt = đỏ) + chênh lệch so MT → cần chú ý nổi ngay.
     def _lastnn(xs):
         return next((v for v in reversed(xs or []) if v is not None), None)
+
+    def _goal(val, target, higher_better):
+        """(class trạng thái, chữ chênh lệch so mục tiêu)."""
+        if val is None:
+            return ("na", "")
+        if higher_better:
+            return ("gok", "đạt") if val >= target else ("gbad", "còn %s điểm" % _n(round(target - val)))
+        return ("gok", "đạt") if val <= target else ("gbad", "vượt %s" % _n(round(val - target)))
+
     _tri = []
     if trend and len(trend) >= 2:
         _pc = [t["pct"] for t in trend][-14:]
         _lv = _lastnn(_pc)
+        _gc, _gd = _goal(_lv, 70, True)
         _tri.append(("🎯 %GTC", ("%s%%" % _n(round(_lv))) if _lv is not None else "—",
-                     _spark(_pc, "#fbbf24", w=300, h=40, target=70), "MT 70%"))
+                     _spark(_pc, "#fbbf24", w=300, h=40, target=70), "70%", _gc, _gd))
     if g120_trend and len(g120_trend) >= 2:
         _g = g120_trend[-14:]
-        _tri.append(("🔴 Backlog &gt;120h", _n(_lastnn(_g)),
-                     _spark(_g, "#fb7185", w=300, h=40, target=500), "MT 500"))
+        _gv = _lastnn(_g)
+        _gc, _gd = _goal(_gv, 500, False)
+        _tri.append(("🔴 Backlog &gt;120h", _n(_gv),
+                     _spark(_g, "#fb7185", w=300, h=40, target=500), "500", _gc, _gd))
     if noon12_trend and len(noon12_trend) >= 2:
         _nn = noon12_trend[-14:]
-        _tri.append(("⏳ Tồn gán 12h", _n(_lastnn(_nn)),
-                     _spark(_nn, "#f5aa17", w=300, h=40, target=3000), "MT 3.000"))
+        _nv = _lastnn(_nn)
+        _gc, _gd = _goal(_nv, 3000, False)
+        _tri.append(("⏳ Tồn gán 12h", _n(_nv),
+                     _spark(_nn, "#f5aa17", w=300, h=40, target=3000), "3.000", _gc, _gd))
     if _tri:
-        _cells = "".join("<div class='htl'><div class='htll'>%s</div>"
-                         "<div class='htlv'>%s</div><div class='htlk'>%s</div>"
-                         "<div class='htlt'>⌁ %s</div></div>"
-                         % (l, v, s, mt) for l, v, s, mt in _tri)
+        _cells = "".join(
+            "<div class='htl %s'><div class='htll'>%s</div>"
+            "<div class='htlv'>%s</div><div class='htlk'>%s</div>"
+            "<div class='htlt'>⌁ MT %s%s</div></div>"
+            % (gc, l, v, s, mt, (" · <b>%s</b>" % gd) if gd else "")
+            for l, v, s, mt, gc, gd in _tri)
         P.append("<div class='htri'><div class='htri-h'>📈 Xu hướng 14 ngày chốt "
-                 "<span class='htri-s'>(nét đứt = mục tiêu)</span></div>"
+                 "<span class='htri-s'>· nét đứt = mục tiêu</span></div>"
                  "<div class='htri-g'>%s</div></div>" % _cells)
 
     # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
@@ -2100,14 +2118,18 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
  border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hwh-t{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#cdd4ea;margin-bottom:8px}
 .hwh-t i{font-style:normal;text-transform:none;font-weight:500;opacity:.7}
-.hwh-g{display:flex;flex-wrap:wrap;gap:9px 16px}
-.hwi{display:flex;flex-direction:column;gap:1px;min-width:56px}
-.hwi span{font-size:10.5px;color:#cdd4ea;font-weight:600;white-space:nowrap}
-.hwi b{font-family:Sora,sans-serif;font-size:18.5px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.1;white-space:nowrap}
+.hwh-g{display:grid;grid-template-columns:repeat(3,1fr);gap:9px 12px}
+.hwi{display:flex;flex-direction:column;gap:1px;min-width:0}
+.hwi span{font-size:10px;color:var(--mut);font-weight:500;white-space:nowrap}
+.hwi b{font-family:Sora,sans-serif;font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.15;white-space:nowrap}
 .hwa{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
 .hwa.up{color:#ff6274}.hwa.dn{color:#2ee88c}.hwa.fl{color:var(--mut)}
-.hsub{color:#cfd6ec;font-size:13.5px;margin-top:11px;font-variant-numeric:tabular-nums;line-height:1.55}
-.hsub b.hn{color:#24d680;font-weight:800;font-size:15px}
+.hsub{color:#cfd6ec;font-size:13.5px;margin-top:11px;font-variant-numeric:tabular-nums;line-height:1.7}
+.hsub b.hn{color:#2ee88c;font-weight:850;font-size:17px}
+.hsub b.hnn{color:#fff;font-weight:800;font-size:15px}
+.hsub b.hnw{color:var(--warn);font-weight:850;font-size:15px}
+.hsub .hsl{color:var(--mut);font-weight:500}
+.hsub .hsep{color:var(--mut);opacity:.5;margin:0 1px}
 .hsub .ld{color:var(--txt);font-weight:700}
 .href{display:flex;flex-wrap:wrap;gap:8px 9px;margin-top:14px}
 .rc{font-size:13.5px;color:#cfd6ec;background:rgba(255,255,255,.06);border:1px solid var(--line);
@@ -2117,16 +2139,24 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .spklbl{font-size:9.5px;color:var(--mut);font-weight:600;letter-spacing:.02em;margin-bottom:3px}
 svg.spk{display:block}
 /* 3 ĐƯỜNG XU HƯỚNG 14 NGÀY ngay dưới số %GTC (%GTC · Backlog>120h · Tồn gán 12h) */
-.htri{margin-top:13px}
-.htri-h{font-size:10.5px;color:var(--mut);font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:7px}
-.htri-h .htri-s{font-weight:500;text-transform:none;letter-spacing:0;opacity:.75}
-.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.htl{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:8px 9px 6px;min-width:0}
-.htll{font-size:10.5px;color:var(--mut);font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.htlv{color:var(--txt);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;margin:1px 0 3px}
+.htri{margin-top:14px}
+.htri-h{font-size:10.5px;color:var(--mut);font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+.htri-h .htri-s{font-weight:500;text-transform:none;letter-spacing:0;opacity:.7}
+.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:stretch}
+.htl{display:flex;flex-direction:column;background:rgba(255,255,255,.04);border:1px solid var(--line);
+ border-radius:13px;padding:9px 10px 7px;min-width:0}
+.htl.gbad{background:rgba(242,88,95,.1);border-color:rgba(242,88,95,.32)}
+.htl.gok{background:rgba(23,201,131,.09);border-color:rgba(23,201,131,.3)}
+.htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.htlv{font-weight:850;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05;margin:2px 0 4px;color:#fff}
+.htl.gbad .htlv{color:#ff7b81}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
-.htlt{font-size:9.5px;color:#a78bfa;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums;white-space:nowrap}
-@media(max-width:430px){.htri-g{gap:6px}.htl{padding:7px 7px 5px}.htll{font-size:10px}.htlv{font-size:14px}.htlt{font-size:9px}}
+.htlt{font-size:9.5px;color:#a78bfa;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.htlt b{font-weight:800}
+.htl.gbad .htlt b{color:#ff8e93}.htl.gok .htlt b{color:#4de39a}
+@media(max-width:412px){.htri-g{gap:6px}.htl{padding:8px 7px 6px}.htll{font-size:9.5px}.htlv{font-size:17px}
+ .htlt{font-size:8.5px}}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
