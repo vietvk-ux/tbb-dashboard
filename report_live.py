@@ -1259,8 +1259,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _nn = noon12_trend[-14:]
         _tri.append(("⏳ Tồn gán 12h", _n(_lastnn(_nn)), _spark(_nn, "#f5aa17", w=300, h=40)))
     if _tri:
-        _cells = "".join("<div class='htl'><div class='htll'>%s <b>%s</b></div>"
-                         "<div class='htlk'>%s</div></div>" % (l, v, s) for l, v, s in _tri)
+        _cells = "".join("<div class='htl'><div class='htll'>%s</div>"
+                         "<div class='htlv'>%s</div><div class='htlk'>%s</div></div>"
+                         % (l, v, s) for l, v, s in _tri)
         P.append("<div class='htri'><div class='htri-h'>📈 Xu hướng 14 ngày chốt</div>"
                  "<div class='htri-g'>%s</div></div>" % _cells)
 
@@ -2116,10 +2117,10 @@ svg.spk{display:block}
 .htri-h{font-size:10.5px;color:var(--mut);font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:7px}
 .htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .htl{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:8px 9px 4px;min-width:0}
-.htll{font-size:11px;color:var(--mut);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
-.htll b{color:var(--txt);font-weight:800;font-size:13px;margin-left:2px;font-variant-numeric:tabular-nums}
+.htll{font-size:10.5px;color:var(--mut);font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.htlv{color:var(--txt);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;margin:1px 0 3px}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
-@media(max-width:430px){.htri-g{gap:6px}.htl{padding:7px 7px 3px}.htll{font-size:10px}.htll b{font-size:12px}}
+@media(max-width:430px){.htri-g{gap:6px}.htl{padding:7px 7px 3px}.htll{font-size:10px}.htlv{font-size:14px}}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
