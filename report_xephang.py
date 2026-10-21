@@ -245,8 +245,8 @@ _HEAD = """<!doctype html><html lang='vi'><head><meta charset='utf-8'>
 <meta name='theme-color' content='#0a0d18'>
 <title>Xếp hạng tổng hợp · TBB</title>
 <style>
-:root{--bg:#0a0d18;--card:#161b2d;--card2:#1b2136;--line:#272d45;--mut:#c6cde6;--txt:#fbfcff;
---good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18}
+:root{--bg:#0a0d18;--card:#161b2d;--card2:#1b2136;--line:#272d45;--mut:#dce2f6;--txt:#ffffff;
+--good:#25dd90;--warn:#f9b534;--bad:#ff5668;--ink:#0a0d18}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 background:linear-gradient(180deg,#0b0f1c,#0a0d18 240px,#0a0d18);color:var(--txt);font-size:15px;line-height:1.35}

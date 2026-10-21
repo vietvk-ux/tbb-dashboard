@@ -198,7 +198,7 @@ def _bc_drv_details(b, drivers):
 _CSS = """<style>
 :root{
  --bg:#0a0d18;--card:#161b2d;--card2:#1b2136;--line:#272d45;
- --mut:#c6cde6;--txt:#fbfcff;--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18
+ --mut:#dce2f6;--txt:#ffffff;--good:#25dd90;--warn:#f9b534;--bad:#ff5668;--ink:#0a0d18
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;

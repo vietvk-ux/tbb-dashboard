@@ -2083,7 +2083,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
 _CSS = """<style>
 :root{
  --bg:#0a0e1a;--bg2:#10131f;--card:#171c2e;--card2:#212840;--line:rgba(255,255,255,.08);
- --mut:#cfd6ec;--txt:#fbfcff;--good:#17c983;--warn:#f5aa17;--bad:#f5455c;--ink:#0a0d18;
+ --mut:#dce2f6;--txt:#ffffff;--good:#25dd90;--warn:#f9b534;--bad:#ff5668;--ink:#0a0d18;
  --vi:#9d92e0;--cy:#3fb9d6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -2110,7 +2110,7 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 /* Hàng trên hero: số %GTC to (trái) + ⚖️ Tồn kho kg thực (phải); mobile flex-wrap xuống dòng */
 .htop{display:flex;align-items:center;gap:10px 22px;flex-wrap:wrap;margin:8px 0 12px}
-.hpct{font-size:64px;font-weight:850;line-height:1;margin:0;font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-shadow:0 0 14px rgba(var(--h),.16)}
+.hpct{font-size:64px;font-weight:850;line-height:1;margin:0;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
 .hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
 .hwh{flex:1 1 220px;min-width:210px;padding:9px 12px;border-radius:12px;
@@ -2364,7 +2364,7 @@ details.wbc[open] .wcar{transform:rotate(180deg)}
 .bcfeat .mn{font-size:21px}
 .bcfeat .ms{font-size:12.5px;margin-top:4px}
 .bcfeat .ms b{color:#9ec9f0;font-weight:800}
-.bcfeat .mbig{font-size:38px;text-shadow:0 0 18px rgba(var(--h),.4)}
+.bcfeat .mbig{font-size:38px}
 .bcfeat .mbig .u{font-size:15px;margin-left:4px}
 .bcfeat .cvar{font-size:18px}
 @media(max-width:430px){.bcfeat>summary{padding:15px 14px;gap:12px}.bcfeat .mic{width:50px;height:50px;font-size:26px}

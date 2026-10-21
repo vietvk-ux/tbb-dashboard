@@ -456,8 +456,8 @@ window.addEventListener('resize',draw);draw();
 
 
 _CSS = """<style>
-:root{--bg:#0a0d18;--card:#131829;--line:#1f2740;--txt:#fbfcff;--mut:#c6cde6;
---good:#17c983;--warn:#f5aa17;--bad:#f5455c;--accent:#3b82f6}
+:root{--bg:#0a0d18;--card:#131829;--line:#1f2740;--txt:#ffffff;--mut:#dce2f6;
+--good:#25dd90;--warn:#f9b534;--bad:#ff5668;--accent:#3b82f6}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);
 font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 .wrap{max-width:760px;margin:0 auto;padding:12px}
