@@ -1246,47 +1246,60 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "<span class='hsep'>·</span> <span class='hsl'>cần giao</span> <b class='hnw'>%s</b></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
 
-    # ===== 3 ĐƯỜNG XU HƯỚNG 14 NGÀY CHỐT (ngay dưới số %GTC): %GTC · Backlog>120h · Tồn gán 12h =====
-    # Giá trị ĐỔI MÀU theo mục tiêu (đạt = xanh · chưa đạt = đỏ) + chênh lệch so MT → cần chú ý nổi ngay.
-    def _lastnn(xs):
-        return next((v for v in reversed(xs or []) if v is not None), None)
+    # ===== 3 CHỈ SỐ ĐIỀU HÀNH (ngay dưới số %GTC): %GTC · Backlog>120h · Tồn chưa gán giao =====
+    # Mỗi card = SỐ LIVE bây giờ (KHỚP tile bên dưới) + so cùng giờ HÔM QUA + đường 14 ngày chốt +
+    # vạch mục tiêu. Đồng bộ: số to trên card = số live, không lệch với tile Tổng quan vận hành.
+    _hq_pct = cmp_y.get("pct") if cmp_y else None
+    _hq_g120 = cmp_y.get("g120") if cmp_y else None
+    _hq_cg = (cmp_y.get("snap") or {}).get("chua_gan") if cmp_y else None
 
-    def _goal(val, target, higher_better):
-        """(class trạng thái, chữ chênh lệch so mục tiêu)."""
-        if val is None:
-            return ("na", "")
-        if higher_better:
-            return ("gok", "đạt") if val >= target else ("gbad", "còn %s điểm" % _n(round(target - val)))
-        return ("gok", "đạt") if val <= target else ("gbad", "vượt %s" % _n(round(val - target)))
+    def _cmp_hq(live, yest, higher_better, pct=False):
+        """So LIVE vs cùng giờ hôm qua → (class good/bad, chữ '▲/▼ Δ vs HQ'). '' nếu thiếu số."""
+        if live is None or yest is None:
+            return ("", "")
+        d = live - yest
+        if abs(d) < (0.05 if pct else 0.5):
+            return ("cfl", "= HQ")
+        up = d > 0
+        good = up if higher_better else (not up)
+        dv = ("%g" % round(abs(d), 1)).replace(".", ",") if pct else _n(round(abs(d)))
+        return ("cok" if good else "cbad", "%s%s vs HQ" % ("▲" if up else "▼", dv))
+
+    def _st_pct(p):
+        return "na" if p is None else "gok" if p >= 70 else "gwarn" if p >= 60 else "gbad"
 
     _tri = []
-    if trend and len(trend) >= 2:
-        _pc = [t["pct"] for t in trend][-14:]
-        _lv = _lastnn(_pc)
-        _gc, _gd = _goal(_lv, 70, True)
-        _tri.append(("🎯 %GTC", ("%s%%" % _n(round(_lv))) if _lv is not None else "—",
-                     _spark(_pc, "#fbbf24", w=300, h=40, target=70), "70%", _gc, _gd))
-    if g120_trend and len(g120_trend) >= 2:
-        _g = g120_trend[-14:]
-        _gv = _lastnn(_g)
-        _gc, _gd = _goal(_gv, 500, False)
-        _tri.append(("🔴 Backlog &gt;120h", _n(_gv),
-                     _spark(_g, "#fb7185", w=300, h=40, target=500), "500", _gc, _gd))
-    if noon12_trend and len(noon12_trend) >= 2:
-        _nn = noon12_trend[-14:]
-        _nv = _lastnn(_nn)
-        _gc, _gd = _goal(_nv, 3000, False)
-        _tri.append(("⏳ Tồn gán 12h", _n(_nv),
-                     _spark(_nn, "#f5aa17", w=300, h=40, target=3000), "3.000", _gc, _gd))
+    # 1) %GTC — live reg_pct (khớp số to Hero), đường 14 ngày chốt, MT 70
+    _pc = [t["pct"] for t in trend][-14:] if (trend and len(trend) >= 2) else None
+    _c1, _t1 = _cmp_hq(reg_pct, _hq_pct, True, pct=True)
+    _tri.append(("🎯 %GTC", ("%s%%" % _n(round(reg_pct))) if reg_pct is not None else "—",
+                 _spark(_pc, "#fbbf24", w=300, h=40, target=70) if _pc else "",
+                 "⌁ MT 70%", _st_pct(reg_pct), _c1, _t1))
+    # 2) Backlog >120h — live giao_120h (khớp tile), đường 14 ngày, MT 500
+    _g = g120_trend[-14:] if (g120_trend and len(g120_trend) >= 2) else None
+    _c2, _t2 = _cmp_hq(giao_120h, _hq_g120, False)
+    _st2 = "na" if giao_120h is None else ("gok" if giao_120h <= 500 else "gbad")
+    _tri.append(("🔴 Backlog &gt;120h", _n(giao_120h) if giao_120h is not None else "—",
+                 _spark(_g, "#fb7185", w=300, h=40, target=500) if _g else "",
+                 "⌁ MT 500", _st2, _c2, _t2))
+    # 3) Tồn CHƯA GÁN GIAO — live R["backlog"] (khớp tile Tổng quan), đường 14 ngày chốt (chua_gan)
+    _cg = [t["chuagan"] for t in trend][-14:] if (trend and len(trend) >= 2) else None
+    _c3, _t3 = _cmp_hq(R["backlog"], _hq_cg, False)
+    _st3 = _c3 if _c3 in ("cbad", "cok") else "na"
+    _st3 = "gbad" if _st3 == "cbad" else ("gok" if _st3 == "cok" else "na")
+    _tri.append(("⏳ Chưa gán giao", _n(R["backlog"]),
+                 _spark(_cg, "#f5aa17", w=300, h=40) if _cg else "",
+                 "⌁ 14 ngày chốt", _st3, _c3, _t3))
     if _tri:
         _cells = "".join(
             "<div class='htl %s'><div class='htll'>%s</div>"
-            "<div class='htlv'>%s</div><div class='htlk'>%s</div>"
-            "<div class='htlf'><span class='htlt'>⌁ MT %s</span>%s</div></div>"
-            % (gc, l, v, s, mt, ("<span class='htld'>%s</span>" % gd) if gd else "")
-            for l, v, s, mt, gc, gd in _tri)
-        P.append("<div class='htri'><div class='htri-h'>📈 Xu hướng 14 ngày chốt "
-                 "<span class='htri-s'>· nét đứt = mục tiêu</span></div>"
+            "<div class='htlv'>%s</div>%s"
+            "<div class='htlf'>%s<span class='htlt'>%s</span></div></div>"
+            % (gc, l, v, ("<div class='htlk'>%s</div>" % s) if s else "<div class='htlk'></div>",
+               ("<span class='htld %s'>%s</span>" % (cc, ct)) if ct else "", mt)
+            for l, v, s, mt, gc, cc, ct in _tri)
+        P.append("<div class='htri'><div class='htri-h'>🎯 3 chỉ số điều hành "
+                 "<span class='htri-s'>· số LIVE · so cùng giờ HQ · đường 14 ngày</span></div>"
                  "<div class='htri-g'>%s</div></div>" % _cells)
 
     # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
@@ -2145,18 +2158,19 @@ svg.spk{display:block}
 .htl{display:flex;flex-direction:column;background:rgba(255,255,255,.04);border:1px solid var(--line);
  border-radius:13px;padding:9px 10px 7px;min-width:0}
 .htl.gbad{background:rgba(242,88,95,.1);border-color:rgba(242,88,95,.32)}
+.htl.gwarn{background:rgba(249,181,52,.1);border-color:rgba(249,181,52,.32)}
 .htl.gok{background:rgba(23,201,131,.09);border-color:rgba(23,201,131,.3)}
 .htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;
  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .htlv{font-weight:850;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05;margin:2px 0 4px;color:#fff}
-.htl.gbad .htlv{color:#ff7b81}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
+.htl.gbad .htlv{color:#ff7b81}.htl.gwarn .htlv{color:#f9b534}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
 .htlf{margin-top:4px;display:flex;flex-direction:column;gap:1px}
 .htlt{font-size:9.5px;color:#a78bfa;font-weight:600;font-variant-numeric:tabular-nums;
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .htld{font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;
  overflow:hidden;text-overflow:ellipsis}
-.htl.gbad .htld{color:#ff8e93}.htl.gok .htld{color:#4de39a}.htl.na .htld{color:var(--mut)}
+.htld.cbad{color:#ff8e93}.htld.cok{color:#4de39a}.htld.cfl{color:var(--mut)}
 @media(max-width:412px){.htri-g{gap:6px}.htl{padding:8px 7px 6px}.htll{font-size:9.5px}.htlv{font-size:17px}
  .htlt{font-size:8.5px}.htld{font-size:9.5px}}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
