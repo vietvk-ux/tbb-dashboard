@@ -564,6 +564,39 @@ def _fetch_giao120h_trend(days=8):
         return None
 
 
+def _fetch_region_noon12_trend(days=14, noon_hour=12):
+    """Tồn CHƯA GÁN GIAO CẤP VÙNG tại ~12h trưa, N ngày CHỐT gần nhất (tới hôm qua) =
+    Σ bcsnap[bc][2] của hàng gio=12 mỗi ngày trong bao_cao_gio. List cũ→mới; None nếu
+    thiếu creds/lỗi/<2 điểm. (bao_cao_gio KHÔNG có cột id → order theo ngay.)"""
+    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+           or os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if not (url and key):
+        return None
+    try:
+        import requests
+        today = datetime.now(VN).date()
+        since = (today - timedelta(days=days + 4)).isoformat()
+        h = {"apikey": key, "Authorization": "Bearer " + key}
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=ngay,bcsnap&gio=eq.%d"
+                         "&ngay=gte.%s&ngay=lt.%s&order=ngay.desc&limit=%d"
+                         % (url, noon_hour, since, today.isoformat(), days + 6),
+                         headers=h, timeout=20)
+        if not r.ok:
+            return None
+        by = {}
+        for x in r.json():
+            bs = x.get("bcsnap") or {}
+            vs = [v[2] for v in bs.values()
+                  if isinstance(v, list) and len(v) >= 3 and v[2] is not None]
+            if vs:                              # ngày CÓ log backlog-12h (bỏ ngày khuyết → tránh '0' giả)
+                by[x["ngay"]] = sum(vs)
+        vals = [by[d] for d in sorted(by)][-days:]
+        return vals if len(vals) >= 2 else None
+    except Exception:
+        return None
+
+
 def _spark(vals, color, w=240, h=46, target=None, pad=6):
     """Đường xu hướng (SVG) RÕ NÉT: đường crisp 2px (non-scaling-stroke, không méo khi kéo giãn)
     + vùng tô gradient dưới đường + điểm cuối nổi bật. target = vạch mục tiêu. '' nếu <2 điểm."""
@@ -1082,7 +1115,8 @@ def _read_watch_chot():
 
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
-             fc_uplift=None, pace=None, cmp_y=None, bc_avg=None, lgt_w=None, nv_avg=None):
+             fc_uplift=None, pace=None, cmp_y=None, bc_avg=None, lgt_w=None, nv_avg=None,
+             noon12_trend=None):
     now = datetime.now(VN)
     # SO CÙNG GIỜ HÔM QUA / TB 7 NGÀY chỉ hiện từ ~10h sáng (ENV CMP_MIN_HOUR): trước đó %GTC
     # luỹ kế biến động mạnh do 'sóng gán đơn' đầu ngày (mẫu số nhảy vọt) → so sánh dễ hiểu nhầm.
@@ -1208,6 +1242,28 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='hsub'><b class='hn'>%s</b> / <b class='hn'>%s</b> đơn giao thành công · "
              "LTC <b class='hn'>%s</b> · cần giao <b class='hn'>%s</b></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
+
+    # ===== 3 ĐƯỜNG XU HƯỚNG 14 NGÀY CHỐT (ngay dưới số %GTC): %GTC · Backlog>120h · Tồn gán 12h =====
+    def _lastnn(xs):
+        return next((v for v in reversed(xs or []) if v is not None), None)
+    _tri = []
+    if trend and len(trend) >= 2:
+        _pc = [t["pct"] for t in trend][-14:]
+        _lv = _lastnn(_pc)
+        _tri.append(("🎯 %GTC", ("%s%%" % _n(round(_lv))) if _lv is not None else "—",
+                     _spark(_pc, "#fbbf24", w=300, h=40, target=70)))
+    if g120_trend and len(g120_trend) >= 2:
+        _g = g120_trend[-14:]
+        _tri.append(("🔴 Backlog &gt;120h", _n(_lastnn(_g)), _spark(_g, "#fb7185", w=300, h=40)))
+    if noon12_trend and len(noon12_trend) >= 2:
+        _nn = noon12_trend[-14:]
+        _tri.append(("⏳ Tồn gán 12h", _n(_lastnn(_nn)), _spark(_nn, "#f5aa17", w=300, h=40)))
+    if _tri:
+        _cells = "".join("<div class='htl'><div class='htll'>%s <b>%s</b></div>"
+                         "<div class='htlk'>%s</div></div>" % (l, v, s) for l, v, s in _tri)
+        P.append("<div class='htri'><div class='htri-h'>📈 Xu hướng 14 ngày chốt</div>"
+                 "<div class='htri-g'>%s</div></div>" % _cells)
+
     # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
     # (Bỏ dòng đánh giá thường ngày '🟡 CẦN CHÚ Ý · còn X điểm' 08/10 — trùng số %GTC + bar + chips.)
     if _oprisk:
@@ -1367,9 +1423,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         if _aibox:
             P.append(_aibox)
 
-    if trend and len(trend) >= 2:
-        pcts = [t["pct"] for t in trend]
-        P.append("<div class='sparkwrap'>%s</div>" % _spark(pcts, "#fbbf24", w=280, h=50, target=70))
+    # (Đường %GTC đơn 14 ngày ĐÃ GỘP vào khối '📈 Xu hướng 14 ngày chốt' ngay dưới số %GTC — bỏ ở đây cho gọn.)
     if ref:
         # (Bỏ chip 'Còn X điểm tới 70%' 08/10 — trùng thanh bar + mục tiêu; giữ các mốc tham chiếu.)
         # TB 30 ngày chỉ hiện khi CÓ hơn 7 ngày dữ liệu (nếu bằng 7 ngày thì trùng TB 7 ngày).
@@ -2057,6 +2111,15 @@ body{margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',
 .sparkwrap{margin-top:10px}
 .spklbl{font-size:9.5px;color:var(--mut);font-weight:600;letter-spacing:.02em;margin-bottom:3px}
 svg.spk{display:block}
+/* 3 ĐƯỜNG XU HƯỚNG 14 NGÀY ngay dưới số %GTC (%GTC · Backlog>120h · Tồn gán 12h) */
+.htri{margin-top:13px}
+.htri-h{font-size:10.5px;color:var(--mut);font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:7px}
+.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.htl{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:8px 9px 4px;min-width:0}
+.htll{font-size:11px;color:var(--mut);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.htll b{color:var(--txt);font-weight:800;font-size:13px;margin-left:2px;font-variant-numeric:tabular-nums}
+.htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
+@media(max-width:430px){.htri-g{gap:6px}.htl{padding:7px 7px 3px}.htll{font-size:10px}.htll b{font-size:12px}}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
@@ -2492,6 +2555,7 @@ def main():
         # Xu hướng vùng 14 ngày (Supabase) cho hero + ô "cần làm ngay". Lỗi → None (ẩn spark).
         trend = _fetch_region_trend(14)
         g120_trend = _fetch_giao120h_trend(14)         # Giao>120h chốt ngày (bao_cao_ton_dong)
+        noon12_trend = _fetch_region_noon12_trend(14)  # Tồn gán 12h cấp vùng (bao_cao_gio gio=12)
         try:
             import report_nvxuly as _rnx
             cx_trend = _rnx.canxuly_trend(14)          # NV cần xử lý chốt ngày (rolling 14 ngày)
@@ -2578,7 +2642,7 @@ def main():
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
                  fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg, lgt_w=lgt_w,
-                 nv_avg=nv_avg)
+                 nv_avg=nv_avg, noon12_trend=noon12_trend)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
