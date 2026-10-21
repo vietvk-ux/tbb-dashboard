@@ -1280,8 +1280,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _cells = "".join(
             "<div class='htl %s'><div class='htll'>%s</div>"
             "<div class='htlv'>%s</div><div class='htlk'>%s</div>"
-            "<div class='htlt'>⌁ MT %s%s</div></div>"
-            % (gc, l, v, s, mt, (" · <b>%s</b>" % gd) if gd else "")
+            "<div class='htlf'><span class='htlt'>⌁ MT %s</span>%s</div></div>"
+            % (gc, l, v, s, mt, ("<span class='htld'>%s</span>" % gd) if gd else "")
             for l, v, s, mt, gc, gd in _tri)
         P.append("<div class='htri'><div class='htri-h'>📈 Xu hướng 14 ngày chốt "
                  "<span class='htri-s'>· nét đứt = mục tiêu</span></div>"
@@ -2151,12 +2151,14 @@ svg.spk{display:block}
 .htlv{font-weight:850;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05;margin:2px 0 4px;color:#fff}
 .htl.gbad .htlv{color:#ff7b81}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
-.htlt{font-size:9.5px;color:#a78bfa;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;
+.htlf{margin-top:4px;display:flex;flex-direction:column;gap:1px}
+.htlt{font-size:9.5px;color:#a78bfa;font-weight:600;font-variant-numeric:tabular-nums;
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.htlt b{font-weight:800}
-.htl.gbad .htlt b{color:#ff8e93}.htl.gok .htlt b{color:#4de39a}
+.htld{font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;
+ overflow:hidden;text-overflow:ellipsis}
+.htl.gbad .htld{color:#ff8e93}.htl.gok .htld{color:#4de39a}.htl.na .htld{color:var(--mut)}
 @media(max-width:412px){.htri-g{gap:6px}.htl{padding:8px 7px 6px}.htll{font-size:9.5px}.htlv{font-size:17px}
- .htlt{font-size:8.5px}}
+ .htlt{font-size:8.5px}.htld{font-size:9.5px}}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
