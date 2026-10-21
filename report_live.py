@@ -1366,12 +1366,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         if not rr:
             return ""
         rr.sort(key=lambda r: r[1], reverse=(not hb))     # tệ nhất lên đầu
-        P2 = ["<div class='amdr'><div class='amdr-h'>📊 Theo AM · 14 ngày (tệ → tốt)</div>"]
+        P2 = ["<div class='amdr'><div class='amdr-h'>📊 Theo AM · 14 ngày (tệ → tốt) · ▲▼ so hôm qua</div>"]
         for am, last, ser in rr:
             vv = ("%s%%" % _n(round(last))) if field == "pct" else _n(round(last))
+            _nn2 = [x for x in ser if x is not None]       # so NGÀY mới nhất vs ngày trước đó
+            _cc, _ct = _cmp_hq(last, (_nn2[-2] if len(_nn2) >= 2 else None), hb, pct=(field == "pct"))
+            _ar = ("<span class='amda %s'>%s</span>" % (_cc, _ct.replace(" vs HQ", ""))) if _ct else ""
             sp = _spark(_trim_lead(ser), color, w=320, h=30, target=tgt)
-            P2.append("<div class='amdrow'><div class='amdn'>%s<b>%s</b></div>"
-                      "<div class='amdk'>%s</div></div>" % (_esc(am), vv, sp))
+            P2.append("<div class='amdrow'><div class='amdn'>%s<b>%s</b>%s</div>"
+                      "<div class='amdk'>%s</div></div>" % (_esc(am), vv, _ar, sp))
         P2.append("</div>")
         return "".join(P2)
 
@@ -2229,8 +2232,10 @@ svg.spk{display:block}
 .amdr{padding:0 10px 10px;border-top:1px solid var(--line)}
 .amdr-h{font-size:10px;color:var(--mut);font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin:9px 0 6px}
 .amdrow{display:flex;align-items:center;gap:10px;padding:3px 0}
-.amdn{flex:0 0 38%;font-size:11.5px;color:#cdd4ea;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.amdn{flex:0 0 46%;font-size:11.5px;color:#cdd4ea;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .amdn b{color:#fff;font-weight:800;font-family:'Geist Mono','Geist',monospace;margin-left:6px;letter-spacing:-.02em}
+.amda{font-size:10px;font-weight:800;margin-left:6px;font-variant-numeric:tabular-nums}
+.amda.cok{color:#4de39a}.amda.cbad{color:#ff8e93}.amda.cfl{color:var(--mut)}
 .amdk{flex:1;min-width:0;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:3px 6px 1px}
 .amdk svg.spk{width:100%;height:30px;display:block}
 .htl.gbad{background:rgba(242,88,95,.1);border-color:rgba(242,88,95,.32)}
