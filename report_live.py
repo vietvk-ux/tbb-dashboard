@@ -2147,7 +2147,8 @@ svg.spk{display:block}
  border-radius:13px;padding:9px 10px 7px;min-width:0}
 .htl.gbad{background:rgba(242,88,95,.1);border-color:rgba(242,88,95,.32)}
 .htl.gok{background:rgba(23,201,131,.09);border-color:rgba(23,201,131,.3)}
-.htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;
+ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .htlv{font-weight:850;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05;margin:2px 0 4px;color:#fff}
 .htl.gbad .htlv{color:#ff7b81}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
