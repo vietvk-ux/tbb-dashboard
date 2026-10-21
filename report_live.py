@@ -806,13 +806,15 @@ def _drv_table(drv):
     return "".join(P)
 
 
-def _bc_drv_details(r, arrow=""):
+def _bc_drv_details(r, arrow="", pos=None):
     """1 bưu cục dạng <details> LỒNG (bấm mở ra bảng nhân viên) — dùng trong mục AM/tỉnh.
     arrow = mũi tên So TB7 (_gtc_arrow) truyền từ gen_html → BC con đồng bộ & THẲNG CỘT với
-    thẻ AM/BC cấp đầu và bảng NV (pill %GTC + So TB7 cùng cụm .bcmx + có thanh tiến độ)."""
+    thẻ AM/BC cấp đầu và bảng NV (pill %GTC + So TB7 cùng cụm .bcmx + có thanh tiến độ).
+    pos = vị trí 0→1 trong danh sách (0=đầu) → nền sáng GIẢM DẦN xuống dưới, tăng tương phản số."""
     pc = _pct(r["gtc"], r["total"])
     cls = _cls(pc)
-    P = ["<details class='bc sub %s'><summary>" % cls]
+    _st = (" style='--pos:%.3f'" % max(0.0, min(1.0, pos))) if pos is not None else ""
+    P = ["<details class='bc sub %s'%s><summary>" % (cls, _st)]
     P.append("<div class='bch'><span class='dot %s'></span><span class='bcn %s'>%s</span>"
              "<span class='bcmx'><span class='pill %s'>%s%%</span>%s</span></div>"
              % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—", arrow))
@@ -1981,8 +1983,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                     _low_badge(_am_low) if _am_low else ""))
         P.append("</summary>")
         P.append("<div class='dtl'>")
-        for r in sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
-            P.append(_bc_drv_details(r, _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"]))))
+        _bcs = sorted(am_rows.get(amn, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999))
+        _den = max(len(_bcs) - 1, 1)
+        for _i, r in enumerate(_bcs):
+            P.append(_bc_drv_details(r, _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"])), pos=_i / _den))
         P.append("</div></details>")
 
     # ===== Theo tỉnh (bấm mở xem bưu cục) =====
@@ -2011,8 +2015,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                     _low_badge(_pv_low) if _pv_low else ""))
         P.append("</summary>")
         P.append("<div class='dtl'>")
-        for r in sorted(prov_rows.get(pv, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
-            P.append(_bc_drv_details(r, _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"]))))
+        _bcs = sorted(prov_rows.get(pv, []), key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999))
+        _den = max(len(_bcs) - 1, 1)
+        for _i, r in enumerate(_bcs):
+            P.append(_bc_drv_details(r, _gtc_arrow(r["gtc"], r["total"], _ybc.get(r["name"])), pos=_i / _den))
         P.append("</div></details>")
 
     # ===== Bưu cục =====
@@ -2485,11 +2491,20 @@ table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 .ltc{color:var(--good);font-weight:700}
 .dtl{padding:2px 12px 12px}
 .bc .dtl{padding:2px 4px 10px}
-.bc.sub{margin:7px 0;border-radius:13px;border-color:rgba(var(--h),.22);
- background:linear-gradient(180deg,rgba(var(--h),.06),rgba(255,255,255,.015))}
+/* Bưu cục LỒNG trong AM/tỉnh: nền SÁNG GIẢM DẦN xuống dưới (--pos 0→1) → tăng tương phản,
+   số liệu nổi rõ hơn (chữ sáng trên nền tối dần). --pos mặc định 0 cho mục không xếp hạng. */
+.bc.sub{--pos:0;margin:7px 0;border-radius:13px;border-color:rgba(var(--h),calc(.30 - .14*var(--pos)));
+ background:linear-gradient(0deg,rgba(6,9,17,calc(.36*var(--pos))),rgba(6,9,17,calc(.36*var(--pos)))),
+  linear-gradient(180deg,rgba(var(--h),calc(.12 - .07*var(--pos))),rgba(255,255,255,.015))}
 .bc.sub summary{padding:9px 10px;gap:7px}
-.bc.sub[open]{background:linear-gradient(180deg,rgba(var(--h),.1),rgba(255,255,255,.02))}
+.bc.sub[open]{background:linear-gradient(0deg,rgba(6,9,17,calc(.30*var(--pos))),rgba(6,9,17,calc(.30*var(--pos)))),
+  linear-gradient(180deg,rgba(var(--h),.13),rgba(255,255,255,.02))}
 .bc.sub .dtl{padding:0 2px 6px}
+/* Tương phản số liệu trong bưu cục con rõ hơn (chữ sáng, số đậm) */
+.bc.sub .bcn{color:#f3f6ff}
+.bc.sub .bcm{color:#b7c0de;font-weight:600}
+.bc.sub .bcm>span{color:#cdd5ee}
+.bc.sub .bcm .w{color:#ff8e93}.bc.sub .bcm .ltc{color:#4de39a}.bc.sub .bcm .gtb{color:#ffc658}
 .none{color:var(--mut);font-size:12.5px;padding:6px 2px 10px}
 
 table.drv{width:100%;border-collapse:collapse;font-size:12px}
