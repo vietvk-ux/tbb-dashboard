@@ -171,10 +171,11 @@ def _bc_spark(bc_name, live_pc, trend):
             "<div class='spkwrap'>%s</div></div>" % (ndays, lo, hi, sp))
 
 
-def _bc_scorecard(r, collectable, dkattr="data-k", trend=None):
+def _bc_scorecard(r, collectable, dkattr="data-k", trend=None, pos=None):
     """1 bưu cục = 1 scorecard đầy đủ (dạng <details> bấm mở).
     dkattr: tên attribute khoá tìm kiếm (data-k ở trang riêng, data-kb khi NHÚNG để
-    không đụng ô tìm kiếm chính của trang trực tiếp)."""
+    không đụng ô tìm kiếm chính của trang trực tiếp).
+    pos: vị trí 0→1 trong AM (0=tệ nhất) → nền TỐI DẦN xuống dưới, bớt chói, số liệu rõ hơn."""
     pc = _pct(r["gtc"], r["total"])     # %GTC = GTC / đã gán (khớp toàn dashboard)
     cls = _cls(pc)
     nv = len(r.get("drivers", []))
@@ -189,7 +190,8 @@ def _bc_scorecard(r, collectable, dkattr="data-k", trend=None):
     kg_cg = (r.get("backlog_weight_g", 0) or 0) / 1000.0
 
     keys = (r["name"] + " " + " ".join(d["name"] for d in r.get("drivers", []))).lower()
-    P = ["<details class='bc %s' %s=\"%s\"><summary>" % (cls, dkattr, _esc(keys))]
+    _st = (" style='--pos:%.3f'" % max(0.0, min(1.0, pos))) if pos is not None else ""
+    P = ["<details class='bc scfade %s' %s=\"%s\"%s><summary>" % (cls, dkattr, _esc(keys), _st)]
     P.append("<div class='bch'><span class='dot %s'></span>"
              "<span class='bcn %s'>%s</span><span class='pill %s'>%s%%</span></div>"
              % (cls, cls, _esc(r["name"]), cls, pc if pc is not None else "—"))
@@ -287,8 +289,10 @@ def _am_blocks(rows, collectable, dkattr="data-k", am_open=True, trend=None):
                     ("·" + _late_badge(a_late)) if a_late else "",
                     ("·" + _low_badge(a_low)) if a_low else ""))
         P.append("</summary><div class='dtl'>")
-        for r in sorted(bcs, key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999)):
-            P.append(_bc_scorecard(r, collectable, dkattr, trend))
+        _sbcs = sorted(bcs, key=lambda x: (_pct(x["gtc"], x["total"]) if x["total"] else 999))
+        _den = max(len(_sbcs) - 1, 1)
+        for _i, r in enumerate(_sbcs):
+            P.append(_bc_scorecard(r, collectable, dkattr, trend, pos=_i / _den))
         P.append("</div></details>")
     return "".join(P)
 
@@ -369,5 +373,19 @@ details.bc.am>summary{padding:12px 14px}
 .spkwrap{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.1);border-radius:11px;
  padding:8px 10px 4px}
 .spkwrap svg.spk{width:100%;height:42px}
+/* Scorecard bưu cục: nền SÁNG GIẢM DẦN theo vị trí (--pos 0→1) + BỚT CHÓI khi mở → số liệu rõ hơn.
+   (tệ nhất ở trên = sáng nổi; tốt hơn ở dưới = tối dần, dịu mắt) */
+.bc.scfade{--pos:0;border-color:rgba(var(--h),calc(.30 - .15*var(--pos)));
+ background:linear-gradient(0deg,rgba(5,8,15,calc(.42*var(--pos))),rgba(5,8,15,calc(.42*var(--pos)))),
+  radial-gradient(120% 90% at 0% 0%,rgba(var(--h),calc(.12 - .08*var(--pos))),var(--card) 70%)}
+.bc.scfade[open]{
+ background:linear-gradient(0deg,rgba(5,8,15,calc(.34*var(--pos))),rgba(5,8,15,calc(.34*var(--pos)))),
+  radial-gradient(120% 90% at 0% 0%,rgba(var(--h),.10),var(--card2) 78%)}
+/* Tương phản số liệu: nền ô tile dịu (không chói), chữ/số sáng rõ */
+.bc.scfade .sc{background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.12)}
+.bc.scfade .scl{color:#aab4d4}
+.bc.scfade .scv{color:#fff}
+.bc.scfade .bcm{color:#b7c0de}
+.bc.scfade .scgt{color:#c4ccec}
 """
 _EXTRA_CSS = "<style>" + _EXTRA_CSS_INNER + "</style>"
