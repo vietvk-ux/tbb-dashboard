@@ -2295,7 +2295,7 @@ svg.spk{display:block}
 .htl.gok{background:rgba(23,201,131,.09);border-color:rgba(23,201,131,.3)}
 .htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;padding-right:14px;
  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.htlv{font-family:'Geist Mono','Geist',monospace;font-weight:700;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1.05;margin:2px 0 4px;color:#fff}
+.htlv{font-family:'Geist Mono','Geist',monospace;font-weight:800;font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:-.04em;line-height:1.02;margin:3px 0 5px;color:#fff}
 .htl.gbad .htlv{color:#ff7b81}.htl.gwarn .htlv{color:#f9b534}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
 .htlf{margin-top:4px;display:flex;flex-direction:column;gap:1px}
@@ -2304,7 +2304,7 @@ svg.spk{display:block}
 .htld{font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;
  overflow:hidden;text-overflow:ellipsis}
 .htld.cbad{color:#ff8e93}.htld.cok{color:#4de39a}.htld.cfl{color:var(--mut)}
-@media(max-width:412px){.htri-g{gap:6px}.htl{padding:8px 7px 6px}.htll{font-size:9.5px}.htlv{font-size:17px}
+@media(max-width:412px){.htri-g{gap:6px}.htl{padding:8px 7px 6px}.htll{font-size:9.5px}.htlv{font-size:22px}
  .htlt{font-size:8.5px}.htld{font-size:9.5px}}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
