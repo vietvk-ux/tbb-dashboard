@@ -599,7 +599,7 @@ def _fetch_region_noon12_trend(days=14, noon_hour=12):
 
 def _fetch_am_crit_trend(days=14):
     """14 ngày/AM cho 3 chỉ số điều hành (drill từ 3 card hero):
-      pct  = %GTC CUỐI NGÀY per AM (Σgtc/Σtotal các BC trong AM, snapshot gio lớn nhất mỗi ngày)
+      pct  = %GTC CHỐT ngày per AM (Σgtc/Σdon_giao các BC trong AM, nguồn bao_cao_buu_cuc → KHỚP card vùng)
       noon = tồn chưa gán 12h per AM (Σ bcsnap[bc][2] gio=12)
       g120 = backlog giao >120h per AM (Σ g_gt120 DELIVER từ bao_cao_ton_dong)
     Trả (dates, {am:{'pct':{ngay:v},'noon':{ngay:v},'g120':{ngay:v}}}). Thiếu creds/lỗi → (None, {})."""
@@ -613,18 +613,30 @@ def _fetch_am_crit_trend(days=14):
         today = datetime.now(VN).date()
         since = (today - timedelta(days=days + 4)).isoformat()
         hdr = {"apikey": key, "Authorization": "Bearer " + key}
-        # bao_cao_gio: EOD (gio lớn nhất) + gio=12 mỗi ngày
-        dgio = {}
-        r = requests.get("%s/rest/v1/bao_cao_gio?select=ngay,gio,bcsnap&ngay=gte.%s"
-                         "&order=ngay.desc&limit=900" % (url, since), headers=hdr, timeout=30)
+        # bao_cao_buu_cuc: CLOSE ngày per BC (don_giao, gtc) → %GTC per AM KHỚP bao_cao_vung (card vùng).
+        # (Trước dùng bao_cao_gio EOD snapshot → lệch ~1-2đ vs card vùng; nay dùng đúng số chốt ngày.)
+        bcday, off = {}, 0
+        while True:
+            r = requests.get("%s/rest/v1/bao_cao_buu_cuc?select=ngay,buu_cuc,don_giao,gtc"
+                             "&ngay=gte.%s&order=id.asc&limit=1000&offset=%d"
+                             % (url, since, off), headers=hdr, timeout=30)
+            if not r.ok:
+                break
+            c = r.json()
+            for row in c:
+                bc = row.get("buu_cuc")
+                if bc:
+                    bcday.setdefault(row["ngay"], {})[bc] = (row.get("don_giao") or 0, row.get("gtc") or 0)
+            if len(c) < 1000:
+                break
+            off += 1000
+        # bao_cao_gio gio=12: tồn chưa gán 12h per BC
+        noonday = {}
+        r = requests.get("%s/rest/v1/bao_cao_gio?select=ngay,bcsnap&gio=eq.12&ngay=gte.%s"
+                         "&order=ngay.desc&limit=200" % (url, since), headers=hdr, timeout=30)
         if r.ok:
             for row in r.json():
-                ng, g = row["ngay"], row.get("gio") or 0
-                slot = dgio.setdefault(ng, {"maxg": -1, "max": {}, "noon": None})
-                if g > slot["maxg"]:
-                    slot["maxg"] = g; slot["max"] = row.get("bcsnap") or {}
-                if g == 12:
-                    slot["noon"] = row.get("bcsnap") or {}
+                noonday[row["ngay"]] = row.get("bcsnap") or {}
         # bao_cao_ton_dong: backlog giao >120h per BC
         g120d, off = {}, 0
         while True:
@@ -642,17 +654,15 @@ def _fetch_am_crit_trend(days=14):
             if len(c) < 1000:
                 break
             off += 1000
-        dates = sorted(set(dgio) | set(g120d))[-days:]
+        dates = sorted(set(bcday) | set(noonday) | set(g120d))[-days:]
         res = {}
         for ng in dates:
-            mx = (dgio.get(ng) or {}).get("max") or {}
-            nn = (dgio.get(ng) or {}).get("noon") or {}
-            acc = {}                                 # am -> [gtc,total] cho %GTC
-            for bc, v in mx.items():
-                if isinstance(v, list) and len(v) >= 2:
-                    am = AM_OF.get(bc)
-                    if am:
-                        a = acc.setdefault(am, [0, 0]); a[0] += v[0]; a[1] += v[1]
+            nn = noonday.get(ng) or {}
+            acc = {}                                 # am -> [gtc,total] cho %GTC (từ bao_cao_buu_cuc)
+            for bc, (dg, gt) in (bcday.get(ng) or {}).items():
+                am = AM_OF.get(bc)
+                if am:
+                    a = acc.setdefault(am, [0, 0]); a[0] += gt; a[1] += dg
             for am, (gtc, tot) in acc.items():
                 if tot:
                     res.setdefault(am, {}).setdefault("pct", {})[ng] = round(gtc / tot * 100, 1)
