@@ -876,11 +876,12 @@ def _drv_table(drv):
               % (st.hour, st.minute)) if late else ""
         # TÊN NV tô màu theo %GTC (giống bưu cục): đỏ<60 · vàng<70 · xanh≥70
         nmc = "nmc " + _cls(pc2)
+        # %GTC: chip TikTok (nếu có) ĐỨNG TRƯỚC pill → pill LUÔN sát phải cột = THẲNG HÀNG mọi dòng.
         P.append("<tr%s><td class='nv'>%s<span class='%s'>%s</span>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-                 "<td><span class='pill sm %s'>%s%%</span>%s</td><td>%s</td></tr>"
+                 "<td class='pgc'>%s<span class='pill sm %s'>%s%%</span></td><td>%s</td></tr>"
                  % (attr, cx, nmc, _esc(d["name"]), lb, _n(d["total"]), _n(d["gtc"]),
-                    ltc_cell, _cls(pc2), pc2 if pc2 is not None else "—",
-                    _tt_inline(d.get("vngh_gtc", 0), d.get("vngh", 0)), _nv_cmp_cell(d)))
+                    ltc_cell, _tt_inline(d.get("vngh_gtc", 0), d.get("vngh", 0)),
+                    _cls(pc2), pc2 if pc2 is not None else "—", _nv_cmp_cell(d)))
         if has:
             ws = sorted(wards.items(), key=lambda kv: -kv[1][0])
             cells = []
@@ -2533,9 +2534,10 @@ details.wbc[open] .wcar{transform:rotate(180deg)}
 /* TikTok %GTC NV GỌN đặt kèm sau pill %GTC */
 .ttn{font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap;margin-left:6px}
 .ttn.good{color:var(--good)}.ttn.warn{color:var(--warn)}.ttn.bad{color:var(--bad)}.ttn.na{color:var(--mut)}
-/* cột %GTC: pill min-width cố định + nowrap → số %GTC canh thẳng cột */
-table.drv td:nth-child(5){white-space:nowrap;text-align:right}
-table.drv td:nth-child(5) .pill{min-width:50px}
+/* cột %GTC: pill LUÔN sát phải (min-width cố định), chip TikTok đứng trước → pill THẲNG HÀNG dọc */
+table.drv td:nth-child(5),td.pgc{white-space:nowrap;text-align:right}
+table.drv td:nth-child(5) .pill,td.pgc .pill{min-width:50px;vertical-align:middle}
+td.pgc .ttn{margin:0 4px 0 0;vertical-align:middle}
 /* cột So TB7: nowrap canh phải thẳng hàng dọc */
 table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 
