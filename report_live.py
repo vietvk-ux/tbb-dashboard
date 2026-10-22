@@ -1321,9 +1321,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='htop'>")
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
-    P.append("<div class='hstat %s'><span class='hsi'>%s</span>"
-             "<div class='hstw'><b>%s</b><span>mục tiêu 70%%</span></div></div>"
-             % (_hcls, _hic, _hst))
+    # Gộp mốc tham chiếu vào badge cho THỐNG NHẤT: mục tiêu 70% · hôm qua · TB7 · TB30.
+    _href2 = "<span class='hrf'>🎯 MT <b>70%</b></span>"
+    if ref:
+        _href2 += "<span class='hrf'>Hôm qua <b>%d%%</b></span>" % ref["yp"]
+        _href2 += "<span class='hrf'>TB%d <b>%d%%</b></span>" % (ref["ndays"], ref["avg7p"])
+        if ref.get("avg30p") is not None and ref.get("ndays30", 0) > ref["ndays"]:
+            _href2 += "<span class='hrf'>TB%d <b>%d%%</b></span>" % (ref["ndays30"], ref["avg30p"])
+    P.append("<div class='hstat %s'><div class='hstt'><span class='hsi'>%s</span>"
+             "<b>%s</b></div><div class='hstr'>%s</div></div>"
+             % (_hcls, _hic, _hst, _href2))
     P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     # Dòng số liệu chính (to, đậm) — ĐƯA LÊN NGAY DƯỚI THANH %GTC, TRÊN tồn kho.
@@ -1550,18 +1557,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         if _aibox:
             P.append(_aibox)
 
-    # (Đường %GTC đơn 14 ngày ĐÃ GỘP vào khối '📈 Xu hướng 14 ngày chốt' ngay dưới số %GTC — bỏ ở đây cho gọn.)
-    if ref:
-        # (Bỏ chip 'Còn X điểm tới 70%' 08/10 — trùng thanh bar + mục tiêu; giữ các mốc tham chiếu.)
-        # TB 30 ngày chỉ hiện khi CÓ hơn 7 ngày dữ liệu (nếu bằng 7 ngày thì trùng TB 7 ngày).
-        tb30 = ""
-        if ref.get("avg30p") is not None and ref.get("ndays30", 0) > ref["ndays"]:
-            tb30 = "<span class='rc'>TB %d ngày <b>%d%%</b></span>" % (ref["ndays30"], ref["avg30p"])
-        P.append("<div class='href'>"
-                 "<span class='rc'>🎯 Mục tiêu <b>70%%</b></span>"
-                 "<span class='rc'>Hôm qua <b>%d%%</b></span>"
-                 "<span class='rc'>TB %d ngày <b>%d%%</b></span>%s</div>"
-                 % (ref["yp"], ref["ndays"], ref["avg7p"], tb30))
+    # (4 chip tham chiếu Mục tiêu/Hôm qua/TB7/TB30 ĐÃ GỘP lên badge trạng thái cạnh số %GTC — bỏ ở đây cho gọn.)
     P.append("</section>")
 
     # 🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT — bản CHỐT 23h30 (frozen cả ngày; report_dashboard ghi file)
@@ -2233,14 +2229,18 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
 .hpct span{font-size:30px;font-weight:700;opacity:.55;margin-left:1px;letter-spacing:0}
 /* Badge trạng thái %GTC — đọc nhanh ĐẠT/CẦN CHÚ Ý/DƯỚI MỤC TIÊU */
-.hstat{display:flex;align-items:center;gap:9px;padding:8px 13px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.hstat{flex:1 1 100%;display:flex;flex-direction:column;gap:8px;padding:11px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hstat.good{background:rgba(23,201,131,.12);border-color:rgba(23,201,131,.4)}
 .hstat.warn{background:rgba(249,181,52,.12);border-color:rgba(249,181,52,.4)}
 .hstat.bad{background:rgba(242,88,95,.13);border-color:rgba(242,88,95,.42)}
-.hsi{font-size:19px;line-height:1}
-.hstw b{display:block;font-family:'Geist',sans-serif;font-size:14.5px;font-weight:800;letter-spacing:.01em;line-height:1.15;color:#fff}
-.hstat.good .hstw b{color:#2ee88c}.hstat.warn .hstw b{color:#f9b534}.hstat.bad .hstw b{color:#ff7b81}
-.hstw span{font-size:10.5px;color:var(--mut);font-weight:600}
+.hstt{display:flex;align-items:center;gap:9px}
+.hsi{font-size:20px;line-height:1}
+.hstt b{font-family:'Geist',sans-serif;font-size:16px;font-weight:800;letter-spacing:.02em;color:#fff}
+.hstat.good .hstt b{color:#2ee88c}.hstat.warn .hstt b{color:#f9b534}.hstat.bad .hstt b{color:#ff7b81}
+.hstr{display:flex;flex-wrap:wrap;gap:6px 7px}
+.hrf{font-size:12px;color:var(--mut);font-weight:600;background:rgba(255,255,255,.055);border:1px solid var(--line);
+ border-radius:99px;padding:4px 11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hrf b{color:#fff;font-weight:800;font-size:13.5px;margin-left:3px}
 .hwh{margin-top:11px;padding:9px 12px;border-radius:12px;
  border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hwh-t{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#cdd4ea;margin-bottom:8px}
