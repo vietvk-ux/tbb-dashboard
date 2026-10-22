@@ -102,11 +102,11 @@ _BC_TREND_CACHE = {}        # cache theo tiến trình (report chạy 1 lần/l�
 
 
 def bc_pct_trend(days=14):
-    """%GTC CUỐI NGÀY của TỪNG bưu cục trong `days` ngày gần nhất (chốt = snapshot gio lớn
-    nhất mỗi ngày trong bao_cao_gio.bcsnap=[gtc,total,backlog]).
-    Trả (dates, by_bc): dates=list ISO cũ→mới (gồm hôm nay); by_bc[bc]={ngay: %GTC}.
-    Dữ liệu per-BC chỉ bắt đầu ghi ~12/10 → ngày trước đó khuyết (None) là bình thường.
-    Thiếu creds/lỗi → (None, {})."""
+    """%GTC CHỐT NGÀY của TỪNG bưu cục trong `days` ngày gần nhất — nguồn **bao_cao_buu_cuc**
+    (Σgtc/Σdon_giao close ngày) để KHỚP số chốt toàn dashboard (bao_cao_vung/AM/tỉnh). (Trước
+    dùng bao_cao_gio EOD snapshot ~23h → lệch tới >10đ ở BC có chuyến đóng muộn.)
+    Trả (dates, by_bc): dates=list ISO cũ→mới (GỒM hôm nay — điểm cuối sẽ =live override trong
+    `_bc_spark`); by_bc[bc]={ngay: %GTC}. Thiếu creds/lỗi → (None, {})."""
     if "v" in _BC_TREND_CACHE:
         return _BC_TREND_CACHE["v"]
     out = (None, {})
@@ -116,25 +116,34 @@ def bc_pct_trend(days=14):
     if url and key:
         try:
             import requests
-            since = (datetime.now(VN).date() - timedelta(days=days + 4)).isoformat()
+            today = datetime.now(VN).date()
+            since = (today - timedelta(days=days + 4)).isoformat()
             h = {"apikey": key, "Authorization": "Bearer " + key}
-            r = requests.get("%s/rest/v1/bao_cao_gio?select=ngay,gio,bcsnap"
-                             "&ngay=gte.%s&order=ngay.desc&limit=800" % (url, since),
-                             headers=h, timeout=20)
-            if r.ok:
-                best = {}                       # ngay -> (gio_max, bcsnap)
-                for x in r.json():
-                    ng, g = x["ngay"], x.get("gio") or 0
-                    if ng not in best or g > best[ng][0]:
-                        best[ng] = (g, x.get("bcsnap") or {})
-                dates = sorted(best)[-days:]
-                by_bc = {}
-                for ng in dates:
-                    for bc, v in (best[ng][1] or {}).items():
-                        if isinstance(v, list) and len(v) >= 2 and v[1]:
-                            by_bc.setdefault(bc, {})[ng] = round(v[0] / v[1] * 100, 1)
-                if dates:
-                    out = (dates, by_bc)
+            byday, off = {}, 0                  # ngay -> {bc: %GTC}
+            while True:
+                r = requests.get("%s/rest/v1/bao_cao_buu_cuc?select=ngay,buu_cuc,don_giao,gtc"
+                                 "&ngay=gte.%s&order=id.asc&limit=1000&offset=%d" % (url, since, off),
+                                 headers=h, timeout=25)
+                if not r.ok:
+                    break
+                c = r.json()
+                for row in c:
+                    dg, gt = row.get("don_giao") or 0, row.get("gtc") or 0
+                    if dg:
+                        byday.setdefault(row["ngay"], {})[row["buu_cuc"]] = round(gt / dg * 100, 1)
+                if len(c) < 1000:
+                    break
+                off += 1000
+            # dates = các ngày CHỐT (bao_cao_buu_cuc, tới hôm qua) + HÔM NAY (điểm cuối = live override)
+            tod = today.isoformat()
+            dates = [d for d in sorted(byday) if d < tod][-(days - 1):]
+            dates = (dates + [tod])[-days:]
+            by_bc = {}
+            for ng in dates:
+                for bc, pc in (byday.get(ng) or {}).items():
+                    by_bc.setdefault(bc, {})[ng] = pc
+            if dates:
+                out = (dates, by_bc)
         except Exception as e:
             logger.warning("Lấy xu hướng %%GTC bưu cục lỗi (bỏ qua): %s", str(e)[:120])
     _BC_TREND_CACHE["v"] = out

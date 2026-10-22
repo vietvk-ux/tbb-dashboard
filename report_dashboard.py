@@ -368,7 +368,7 @@ _WATCH_TREND_CACHE = {}        # cache theo tiến trình (report chạy 1 lần
 
 def _fetch_watch_crit_trend(d, days=14):
     """Lịch sử `days` ngày/BC cho 3 tiêu chí khối theo dõi:
-      pct  = %GTC CUỐI NGÀY  (bao_cao_gio, snapshot gio lớn nhất mỗi ngày: gtc/total)
+      pct  = %GTC CHỐT NGÀY  (bao_cao_buu_cuc: Σgtc/Σdon_giao → KHỚP bao_cao_vung/AM/tỉnh)
       noon = tồn gán trước 12h (bao_cao_gio gio=12, bcsnap[bc][2])
       g120 = backlog giao >120h CUỐI NGÀY (bao_cao_ton_dong order_type=DELIVER, g_gt120)
     Trả (dates, by_bc): dates=list ISO cũ→mới (gồm ngày d); by_bc[bc]={'pct':{ngay:v},
@@ -403,6 +403,24 @@ def _fetch_watch_crit_trend(d, days=14):
                         slot["maxg"] = g; slot["max"] = row.get("bcsnap") or {}
                     if g == 12:
                         slot["noon"] = row.get("bcsnap") or {}
+            # --- bao_cao_buu_cuc: %GTC CHỐT ngày per BC (KHỚP bao_cao_vung, thay bao_cao_gio EOD) ---
+            bcday, off = {}, 0
+            while True:
+                r = requests.get(url + "/rest/v1/bao_cao_buu_cuc",
+                                 params=[("select", "ngay,buu_cuc,don_giao,gtc"),
+                                         ("ngay", "gte." + since), ("ngay", "lte." + until),
+                                         ("order", "id.asc"), ("limit", "1000"), ("offset", str(off))],
+                                 headers=hdr, timeout=30)
+                if not r.ok:
+                    break
+                c = r.json()
+                for row in c:
+                    dg, gt = row.get("don_giao") or 0, row.get("gtc") or 0
+                    if dg:
+                        bcday.setdefault(row["ngay"], {})[row["buu_cuc"]] = round(gt / dg * 100, 1)
+                if len(c) < 1000:
+                    break
+                off += 1000
             # --- bao_cao_ton_dong: backlog giao >120h cuối ngày per BC ---
             g120d, off = {}, 0
             while True:
@@ -423,14 +441,12 @@ def _fetch_watch_crit_trend(d, days=14):
                 if len(c) < 1000:
                     break
                 off += 1000
-            dates = sorted(set(dgio) | set(g120d))[-days:]
+            dates = sorted(set(dgio) | set(g120d) | set(bcday))[-days:]
             by_bc = {}
             for ng in dates:
-                mx = (dgio.get(ng) or {}).get("max") or {}
                 nn = (dgio.get(ng) or {}).get("noon") or {}
-                for bc, v in mx.items():
-                    if isinstance(v, list) and len(v) >= 2 and v[1]:
-                        by_bc.setdefault(bc, {}).setdefault("pct", {})[ng] = round(v[0] / v[1] * 100, 1)
+                for bc, pc in (bcday.get(ng) or {}).items():       # %GTC CHỐT từ bao_cao_buu_cuc
+                    by_bc.setdefault(bc, {}).setdefault("pct", {})[ng] = pc
                 for bc, v in nn.items():
                     if isinstance(v, list) and len(v) >= 3 and v[2] is not None:
                         by_bc.setdefault(bc, {}).setdefault("noon", {})[ng] = v[2]
