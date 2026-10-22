@@ -2518,8 +2518,8 @@ details.wbc[open] .wcar{transform:rotate(180deg)}
 .sd.fl{color:var(--mut);background:rgba(255,255,255,.05)}
 /* mũi tên %GTC so TB 7 ngày trên thẻ AM / Tỉnh / Bưu cục — ĐỒNG BỘ cỡ/kiểu với cột So TB7 của
    bảng NV (.nvc): chữ trần xanh/đỏ, KHÔNG nền chip, bỏ đuôi 'đ' (▲ xanh tốt hơn · ▼ đỏ kém) */
-.ga{flex:none;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;
- letter-spacing:-.02em;line-height:1.4;min-width:40px;text-align:right}
+.ga{flex:none;font-size:14px;font-weight:850;font-variant-numeric:tabular-nums;
+ letter-spacing:-.02em;line-height:1.4;min-width:46px;text-align:right}
 .ga.up{color:var(--good)}
 .ga.dn{color:var(--bad)}
 .ga.fl{color:var(--mut)}
@@ -2663,7 +2663,7 @@ tr.wsub>td{padding:2px 6px 10px !important;text-align:left}
   table.drv th{font-size:8px;letter-spacing:0}
   td.nv{max-width:112px}
   .pill.sm{min-width:46px;font-size:12.5px;padding:3px 7px}
-  .ga{font-size:11px}   /* khớp cỡ số cột So TB7 bảng NV (11px mobile) */
+  .ga{font-size:12.5px}   /* So TB7 — to hơn cho dễ nhìn trên iPhone */
   .bcm,.pmeta{font-size:10px}
 }
 
