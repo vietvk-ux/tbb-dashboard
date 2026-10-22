@@ -2060,7 +2060,13 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         amn = AM_OF.get(r["name"])
         if amn:
             am_rows.setdefault(amn, []).append(r)
-    P.append("<div class='sec'>🧑‍💼 Theo AM · %GTC thấp → cao · bấm xem bưu cục</div>")
+    # GOM 3 phần drill thành TAB (AM · Tỉnh · Bưu cục) cho gọn — giữ nguyên bấm-mở chi tiết bên trong.
+    P.append("<div class='dtabs'>"
+             "<button class='dtab on' onclick=\"dtab(this,'am')\">🧑‍💼 Theo AM</button>"
+             "<button class='dtab' onclick=\"dtab(this,'tinh')\">🗺 Tỉnh</button>"
+             "<button class='dtab' onclick=\"dtab(this,'bc')\">🏤 Bưu cục</button></div>")
+    P.append("<div class='tpane' id='tp-am'>")
+    P.append("<div class='tsub'>🧑‍💼 AM · %GTC thấp → cao · bấm xem bưu cục → nhân viên</div>")
     for amn, v in sorted(am.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
         pc = _pct(v["gtc"], v["total"])
         cls = _cls(pc)
@@ -2088,10 +2094,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("</div></details>")
 
     # ===== Theo tỉnh (bấm mở xem bưu cục) =====
+    P.append("</div>")                                    # đóng pane AM
     prov_rows = {}
     for r in rows:
         prov_rows.setdefault(r["prov"], []).append(r)
-    P.append("<div class='sec'>🗺 Theo tỉnh · %GTC thấp → cao · bấm xem bưu cục</div>")
+    P.append("<div class='tpane' id='tp-tinh' hidden>")
+    P.append("<div class='tsub'>🗺 Tỉnh · %GTC thấp → cao · bấm xem bưu cục → nhân viên</div>")
     for pv, v in sorted(prov.items(), key=lambda kv: (_pct(kv[1]["gtc"], kv[1]["total"]) if kv[1]["total"] else 999)):
         pc = _pct(v["gtc"], v["total"])
         cls = _cls(pc)
@@ -2120,7 +2128,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("</div></details>")
 
     # ===== Bưu cục =====
-    P.append("<div class='sec'>🏤 Bưu cục · Tồn chưa gán giao cao → thấp</div>")
+    P.append("</div>")                                    # đóng pane Tỉnh
+    P.append("<div class='tpane' id='tp-bc' hidden>")
+    P.append("<div class='tsub'>🏤 Bưu cục · Tồn gán giao cao → thấp · bấm xem nhân viên</div>")
     P.append("<div class='sbar'><input class='search' id='q' placeholder='🔎 Tìm bưu cục / nhân viên...' oninput='filt()'></div>")
     P.append("<div id='empty' class='empty' style='display:none'>Không tìm thấy bưu cục nào.</div>")
     bcs = [r for r in rows if r["backlog"] or r["ontrip"] or r["total"]]
@@ -2149,6 +2159,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append(_drv_table(r["drivers"]))
         P.append("</div></details>")
 
+    P.append("</div>")                                    # đóng pane Bưu cục
     P.append("<div class='foot'><b>📖 Giải thích chỉ số</b><br>"
              "<span class='up' style='color:var(--good);font-weight:800'>▲</span>/<span class='dn' style='color:var(--bad);font-weight:800'>▼ %</span> cạnh số ở lưới = thay đổi <b>ngày chốt hôm qua so hôm kia</b> · <span style='color:var(--good)'>xanh = tốt lên</span> · <span style='color:var(--bad)'>đỏ = xấu đi</span> (tồn/NV cần xử lý tăng là xấu; sản lượng/GTC/NV đạt tăng là tốt)<br>"
              "📥 <b>Đã gán</b> = đơn đã xếp vào chuyến hôm nay · ⏳ <b>Chưa gán</b> = đơn tồn ở kho chưa xếp chuyến<br>"
@@ -2168,6 +2179,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "document.querySelectorAll('.bc[data-k]').forEach(function(e){var k=e.dataset.k||'';"
              "var s=(!q||k.indexOf(q)>=0);e.style.display=s?'':'none';if(s)n++;});"
              "document.getElementById('empty').style.display=(q&&!n)?'block':'none';}</script>")
+    P.append("<script>function dtab(b,id){"
+             "document.querySelectorAll('.dtab').forEach(function(x){x.classList.remove('on')});b.classList.add('on');"
+             "['am','tinh','bc'].forEach(function(t){var p=document.getElementById('tp-'+t);if(p)p.hidden=(t!==id)});"
+             "window.scrollBy(0,0);}</script>")
     P.append("<button id='rf' class='fab' onclick='rf()' aria-label='Làm mới'>"
              "<span class='rfi'>⟳</span></button>")
     P.append("<script>function rf(){var b=document.getElementById('rf');"
@@ -2573,6 +2588,16 @@ table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 .mtile.feat .mbig span{font-size:15px;color:rgba(var(--h),1);margin-left:2px}
 
 .sec{font-size:12.5px;font-weight:800;letter-spacing:.05em;color:#e3e8f7;text-transform:uppercase;margin:20px 4px 10px}
+/* TAB gom 3 phần drill (AM · Tỉnh · Bưu cục) — sticky dưới header cho dễ chuyển */
+.dtabs{display:flex;gap:6px;margin:20px 0 10px;position:sticky;top:calc(44px + env(safe-area-inset-top));z-index:15;
+ background:var(--bg);padding:4px 0}
+.dtab{flex:1;text-align:center;padding:10px 4px;border-radius:12px;font-size:12.5px;font-weight:800;
+ border:1px solid var(--line);color:var(--mut);background:var(--card);cursor:pointer;white-space:nowrap;
+ font-family:'Geist',sans-serif;-webkit-tap-highlight-color:transparent;transition:.15s}
+.dtab.on{background:rgba(56,185,248,.14);border-color:rgba(56,185,248,.5);color:#8bd4fb}
+.dtab:active{transform:scale(.97)}
+.tsub{font-size:11.5px;color:var(--mut);font-weight:600;margin:0 4px 11px;letter-spacing:.01em}
+.tpane[hidden]{display:none}
 
 .provs{display:flex;flex-direction:column;gap:8px}
 .prow{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:14px;padding:12px 14px;
