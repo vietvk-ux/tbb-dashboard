@@ -2535,7 +2535,7 @@ details.wbc[open] .wcar{transform:rotate(180deg)}
 .ttn.good{color:var(--good)}.ttn.warn{color:var(--warn)}.ttn.bad{color:var(--bad)}.ttn.na{color:var(--mut)}
 /* cột %GTC: pill min-width cố định + nowrap → số %GTC canh thẳng cột */
 table.drv td:nth-child(5){white-space:nowrap;text-align:right}
-table.drv td:nth-child(5) .pill{min-width:46px}
+table.drv td:nth-child(5) .pill{min-width:50px}
 /* cột So TB7: nowrap canh phải thẳng hàng dọc */
 table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 
@@ -2583,9 +2583,9 @@ table.drv td:nth-child(6){white-space:nowrap;text-align:right}
 .dot{width:9px;height:9px;border-radius:50%;flex:none;background:#4b5168}
 .dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
 
-.pill{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:3px 9px;border-radius:99px;
- font-weight:800;font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.3}
-.pill.sm{min-width:42px;font-size:11.5px;padding:2px 7px}
+.pill{display:inline-flex;align-items:center;justify-content:center;min-width:58px;padding:4px 13px;border-radius:99px;
+ font-family:'Geist Mono','Geist',monospace;font-weight:800;font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.25;letter-spacing:-.02em}
+.pill.sm{min-width:50px;font-size:14px;padding:3px 9px}
 .pill.good{background:var(--good)}.pill.warn{background:var(--warn)}.pill.bad{background:var(--bad)}
 .pill.na{background:#3a4160;color:var(--mut)}
 
@@ -2662,7 +2662,7 @@ tr.wsub>td{padding:2px 6px 10px !important;text-align:left}
   table.drv th,table.drv td{padding:6px 2px}
   table.drv th{font-size:8px;letter-spacing:0}
   td.nv{max-width:112px}
-  .pill.sm{min-width:34px;font-size:10px;padding:2px 5px}
+  .pill.sm{min-width:46px;font-size:12.5px;padding:3px 7px}
   .ga{font-size:11px}   /* khớp cỡ số cột So TB7 bảng NV (11px mobile) */
   .bcm,.pmeta{font-size:10px}
 }
