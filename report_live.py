@@ -2509,7 +2509,7 @@ details.wbc[open] .wcar{transform:rotate(180deg)}
 .nvxm{margin-top:5px;color:var(--mut);font-size:10.5px;font-variant-numeric:tabular-nums}
 .sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:rgb(var(--h))}
 .sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
-.sl{color:var(--mut);font-size:10.5px;margin-top:3px;white-space:nowrap}
+.sl{color:var(--mut);font-size:10.5px;margin-top:3px;line-height:1.3;word-break:break-word}
 /* chip ▲/▼ so cùng giờ hôm qua trên mỗi ô dải chỉ số */
 .sd{margin-top:4px;font-size:9.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;
  display:inline-block;padding:1px 5px;border-radius:7px;line-height:1.35}

@@ -232,8 +232,10 @@ color:var(--tx);text-decoration:none;font-weight:700;font-size:13px}
 .secsub{color:var(--mut);font-size:12px;margin:0 2px 10px}
 .subh{font-size:13px;font-weight:700;color:#cbd0ea;margin:16px 2px 8px}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.swipe{font-size:10px;font-weight:700;color:var(--acc);opacity:.85;white-space:nowrap;margin-left:4px;letter-spacing:0;text-transform:none}
 table{width:100%;border-collapse:collapse;font-size:13px}
 .scroll table{min-width:520px}
+@media(max-width:430px){.scroll table{min-width:460px}th,td{padding:6px 4px;font-size:12px}}
 th,td{padding:7px 5px;text-align:right;border-bottom:1px solid var(--line)}
 th:first-child,td:first-child{text-align:left}
 th{color:var(--mut);font-weight:600;font-size:11px}
@@ -471,7 +473,8 @@ def render_red_section(entries, prev_red=None, prev_date=None):
     rows = [x for x in rows if x[1]["total"] > 0]
     rows.sort(key=lambda x: -x[1]["total"])
     if rows:
-        P.append("<div class='subh'>🔴 Top bưu cục đơn backlog nhiều nhất</div>")
+        P.append("<div class='subh'>🔴 Top bưu cục đơn backlog nhiều nhất "
+                 "<span class='swipe'>vuốt ngang →</span></div>")
         P.append("<div class='scroll'><table><tr><th>Bưu cục</th><th>Giao&gt;120</th><th>Trả&gt;120</th>"
                  "<th>LCg&gt;48</th><th>LCt&gt;48</th><th>Tổng backlog</th></tr>")
         for name, r in rows[:10]:
