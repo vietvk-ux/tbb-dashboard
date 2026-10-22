@@ -1598,10 +1598,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         d = round((xs[-1] - prev) / abs(prev) * 100)
         if d == 0:
             return " <span class='dl fl'>▬</span>"
-        if abs(d) > 999:            # chặn trần an toàn, tránh số delta phi lý
-            d = 999 if d > 0 else -999
         up = d > 0
         cls = "up" if (up == up_good) else "dn"   # thay đổi TỐT = xanh · XẤU = đỏ
+        if abs(d) > 300:            # % nổ (nền hôm qua nhỏ) → chữ thay vì số phi lý "999%"
+            return " <span class='dl %s'>%s nhiều</span>" % (cls, "▲ tăng" if up else "▼ giảm")
         return " <span class='dl %s'>%s%d%%</span>" % (cls, "▲" if up else "▼", abs(d))
 
     _tr = trend or []
@@ -2190,7 +2190,7 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 30px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));padding-bottom:calc(30px + env(safe-area-inset-bottom))}
 /* DARK MATTE: thẻ đặc, KHÔNG backdrop-blur (bỏ hiệu ứng kính/bóng gương) — số liệu sắc, không nhoè */
 .brand,.hh,.amn{font-family:'Geist',sans-serif;letter-spacing:-.01em}
-.hpct,.sv,.mbig,.vst,.vpct b,.ttv{font-family:'Geist Mono','Geist',monospace;font-feature-settings:'tnum' 1}
+.sv,.mbig,.vst,.vpct b,.ttv{font-family:'Geist Mono','Geist',monospace;font-feature-settings:'tnum' 1}
 
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
  padding:calc(12px + env(safe-area-inset-top)) 2px 10px;background:var(--bg);margin-bottom:4px}
@@ -2209,7 +2209,7 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 /* Hàng trên hero: SỐ %GTC là tâm điểm (rất to) + badge trạng thái bên cạnh */
 .htop{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;margin:6px 0 11px}
-.hpct{font-size:82px;font-weight:900;line-height:.92;margin:0;font-variant-numeric:tabular-nums;letter-spacing:-.045em}
+.hpct{font-family:'Geist',sans-serif;font-size:84px;font-weight:900;line-height:.9;margin:0;font-variant-numeric:tabular-nums;letter-spacing:-.05em}
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
 .hpct span{font-size:30px;font-weight:700;opacity:.55;margin-left:1px;letter-spacing:0}
 /* Badge trạng thái %GTC — đọc nhanh ĐẠT/CẦN CHÚ Ý/DƯỚI MỤC TIÊU */
@@ -2228,7 +2228,7 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hwh-g{display:grid;grid-template-columns:repeat(3,1fr);gap:9px 12px}
 .hwi{display:flex;flex-direction:column;gap:1px;min-width:0}
 .hwi span{font-size:10px;color:var(--mut);font-weight:500;white-space:nowrap}
-.hwi b{font-family:'Geist Mono','Geist',monospace;font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.15;white-space:nowrap}
+.hwi b{font-family:'Geist',sans-serif;font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.15;white-space:nowrap}
 .hwa{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
 .hwa.up{color:#ff6274}.hwa.dn{color:#2ee88c}.hwa.fl{color:var(--mut)}
 .hsub{color:#cfd6ec;font-size:13.5px;margin-top:11px;font-variant-numeric:tabular-nums;line-height:1.7}
