@@ -1327,9 +1327,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     # Dòng số liệu chính (to, đậm) — ĐƯA LÊN NGAY DƯỚI THANH %GTC, TRÊN tồn kho.
-    P.append("<div class='hsub'><b class='hn'>%s</b><span class='hsl'>/%s giao thành công</span> "
-             "<span class='hsep'>·</span> <span class='hsl'>LTC</span> <b class='hnn'>%s</b> "
-             "<span class='hsep'>·</span> <span class='hsl'>cần giao</span> <b class='hnw'>%s</b></div>"
+    P.append("<div class='hsub'>"
+             "<span class='hu'><b class='hn'>%s</b><span class='hsl'>/%s</span></span>"
+             "<span class='hsl'> giao thành công</span> <span class='hsep'>·</span> "
+             "<span class='hu'><span class='hsl'>LTC</span> <b class='hnn'>%s</b></span> "
+             "<span class='hsep'>·</span> "
+             "<span class='hu'><span class='hsl'>cần giao</span> <b class='hnw'>%s</b></span></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
     # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, DƯỚI dòng số liệu
     if lgt_w:
@@ -2254,6 +2257,7 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hsub b.hnw{color:var(--warn);font-weight:900;font-size:21px}
 .hsub .hsl{color:var(--mut);font-weight:600;font-size:13px}
 .hsub .hsep{color:var(--mut);opacity:.5;margin:0 1px}
+.hsub .hu{white-space:nowrap}
 .hsub .ld{color:var(--txt);font-weight:700}
 .href{display:flex;flex-wrap:wrap;gap:8px 9px;margin-top:14px}
 .rc{font-size:13.5px;color:#cfd6ec;background:rgba(255,255,255,.06);border:1px solid var(--line);
