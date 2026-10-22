@@ -1414,7 +1414,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     _g = g120_trend[-14:] if (g120_trend and len(g120_trend) >= 2) else None
     _c2, _t2 = _cmp_hq(giao_120h, _hq_g120, False)
     _st2 = "na" if giao_120h is None else ("gok" if giao_120h <= 500 else "gbad")
-    _tri.append(("🔴 Backlog &gt;120h", _n(giao_120h) if giao_120h is not None else "—",
+    _tri.append(("🔴 Giao &gt;120h", _n(giao_120h) if giao_120h is not None else "—",
                  _spark(_g, "#fb7185", w=300, h=40, target=500) if _g else "",
                  "⌁ MT 500", _st2, _c2, _t2, "g120", False, 500, "#fb7185"))
     # 3) Tồn chưa gán tại MỐC 12h (để ĐÁNH GIÁ — chuẩn như xếp hạng/theo dõi sâu sát): giá trị =
@@ -2293,8 +2293,9 @@ svg.spk{display:block}
 .htl.gbad{background:rgba(242,88,95,.1);border-color:rgba(242,88,95,.32)}
 .htl.gwarn{background:rgba(249,181,52,.1);border-color:rgba(249,181,52,.32)}
 .htl.gok{background:rgba(23,201,131,.09);border-color:rgba(23,201,131,.3)}
-.htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;padding-right:14px;
+.htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;padding-right:13px;
  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* caret chỉ chiếm góc trên-phải → dòng 2 của nhãn KHÔNG cần chừa chỗ (bỏ padding ở dòng 2 nhờ box narrow) */
 .htlv{font-family:'Geist Mono','Geist',monospace;font-weight:800;font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:-.04em;line-height:1.02;margin:3px 0 5px;color:#fff}
 .htl.gbad .htlv{color:#ff7b81}.htl.gwarn .htlv{color:#f9b534}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
