@@ -1326,7 +1326,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              % (_hcls, _hic, _hst))
     P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
-    # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, dưới thanh %GTC
+    # Dòng số liệu chính (to, đậm) — ĐƯA LÊN NGAY DƯỚI THANH %GTC, TRÊN tồn kho.
+    P.append("<div class='hsub'><b class='hn'>%s</b><span class='hsl'>/%s giao thành công</span> "
+             "<span class='hsep'>·</span> <span class='hsl'>LTC</span> <b class='hnn'>%s</b> "
+             "<span class='hsep'>·</span> <span class='hsl'>cần giao</span> <b class='hnw'>%s</b></div>"
+             % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
+    # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, DƯỚI dòng số liệu
     if lgt_w:
         _ysnap = (cmp_y.get("snap") or {}) if cmp_y else {}   # khối lượng tồn kho CÙNG GIỜ HÔM QUA
 
@@ -1341,10 +1346,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  "<div class='hwh-g'>%s%s%s%s</div></div>"
                  % (_wi("📥", "Lấy", "lay", "w_lay"), _wi("🚚", "Giao", "giao", "w_giao"),
                     _wi("↩️", "Trả", "tra", "w_tra"), _lc))
-    P.append("<div class='hsub'><b class='hn'>%s</b><span class='hsl'>/%s giao thành công</span> "
-             "<span class='hsep'>·</span> <span class='hsl'>LTC</span> <b class='hnn'>%s</b> "
-             "<span class='hsep'>·</span> <span class='hsl'>cần giao</span> <b class='hnw'>%s</b></div>"
-             % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
 
     # ===== 3 CHỈ SỐ ĐIỀU HÀNH (ngay dưới số %GTC): %GTC · Backlog>120h · Tồn chưa gán giao =====
     # Mỗi card = SỐ LIVE bây giờ (KHỚP tile bên dưới) + so cùng giờ HÔM QUA + đường 14 ngày chốt +
@@ -2247,11 +2248,11 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hwi b{font-family:'Geist',sans-serif;font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.15;white-space:nowrap}
 .hwa{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
 .hwa.up{color:#ff6274}.hwa.dn{color:#2ee88c}.hwa.fl{color:var(--mut)}
-.hsub{color:#cfd6ec;font-size:13.5px;margin-top:11px;font-variant-numeric:tabular-nums;line-height:1.7}
-.hsub b.hn{color:#2ee88c;font-weight:850;font-size:17px}
-.hsub b.hnn{color:#fff;font-weight:800;font-size:15px}
-.hsub b.hnw{color:var(--warn);font-weight:850;font-size:15px}
-.hsub .hsl{color:var(--mut);font-weight:500}
+.hsub{color:#cfd6ec;font-size:15px;margin:12px 0 2px;font-variant-numeric:tabular-nums;line-height:1.65}
+.hsub b.hn{color:#2ee88c;font-weight:900;font-size:22px}
+.hsub b.hnn{color:#fff;font-weight:850;font-size:19px}
+.hsub b.hnw{color:var(--warn);font-weight:900;font-size:21px}
+.hsub .hsl{color:var(--mut);font-weight:600;font-size:13px}
 .hsub .hsep{color:var(--mut);opacity:.5;margin:0 1px}
 .hsub .ld{color:var(--txt);font-weight:700}
 .href{display:flex;flex-wrap:wrap;gap:8px 9px;margin-top:14px}
