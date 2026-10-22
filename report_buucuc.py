@@ -394,6 +394,7 @@ details.bc.am>summary{padding:12px 14px}
 .bc.scfade .sc{background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.12)}
 .bc.scfade .scl{color:#aab4d4}
 .bc.scfade .scv{color:#fff}
+.bc.scfade .scv.good{color:var(--good)}.bc.scfade .scv.warn{color:var(--warn)}.bc.scfade .scv.bad{color:var(--bad)}.bc.scfade .scv.na{color:var(--mut)}
 .bc.scfade .bcm{color:#b7c0de}
 .bc.scfade .scgt{color:#c4ccec}
 """
