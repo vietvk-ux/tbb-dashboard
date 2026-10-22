@@ -1474,24 +1474,25 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         # MÀU (user 19/10): Đã gán/GTC/Backlog → TĂNG=ĐỎ (dn)·GIẢM=XANH (up). %GTC GIỮ KIỂU CHẤT LƯỢNG.
         def _dir(d):
             return "dn" if d > 0 else ("up" if d < 0 else "fl")
-        # %GTC (chênh điểm) — TĂNG=XANH (tốt) · GIẢM=ĐỎ (xấu) — giữ nguyên kiểu cũ
+        # Mỗi chỉ số = 1 CHIP (nhãn nhỏ · số to · delta màu) → lướt nhanh trên iPhone.
+        # %GTC (chênh điểm) — TĂNG=XANH (tốt) · GIẢM=ĐỎ (xấu).
         if "pct" in cmp_y:
             d, s = _dpp(reg_pct, cmp_y["pct"])
             _cp = "up" if d > 0 else ("dn" if d < 0 else "fl")
-            parts.append("<b>%%GTC</b> %d%% <span class='cq %s'>%s đ</span> <i>(hôm qua %s%%)</i>"
-                         % (reg_pct, _cp, s, ("%g" % cmp_y["pct"]).replace(".", ",")))
-        # Đã gán (total)
+            parts.append("<span class='scq'><i>%%GTC</i><b>%d%%</b><span class='cq %s'>%s đ</span></span>"
+                         % (reg_pct, _cp, s))
         if "total" in cmp_y:
             d, s = _dpc(R["total"], cmp_y["total"])
-            parts.append("<b>Đã gán</b> %s <span class='cq %s'>%s</span>" % (_n(R["total"]), _dir(d), s))
-        # GTC (đơn giao TC)
+            parts.append("<span class='scq'><i>Đã gán</i><b>%s</b><span class='cq %s'>%s</span></span>"
+                         % (_n(R["total"]), _dir(d), s))
         if "gtc" in cmp_y:
             d, s = _dpc(R["gtc"], cmp_y["gtc"])
-            parts.append("<b>GTC</b> %s <span class='cq %s'>%s</span>" % (_n(R["gtc"]), _dir(d), s))
-        # Backlog 120h
+            parts.append("<span class='scq'><i>GTC</i><b>%s</b><span class='cq %s'>%s</span></span>"
+                         % (_n(R["gtc"]), _dir(d), s))
         if "g120" in cmp_y and giao_120h is not None:
             d, s = _dpc(giao_120h, cmp_y["g120"])
-            parts.append("<b>Backlog</b> %s <span class='cq %s'>%s</span>" % (_n(giao_120h), _dir(d), s))
+            parts.append("<span class='scq'><i>Backlog</i><b>%s</b><span class='cq %s'>%s</span></span>"
+                         % (_n(giao_120h), _dir(d), s))
         _miss = "" if ("total" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
                 " · <i>(Đã gán/GTC/Backlog đủ từ mai)</i>"
         # CHI TIẾT THEO AM (bấm dòng ⏱ để xổ): %GTC + Đã gán + GTC từng AM vs cùng giờ hôm qua.
@@ -1537,15 +1538,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                 _am_tbl = "".join(_R2)
 
         if parts:
-            _sumline = ("<span class='hvi'>⏱</span> <b>SO CÙNG GIỜ HÔM QUA · mốc %dh</b> · %s%s"
-                        % (_ch, " · ".join(parts), _miss))
+            _hdr = ("<div class='hcmp-h'><span class='hvi'>⏱</span> <b>SO CÙNG GIỜ HÔM QUA · %dh</b>%s</div>"
+                    % (_ch, _miss))
+            _chips = "<div class='scqrow'>%s</div>" % "".join(parts)
             if _am_tbl:
-                P.append("<details class='hcmp cx'><summary>%s<span class='hcv'>▾</span></summary>"
+                P.append("<details class='hcmp cx'><summary>%s%s<span class='hcv'>▾ chi tiết AM</span></summary>"
                          "<div class='amwrap'><div class='amnote'>Chi tiết từng AM · so cùng giờ "
                          "hôm qua · %%GTC tụt nhiều nhất lên đầu</div>%s</div></details>"
-                         % (_sumline, _am_tbl))
+                         % (_hdr, _chips, _am_tbl))
             else:
-                P.append("<div class='hcmp'>%s</div>" % _sumline)
+                P.append("<div class='hcmp'>%s%s</div>" % (_hdr, _chips))
 
     # ⚡ ĐIỂM NÓNG CHÚ Ý — chèn vào ĐÂY (TRONG hero, ngay dưới ⏱ so cùng giờ). Nội dung tính ở
     # dưới (cần am_pcts…) rồi ghi vào P[_diag_slot]. (Chuyển từ trên lưới vào hero 08/10.)
@@ -1866,19 +1868,26 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     nv_qual = sum(1 for r in rows for d in r.get("drivers", [])
                   if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None)
     nv_rate = round((nv_qual - nv_low) * 100 / nv_qual) if nv_qual else None
+    # Mỗi điểm nóng = 1 DÒNG (nhãn trái · số/giá trị phải) → dễ lướt số trên iPhone (thay câu dài).
+    def _dgr(icon, lbl, val):
+        return ("<div class='dgr'><span class='dgl'>%s %s</span>"
+                "<span class='dgv'>%s</span></div>" % (icon, lbl, val))
     diag = []
     if top_bl and top_bl.get("backlog", 0) > 0:
-        diag.append("🔴 Chưa gán giao cao nhất <b>%s</b> (%s đơn)" % (_esc(top_bl["name"]), _n(top_bl["backlog"])))
+        diag.append(_dgr("🔴", "Chưa gán cao nhất",
+                         "%s · <b>%s</b>" % (_esc(top_bl["name"]), _n(top_bl["backlog"]))))
     if worst_am:
-        diag.append("🟠 AM yếu nhất <b>%s</b> (%d%%)" % (_esc(worst_am[0]), round(worst_am[1])))
+        diag.append(_dgr("🟠", "AM yếu nhất",
+                         "%s · <b>%d%%</b>" % (_esc(worst_am[0]), round(worst_am[1]))))
     if bc_low:
-        diag.append("🏤 <b>%d</b> bưu cục %%GTC &lt;50%%" % bc_low)
+        diag.append(_dgr("🏤", "Bưu cục %GTC &lt;50%", "<b>%d</b>" % bc_low))
     if nv_low:
-        diag.append("👤 <b>%d</b> NV %%GTC &lt;50%%" % nv_low)
+        diag.append(_dgr("👤", "Nhân viên %GTC &lt;50%", "<b>%d</b>" % nv_low))
     if nv_rate is not None:
-        diag.append("✅ <b>%d%%</b> NV đạt (≥50%%, %d NV)" % (nv_rate, nv_qual))
+        diag.append(_dgr("✅", "NV đạt ≥50%",
+                         "<b>%d%%</b> <span class='dgs'>· %d NV</span>" % (nv_rate, nv_qual)))
     if not diag:
-        diag.append("✅ Vùng vận hành ổn định")
+        diag.append(_dgr("✅", "Vùng vận hành ổn định", ""))
 
     # ---- Top 5 tệ nhất từng mục (bấm mở dòng chú ý để đọc ngay) ----
     top_bl5 = sorted([r for r in rows if r.get("backlog", 0) > 0],
@@ -1918,12 +1927,14 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # Ghi vào CHỖ ĐẶT SẴN trên đầu (trước lưới Tổng Quan Vận Hành) thay vì append cuối.
     if grps:
         P[_diag_slot] = (
-            "<details class='diag'><summary>⚡ <b>Điểm Nóng Chú Ý</b> · %s<span class='dcv'>▾</span></summary>"
+            "<details class='diag'><summary><div class='dgh2'>⚡ <b>ĐIỂM NÓNG CHÚ Ý</b>"
+            "<span class='dcv'>▾ Top 5</span></div><div class='dgrows'>%s</div></summary>"
             "<div class='ddtl'><div class='dnote'>Top 5 cần chú ý mỗi mục · "
             "%%GTC luỹ kế trong ngày (sáng còn thấp là bình thường)</div>%s</div></details>"
-            % (" · ".join(diag), "".join(grps)))
+            % ("".join(diag), "".join(grps)))
     else:
-        P[_diag_slot] = "<div class='diag'>⚡ <b>Điểm Nóng Chú Ý</b> · %s</div>" % " · ".join(diag)
+        P[_diag_slot] = ("<div class='diag'><div class='dgh2'>⚡ <b>ĐIỂM NÓNG CHÚ Ý</b></div>"
+                         "<div class='dgrows'>%s</div></div>" % "".join(diag))
 
     # ===== Dải chỉ số · Bento (Mẫu 3) · màu theo từng chỉ số =====
     vpct = _pct(R["vngh_gtc"], R["vngh"])
@@ -2338,6 +2349,26 @@ svg.spk{display:block}
 .hcmp .cq.dn{color:#ff6274;background:rgba(245,69,92,.2)}
 .hcmp .cq.fl{color:var(--mut);background:rgba(255,255,255,.06)}
 .hcmp .cq.nt{color:var(--txt);background:rgba(255,255,255,.08)}
+/* SO CÙNG GIỜ — header + hàng CHIP (nhãn nhỏ · số to Mono · delta màu) */
+.hcmp-h{font-size:11.5px;font-weight:700;color:var(--mut);letter-spacing:.03em;margin-bottom:9px;text-transform:uppercase}
+.hcmp-h b{font-family:'Geist',sans-serif;font-size:11.5px;color:#e3e8f7;font-weight:800}
+.hcmp-h i{font-style:normal;color:var(--mut);font-weight:400;font-size:10px;text-transform:none}
+.scqrow{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.scq{display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:rgba(255,255,255,.04);
+ border:1px solid var(--line);border-radius:11px;padding:7px 11px}
+.scq i{font-style:normal;color:var(--mut);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.03em}
+.scq>b{font-family:'Geist Mono','Geist',monospace;font-weight:800;font-size:19px;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1.05}
+.scq .cq{margin:2px 0 0;font-size:11px;padding:2px 7px}
+/* ĐIỂM NÓNG — header + DÒNG (nhãn trái · số phải) */
+.dgh2{font-size:12px;font-weight:700;color:#e3e8f7;letter-spacing:.03em;display:flex;align-items:center;justify-content:space-between}
+.dgh2 b{font-family:'Geist',sans-serif;font-weight:800;color:#ff7b81}
+.dgrows{display:flex;flex-direction:column;margin-top:8px}
+.dgr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
+.dgr:first-child{border-top:0}
+.dgl{font-size:12.5px;color:var(--mut);font-weight:600;min-width:0}
+.dgv{font-size:13px;color:#cfd6ec;font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dgv b{font-family:'Geist Mono','Geist',monospace;color:#fff;font-weight:800;font-size:15.5px;letter-spacing:-.02em}
+.dgs{color:var(--mut);font-weight:500;font-size:11px}
 /* ⏱ bấm xổ ra bảng chi tiết SO CÙNG GIỜ HÔM QUA theo từng AM */
 details.hcmp.cx>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px}
 details.hcmp.cx>summary::-webkit-details-marker{display:none}
