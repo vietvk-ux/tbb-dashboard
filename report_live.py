@@ -2360,8 +2360,9 @@ svg.spk{display:block}
 .scq>b{font-family:'Geist Mono','Geist',monospace;font-weight:800;font-size:19px;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1.05}
 .scq .cq{margin:2px 0 0;font-size:11px;padding:2px 7px}
 /* ĐIỂM NÓNG — header + DÒNG (nhãn trái · số phải) */
-.dgh2{font-size:12px;font-weight:700;color:#e3e8f7;letter-spacing:.03em;display:flex;align-items:center;justify-content:space-between}
+.dgh2{font-size:12px;font-weight:700;color:#e3e8f7;letter-spacing:.03em;display:flex;align-items:center;gap:7px}
 .dgh2 b{font-family:'Geist',sans-serif;font-weight:800;color:#ff7b81}
+.diag .dcv{font-size:10.5px;font-weight:700;white-space:nowrap}
 .dgrows{display:flex;flex-direction:column;margin-top:8px}
 .dgr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
 .dgr:first-child{border-top:0}
