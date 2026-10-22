@@ -1311,10 +1311,21 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # ===== Hero %GTC + dải đánh giá + đường xu hướng 14 ngày (chốt cuối ngày) =====
     P.append("<section class='hero %s'>" % _cls(reg_pct))
     P.append("<div class='hlbl'>🎯 %GTC TOÀN VÙNG · TỚI HIỆN TẠI</div>")
-    # Số %GTC to BÊN TRÁI + ⚖️ Tồn kho (kg thực) BÊN PHẢI, cùng 1 hàng (desktop); mobile tự xuống dòng.
+    # SỐ %GTC là TÂM ĐIỂM: số rất to + badge trạng thái bên cạnh (ĐẠT / CẦN CHÚ Ý / DƯỚI MỤC TIÊU).
+    # Tồn kho (kg thực) tách xuống KHỐI RIÊNG bên dưới để không tranh chỗ với số %GTC.
+    _hcls = _cls(reg_pct)
+    _hmap = {"good": ("🟢", "ĐẠT MỤC TIÊU"), "warn": ("🟡", "CẦN CHÚ Ý"),
+             "bad": ("🔴", "DƯỚI MỤC TIÊU"), "na": ("⚪", "—")}
+    _hic, _hst = _hmap.get(_hcls, _hmap["na"])
     P.append("<div class='htop'>")
     P.append("<div class='hpct'>%s<span>%%</span></div>"
              % (reg_pct if reg_pct is not None else "—"))
+    P.append("<div class='hstat %s'><span class='hsi'>%s</span>"
+             "<div class='hstw'><b>%s</b><span>mục tiêu 70%%</span></div></div>"
+             % (_hcls, _hic, _hst))
+    P.append("</div>")
+    P.append(_bar(reg_pct, _cls(reg_pct), target=70))
+    # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, dưới thanh %GTC
     if lgt_w:
         _ysnap = (cmp_y.get("snap") or {}) if cmp_y else {}   # khối lượng tồn kho CÙNG GIỜ HÔM QUA
 
@@ -1329,8 +1340,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                  "<div class='hwh-g'>%s%s%s%s</div></div>"
                  % (_wi("📥", "Lấy", "lay", "w_lay"), _wi("🚚", "Giao", "giao", "w_giao"),
                     _wi("↩️", "Trả", "tra", "w_tra"), _lc))
-    P.append("</div>")
-    P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     P.append("<div class='hsub'><b class='hn'>%s</b><span class='hsl'>/%s giao thành công</span> "
              "<span class='hsep'>·</span> <span class='hsl'>LTC</span> <b class='hnn'>%s</b> "
              "<span class='hsep'>·</span> <span class='hsl'>cần giao</span> <b class='hnw'>%s</b></div>"
@@ -2198,12 +2207,21 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hero.warn{--h:247,185,85;box-shadow:0 8px 26px -16px rgba(247,185,85,.2)}
 .hero.bad{--h:242,88,95;box-shadow:0 8px 26px -16px rgba(242,88,95,.2)}
 .hlbl{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-/* Hàng trên hero: số %GTC to (trái) + ⚖️ Tồn kho kg thực (phải); mobile flex-wrap xuống dòng */
-.htop{display:flex;align-items:center;gap:10px 22px;flex-wrap:wrap;margin:8px 0 12px}
-.hpct{font-size:64px;font-weight:850;line-height:1;margin:0;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+/* Hàng trên hero: SỐ %GTC là tâm điểm (rất to) + badge trạng thái bên cạnh */
+.htop{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;margin:6px 0 11px}
+.hpct{font-size:82px;font-weight:900;line-height:.92;margin:0;font-variant-numeric:tabular-nums;letter-spacing:-.045em}
 .hero.good .hpct{color:var(--good)}.hero.warn .hpct{color:var(--warn)}.hero.bad .hpct{color:var(--bad)}.hero.na .hpct{color:var(--mut)}
-.hpct span{font-size:26px;font-weight:700;opacity:.6;margin-left:2px}
-.hwh{flex:1 1 220px;min-width:210px;padding:9px 12px;border-radius:12px;
+.hpct span{font-size:30px;font-weight:700;opacity:.55;margin-left:1px;letter-spacing:0}
+/* Badge trạng thái %GTC — đọc nhanh ĐẠT/CẦN CHÚ Ý/DƯỚI MỤC TIÊU */
+.hstat{display:flex;align-items:center;gap:9px;padding:8px 13px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.hstat.good{background:rgba(23,201,131,.12);border-color:rgba(23,201,131,.4)}
+.hstat.warn{background:rgba(249,181,52,.12);border-color:rgba(249,181,52,.4)}
+.hstat.bad{background:rgba(242,88,95,.13);border-color:rgba(242,88,95,.42)}
+.hsi{font-size:19px;line-height:1}
+.hstw b{display:block;font-family:'Geist',sans-serif;font-size:14.5px;font-weight:800;letter-spacing:.01em;line-height:1.15;color:#fff}
+.hstat.good .hstw b{color:#2ee88c}.hstat.warn .hstw b{color:#f9b534}.hstat.bad .hstw b{color:#ff7b81}
+.hstw span{font-size:10.5px;color:var(--mut);font-weight:600}
+.hwh{margin-top:11px;padding:9px 12px;border-radius:12px;
  border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .hwh-t{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#cdd4ea;margin-bottom:8px}
 .hwh-t i{font-style:normal;text-transform:none;font-weight:500;opacity:.7}
