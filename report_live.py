@@ -1560,12 +1560,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             P.append(_aibox)
 
     # (4 chip tham chiếu Mục tiêu/Hôm qua/TB7/TB30 ĐÃ GỘP lên badge trạng thái cạnh số %GTC — bỏ ở đây cho gọn.)
-    P.append("</section>")
-
-    # 🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT — bản CHỐT 23h30 (frozen cả ngày; report_dashboard ghi file)
+    # 🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT — bản CHỐT 23h30 (frozen) — ĐƯA VÀO HERO (user 22/10) cho gọn.
     _wchot = _read_watch_chot()
     if _wchot:
         P.append(_wchot)
+    P.append("</section>")
 
     # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
     nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
