@@ -21,6 +21,8 @@ MIN_ORDERS = 10    # tối thiểu đơn để vào bảng hiệu suất (tránh
 
 # CSS bổ sung (report_live._CSS thiếu các class này)
 _CSS2 = """<style>
+.hsub{color:#cfd6ec;font-size:14px;margin:10px 0 2px;font-variant-numeric:tabular-nums;line-height:1.6}
+.hsub b{color:#fff;font-weight:800}.hsub b.good{color:#2ee88c}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 12px 8px;margin-bottom:4px;overflow-x:auto}
 .note{color:var(--mut);font-size:11.5px;margin:8px 2px;line-height:1.5}
 table.drv td.rk,table.drv th.rk{color:var(--mut);width:18px;text-align:center}

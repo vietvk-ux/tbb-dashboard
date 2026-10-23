@@ -1334,12 +1334,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     # Dòng số liệu chính (to, đậm) — ĐƯA LÊN NGAY DƯỚI THANH %GTC, TRÊN tồn kho.
-    P.append("<div class='hsub'>"
-             "<span class='hu'><b class='hn'>%s</b><span class='hsl'>/%s</span></span>"
-             "<span class='hsl'> giao thành công</span> <span class='hsep'>·</span> "
-             "<span class='hu'><span class='hsl'>LTC</span> <b class='hnn'>%s</b></span> "
-             "<span class='hsep'>·</span> "
-             "<span class='hu'><span class='hsl'>cần giao</span> <b class='hnw'>%s</b></span></div>"
+    P.append("<div class='hsc'>"
+             "<div class='hsx good'><span>✅ Giao thành công</span>"
+             "<b>%s<i>/%s</i></b></div>"
+             "<div class='hsx'><span>🔁 LTC</span><b>%s</b></div>"
+             "<div class='hsx warn'><span>📦 Cần giao</span><b>%s</b></div></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
     # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, DƯỚI dòng số liệu
     if lgt_w:
@@ -2262,14 +2261,16 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hwi b{font-family:'Geist',sans-serif;font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.15;white-space:nowrap}
 .hwa{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
 .hwa.up{color:#ff6274}.hwa.dn{color:#2ee88c}.hwa.fl{color:var(--mut)}
-.hsub{color:#cfd6ec;font-size:15px;margin:12px 0 2px;font-variant-numeric:tabular-nums;line-height:1.65}
-.hsub b.hn{color:#2ee88c;font-weight:900;font-size:22px}
-.hsub b.hnn{color:#fff;font-weight:850;font-size:19px}
-.hsub b.hnw{color:var(--warn);font-weight:900;font-size:21px}
-.hsub .hsl{color:var(--mut);font-weight:600;font-size:13px}
-.hsub .hsep{color:var(--mut);opacity:.5;margin:0 1px}
-.hsub .hu{white-space:nowrap}
-.hsub .ld{color:var(--txt);font-weight:700}
+.hsc{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 2px}
+.hsx{border:1px solid var(--line);border-radius:12px;padding:9px 11px;
+ background:rgba(255,255,255,.04);min-width:0;display:flex;flex-direction:column;gap:3px}
+.hsx span{font-size:10px;color:var(--mut);font-weight:600;white-space:nowrap;
+ overflow:hidden;text-overflow:ellipsis}
+.hsx b{font-family:'Geist',sans-serif;font-size:21px;font-weight:900;color:#fff;
+ font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.1;white-space:nowrap}
+.hsx b i{font-style:normal;font-size:13px;font-weight:600;color:var(--mut)}
+.hsx.good b{color:#2ee88c}
+.hsx.warn b{color:var(--warn)}
 .href{display:flex;flex-wrap:wrap;gap:8px 9px;margin-top:14px}
 .rc{font-size:13.5px;color:#cfd6ec;background:rgba(255,255,255,.06);border:1px solid var(--line);
  border-radius:99px;padding:7px 14px;font-variant-numeric:tabular-nums;white-space:nowrap}
