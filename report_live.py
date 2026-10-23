@@ -1012,7 +1012,10 @@ async def fetch_live(token):
             try:
                 async with sem:
                     bl = await fetch_chua_gan(session, hid, token)
-                backlog = bl.get("deliver", 0)   # Giao "chưa có chuyến đi trong ngày" (chuẩn Tồn LGT)
+                # Tồn CHƯA GÁN giao = Giao thường (DELIVER) + ƯU TIÊN giao (DELIVER_PRIORITY),
+                # đồng nhất quy ước "Giao = DELIVER + DELIVER_PRIORITY" dùng khắp hệ thống (khối lượng,
+                # %Gán giao, đã gán). Trước đây chỉ đếm DELIVER → thiếu đơn ưu tiên giao.
+                backlog = bl.get("deliver", 0) + bl.get("deliver_priority", 0)
                 backlog_weight = bl.get("deliver_weight", 0)   # kg thực (gram) Giao chưa gán (gồm ưu tiên)
                 dagan_weight = bl.get("dagan_weight", 0)       # kg thực (gram) Giao ĐÃ GÁN (ALL−NONE, gồm ưu tiên)
                 ton_lay = bl.get("pick", 0)       # đơn LẤY chưa có chuyến
