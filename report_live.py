@@ -2433,7 +2433,7 @@ details.gt[open] .gtcar{transform:rotate(90deg);color:var(--txt)}
  border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0 0;
  font-size:13.5px;line-height:1.7;color:#d4dbf0}
 /* 🤖 Phân tích điểm nóng theo khung giờ */
-.aidx{margin:10px 0 0;border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.7;color:#d4dbf0;
+.aidx{margin:10px 0 0;border-radius:14px;padding:12px 14px;font-size:13.5px;line-height:1.7;color:#d4dbf0;
  border:1px solid rgba(245,170,23,.42);background:linear-gradient(120deg,rgba(245,170,23,.12),rgba(255,255,255,.03))}
 details.aidx>summary{cursor:pointer;list-style:none;display:block;position:relative;padding-right:18px;color:var(--txt);font-weight:600}
 details.aidx>summary::-webkit-details-marker{display:none}
@@ -2455,7 +2455,7 @@ details.diag[open] .dcv{transform:rotate(180deg)}
 .wchot-hdr{font-size:11.5px;color:var(--mut);font-weight:600;margin:12px 2px 0;letter-spacing:.01em}
 .wchot-hdr .hvi{font-size:13px}.wchot-hdr b{color:var(--warn);font-weight:800}
 .wchot-hdr + .watch{margin-top:5px}
-.watch{border-radius:18px;padding:15px 14px 12px;margin:10px 0 14px;
+.watch{border-radius:14px;padding:13px 14px 12px;margin:10px 0 0;
  background:linear-gradient(160deg,rgba(242,69,92,.14),rgba(245,170,23,.05) 55%,transparent);
  border:1px solid rgba(242,69,92,.34)}
 .whead{font-weight:800;font-size:14px;letter-spacing:.02em;color:#ff7b81;margin-bottom:5px}
