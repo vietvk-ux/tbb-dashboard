@@ -206,12 +206,13 @@ def _region_snapshot(rows, giao_120h=None, lgt_w=None):
     """Snapshot toàn bộ chỉ số DẢI của vùng (để lưu theo giờ → so cùng giờ hôm qua).
     Khớp đúng cách tính trong gen_html (R + on_road/late/nv_low/vpct). lgt_w (gram) để so
     khối lượng TỒN KHO cùng giờ hôm qua (mũi tên ▲/▼ trên hero)."""
-    tot = gtc = vngh = vgtc = cod = ltc = ltb = ontrip = chua_gan = 0
+    tot = gtc = vngh = vgtc = cod = ltc = ltb = ontrip = chua_gan = dagan = 0
     ot_tot = ot_done = late = nv_low = 0
     for r in rows:
         tot += r.get("total", 0); gtc += r.get("gtc", 0); ontrip += r.get("ontrip", 0)
         vngh += r.get("vngh", 0); vgtc += r.get("vngh_gtc", 0); cod += r.get("cod_gtb", 0)
         ltc += r.get("ltc", 0); ltb += r.get("ltb", 0); chua_gan += r.get("backlog", 0)
+        dagan += r.get("dagan_giao", 0)
         for d in r.get("drivers", []):
             ot_tot += d.get("ot_tot", 0); ot_done += d.get("ot_done", 0)
             st = d.get("st")
@@ -224,7 +225,7 @@ def _region_snapshot(rows, giao_120h=None, lgt_w=None):
     s = {"total": tot, "ontrip": ontrip, "on_road": max(ot_tot - ot_done, 0), "gtc": gtc,
          "late": late, "vngh": vngh, "vngh_gtc": vgtc, "vpct": _pct(vgtc, vngh),
          "cod_gtb": cod, "ltc": ltc, "ltb": ltb, "nv_low": nv_low, "g120": giao_120h,
-         "chua_gan": chua_gan}
+         "chua_gan": chua_gan, "dagan_giao": dagan}
     if lgt_w:   # khối lượng tồn kho (gram) → so cùng giờ hôm qua
         s["w_lay"] = lgt_w.get("lay", 0); s["w_giao"] = lgt_w.get("giao", 0)
         s["w_tra"] = lgt_w.get("tra", 0); s["w_lcg"] = lgt_w.get("lc_giao", 0)
@@ -233,10 +234,11 @@ def _region_snapshot(rows, giao_120h=None, lgt_w=None):
 
 
 def _bc_snapshot(rows):
-    """Snapshot [gtc,total,backlog] TỪNG BƯU CỤC. [gtc,total] = so %GTC cùng giờ hôm qua
-    (AM/Tỉnh = tổng BC con; reader chỉ đọc [0],[1]); phần tử thứ 3 `backlog` (chưa gán giao)
-    để báo cáo cuối ngày lấy 'tồn chưa gán tại ~12h' (bưu cục cần theo dõi sâu sát)."""
-    return {r["name"]: [r.get("gtc", 0), r.get("total", 0), r.get("backlog", 0)]
+    """Snapshot [gtc,total,backlog,dagan_giao] TỪNG BƯU CỤC. [gtc,total] = so %GTC cùng giờ hôm
+    qua (AM/Tỉnh = tổng BC con; reader cũ chỉ đọc [0],[1]); [2] `backlog` (chưa gán giao) để báo cáo
+    cuối ngày lấy 'tồn chưa gán tại ~12h'; [3] `dagan_giao` (đã gán đang có chuyến) — thêm để so
+    'Đã gán' cùng giờ hôm qua ở bảng AM (reader guard len>=4)."""
+    return {r["name"]: [r.get("gtc", 0), r.get("total", 0), r.get("backlog", 0), r.get("dagan_giao", 0)]
             for r in rows if r.get("total", 0) > 0 or r.get("backlog", 0) > 0}
 
 
@@ -912,7 +914,7 @@ def _bc_drv_details(r, arrow="", pos=None):
     P.append(_bar(pc, cls))
     P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
              "<span class='ltc'>LTC %s</span>%s%s%s</div>"
-             % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]),
+             % (_n(r.get("dagan_giao", 0)), _n(r.get("backlog", 0)), _n(r["gtc"]),
                 _n(r.get("ltc", 0)), _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0)),
                 _late_badge(_late_cnt(r)), _low_badge(_low_cnt(r))))
     P.append("</summary><div class='dtl'>")
@@ -1232,14 +1234,14 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     for r in rows:
         for k in R:
             R[k] += r.get(k, 0)
-        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "cod_gtb": 0, "kien": 0, "vngh": 0, "vngh_gtc": 0})
-        for k in ("backlog", "ontrip", "fin", "gtc", "att", "total", "ltc", "cod_gtb", "kien", "vngh", "vngh_gtc"):
+        p = prov.setdefault(r["prov"], {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "cod_gtb": 0, "kien": 0, "vngh": 0, "vngh_gtc": 0, "dagan_giao": 0})
+        for k in ("backlog", "ontrip", "fin", "gtc", "att", "total", "ltc", "cod_gtb", "kien", "vngh", "vngh_gtc", "dagan_giao"):
             p[k] += r.get(k, 0)
         amn = AM_OF.get(r["name"])
         if amn:
-            a = am.setdefault(amn, {"bc": 0, "backlog": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "cod_gtb": 0, "kien": 0, "vngh": 0, "vngh_gtc": 0})
+            a = am.setdefault(amn, {"bc": 0, "backlog": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "cod_gtb": 0, "kien": 0, "vngh": 0, "vngh_gtc": 0, "dagan_giao": 0})
             a["bc"] += 1
-            for k in ("backlog", "gtc", "att", "total", "ltc", "cod_gtb", "kien", "vngh", "vngh_gtc"):
+            for k in ("backlog", "gtc", "att", "total", "ltc", "cod_gtb", "kien", "vngh", "vngh_gtc", "dagan_giao"):
                 a[k] += r.get(k, 0)
     reg_pct = _pct(R["gtc"], R["total"])
 
@@ -1499,10 +1501,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             _cp = "up" if d > 0 else ("dn" if d < 0 else "fl")
             parts.append("<span class='scq'><i>%%GTC</i><b>%d%%</b><span class='cq %s'>%s đ</span></span>"
                          % (reg_pct, _cp, s))
-        if "total" in cmp_y:
-            d, s = _dpc(R["total"], cmp_y["total"])
+        if "dagan_giao" in cmp_y:
+            d, s = _dpc(R["dagan_giao"], cmp_y["dagan_giao"])
             parts.append("<span class='scq'><i>Đã gán</i><b>%s</b><span class='cq %s'>%s</span></span>"
-                         % (_n(R["total"]), _dir(d), s))
+                         % (_n(R["dagan_giao"]), _dir(d), s))
         if "gtc" in cmp_y:
             d, s = _dpc(R["gtc"], cmp_y["gtc"])
             parts.append("<span class='scq'><i>GTC</i><b>%s</b><span class='cq %s'>%s</span></span>"
@@ -1511,7 +1513,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             d, s = _dpc(giao_120h, cmp_y["g120"])
             parts.append("<span class='scq'><i>Backlog</i><b>%s</b><span class='cq %s'>%s</span></span>"
                          % (_n(giao_120h), _dir(d), s))
-        _miss = "" if ("total" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
+        _miss = "" if ("dagan_giao" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
                 " · <i>(Đã gán/GTC/Backlog đủ từ mai)</i>"
         # CHI TIẾT THEO AM (bấm dòng ⏱ để xổ): %GTC + Đã gán + GTC từng AM vs cùng giờ hôm qua.
         _ybc_h = cmp_y.get("bcsnap") if isinstance(cmp_y.get("bcsnap"), dict) else None
@@ -1523,7 +1525,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                     continue
                 _a = AM_OF.get(_bc)
                 if _a:
-                    z = _yam_h.setdefault(_a, [0, 0]); z[0] += _gt[0]; z[1] += _gt[1]
+                    z = _yam_h.setdefault(_a, [0, 0, 0])
+                    z[0] += _gt[0]; z[1] += _gt[1]
+                    z[2] += (_gt[3] if len(_gt) >= 4 else 0)   # đã gán đang có chuyến (hôm qua)
             _rows_am = []
             for _amn, _v in am.items():
                 _yv = _yam_h.get(_amn)
@@ -1544,13 +1548,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                        "<th>Đã gán</th><th>GTC</th></tr></thead><tbody>"]
                 for _amn, _v, _tp, _yp, _yv in _rows_am:
                     _dp, _sp = _dpp(_tp, _yp)
-                    _dg, _sg = _dpc(_v["total"], _yv[1])
+                    _yda = _yv[2] if len(_yv) >= 3 else 0          # đã gán hôm qua (0 nếu snapshot cũ)
+                    _dg_cell = (_cqd(*_dpc(_v["dagan_giao"], _yda), good_up=False)
+                                if _yda else "")                   # ẩn delta khi chưa có nền hôm qua
                     _dv, _sv = _dpc(_v["gtc"], _yv[0])
                     _R2.append("<tr><td class='aml'>%s</td><td><b>%s%%</b> %s</td>"
                                "<td>%s %s</td><td>%s %s</td></tr>"
                                % (_esc(_amn), ("%g" % _tp).replace(".", ","),
                                   _cqd(_dp, _sp, True, suffix="đ"),
-                                  _n(_v["total"]), _cqd(_dg, _sg, False),
+                                  _n(_v["dagan_giao"]), _dg_cell,
                                   _n(_v["gtc"]), _cqd(_dv, _sv, False)))
                 _R2.append("</tbody></table>")
                 _am_tbl = "".join(_R2)
@@ -1964,7 +1970,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     tt_rgb = {"good": GREEN, "warn": AMBER, "bad": RED}.get(_cls(vpct), NEU) if vpct is not None else NEU
     #      icon, giá trị, nhãn, màu rgb, extra, neu, key(snap), raw(số nay), up_good
     kpis = [
-        ("📥", _n(R["total"]),     "Đã gán",          NEU,   "", True,  "total",    R["total"],    None),
+        ("📥", _n(R["dagan_giao"]),"Đã gán",          NEU,   "", True,  "dagan_giao", R["dagan_giao"], None),
         ("🏃", _n(R["ontrip"]),    "Đang chạy",       NEU,   "", True,  "ontrip",   R["ontrip"],   None),
         ("🚛", _n(on_road),        "Còn phải giao",   NEU,   "", True,  "on_road",  on_road,       False),
         ("✅", _n(R["gtc"]),       "GTC nay",         NEU,   "", True,  "gtc",      R["gtc"],      True),
@@ -2110,7 +2116,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _am_low = sum(_low_cnt(r) for r in am_rows.get(amn, []))
         P.append("<div class='pmeta'><span>🏤 %s BC</span><span>📥 %s</span><span class='w'>⏳ %s</span>"
                  "<span>✅ %s</span><span class='ltc'>LTC %s</span>%s%s%s</div>"
-                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["ltc"]),
+                 % (v["bc"], _n(v["dagan_giao"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["ltc"]),
                     _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0)) if v.get("vngh") else "",
                     _late_badge(_am_late) if _am_late else "",
                     _low_badge(_am_low) if _am_low else ""))
@@ -2143,7 +2149,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _pv_low = sum(_low_cnt(r) for r in prov_rows.get(pv, []))
         P.append("<div class='pmeta'><span>🏃 %s</span><span>📥 %s</span><span class='w'>⏳ %s</span>"
                  "<span>✅ %s</span><span class='ltc'>LTC %s</span>%s%s%s</div>"
-                 % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
+                 % (_n(v["ontrip"] + v["fin"]), _n(v["dagan_giao"]), _n(v["backlog"]), _n(v["gtc"]),
                     _n(v["ltc"]),
                     _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0)) if v.get("vngh") else "",
                     _late_badge(_pv_late) if _pv_late else "",
@@ -2178,7 +2184,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
                  "<span class='w'>⏳ %s</span><span>✅ %s</span>"
                  "<span class='ltc'>LTC %s</span>%s%s%s</div>"
-                 % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
+                 % (_n(r["ontrip"]), _n(r["fin"]), _n(r.get("dagan_giao", 0)), _n(r["backlog"]), _n(r["gtc"]),
                     _n(r.get("ltc", 0)),
                     _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0)),
                     _late_badge(_late_cnt(r)), _low_badge(_low_cnt(r))))
