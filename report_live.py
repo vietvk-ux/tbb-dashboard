@@ -1352,15 +1352,15 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     _dg_giao = R["dagan_giao"]
     _tcg = R["dagan_giao"] + R["backlog"]
     _pg = (_dg_giao / _tcg * 100.0) if _tcg else 0.0
-    _pgs = ("%.1f%%" % _pg).replace(".", ",")
+    _pgs = ("%.1f%%" % _pg).replace(".", ",")   # %gán = đang giao / tổng cần giao (ngữ cảnh nhỏ)
     P.append("<div class='hsc'>"
              "<div class='hsx good'><span>✅ Giao TC</span>"
              "<b>%s<i>/%s</i></b></div>"
              "<div class='hsx'><span>🔁 LTC</span><b>%s</b></div>"
-             "<div class='hsx'><span>📦 %%Gán giao</span><b>%s</b>"
-             "<span class='hfr'>%s/%s</span></div></div>"
+             "<div class='hsx'><span>🚚 Đơn đang giao</span><b>%s</b>"
+             "<span class='hfr'>%s đã gán</span></div></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]),
-                _pgs, _n(_dg_giao), _n(_tcg)))
+                _n(_dg_giao), _pgs))
     # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, DƯỚI dòng số liệu
     if lgt_w:
         _ysnap = (cmp_y.get("snap") or {}) if cmp_y else {}   # khối lượng tồn kho CÙNG GIỜ HÔM QUA
