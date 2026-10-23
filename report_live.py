@@ -2289,10 +2289,10 @@ svg.spk{display:block}
  border:1px solid rgba(167,139,250,.22)}
 .htri-h{font-size:12px;color:#e8ebfa;font-weight:800;letter-spacing:.03em;text-transform:uppercase;margin-bottom:9px}
 .htri-h .htri-s{font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut)}
-.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;align-items:start}
+.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;align-items:stretch}
 .htl{position:relative;background:rgba(255,255,255,.05);border:1px solid var(--line);
- border-radius:13px;padding:0;min-width:0;overflow:hidden}
-.htl>summary{display:flex;flex-direction:column;list-style:none;cursor:pointer;padding:10px 11px 8px}
+ border-radius:13px;padding:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}
+.htl>summary{display:flex;flex-direction:column;list-style:none;cursor:pointer;padding:10px 11px 8px;flex:1}
 .htl>summary::-webkit-details-marker{display:none}
 .htl[open]{grid-column:1/-1}
 .htcar{position:absolute;top:8px;right:9px;font-size:10px;color:var(--mut);transition:transform .2s;z-index:1}
@@ -2318,7 +2318,7 @@ svg.spk{display:block}
 .htlv{font-family:'Geist Mono','Geist',monospace;font-weight:900;font-size:31px;font-variant-numeric:tabular-nums;letter-spacing:-.045em;line-height:1;margin:4px 0 6px;color:#fff}
 .htl.gbad .htlv{color:#ff7b81}.htl.gwarn .htlv{color:#f9b534}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
-.htlf{margin-top:4px;display:flex;flex-direction:column;gap:1px}
+.htlf{margin-top:auto;padding-top:4px;display:flex;flex-direction:column;gap:1px}
 .htlt{font-size:9.5px;color:#a78bfa;font-weight:600;font-variant-numeric:tabular-nums;
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .htld{font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;
