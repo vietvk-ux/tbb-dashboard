@@ -1501,10 +1501,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             _cp = "up" if d > 0 else ("dn" if d < 0 else "fl")
             parts.append("<span class='scq'><i>%%GTC</i><b>%d%%</b><span class='cq %s'>%s đ</span></span>"
                          % (reg_pct, _cp, s))
-        if "dagan_giao" in cmp_y:
-            d, s = _dpc(R["dagan_giao"], cmp_y["dagan_giao"])
-            parts.append("<span class='scq'><i>Đang giao</i><b>%s</b><span class='cq %s'>%s</span></span>"
-                         % (_n(R["dagan_giao"]), _dir(d), s))
+        if "total" in cmp_y:
+            d, s = _dpc(R["total"], cmp_y["total"])
+            parts.append("<span class='scq'><i>Đã gán</i><b>%s</b><span class='cq %s'>%s</span></span>"
+                         % (_n(R["total"]), _dir(d), s))
         if "gtc" in cmp_y:
             d, s = _dpc(R["gtc"], cmp_y["gtc"])
             parts.append("<span class='scq'><i>GTC</i><b>%s</b><span class='cq %s'>%s</span></span>"
@@ -1513,8 +1513,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             d, s = _dpc(giao_120h, cmp_y["g120"])
             parts.append("<span class='scq'><i>Backlog</i><b>%s</b><span class='cq %s'>%s</span></span>"
                          % (_n(giao_120h), _dir(d), s))
-        _miss = "" if ("dagan_giao" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
-                " · <i>(Đang giao/GTC/Backlog đủ từ mai)</i>"
+        _miss = "" if ("total" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
+                " · <i>(Đã gán/GTC/Backlog đủ từ mai)</i>"
         # CHI TIẾT THEO AM (bấm dòng ⏱ để xổ): %GTC + Đã gán + GTC từng AM vs cùng giờ hôm qua.
         _ybc_h = cmp_y.get("bcsnap") if isinstance(cmp_y.get("bcsnap"), dict) else None
         _am_tbl = ""
