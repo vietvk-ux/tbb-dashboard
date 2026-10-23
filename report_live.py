@@ -1333,7 +1333,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              % (_hcls, _hic, _hst, _href2))
     P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
-    # Dòng số liệu chính (to, đậm) — ĐƯA LÊN NGAY DƯỚI THANH %GTC, TRÊN tồn kho.
+    # 🎯 3 CHỈ SỐ ĐIỀU HÀNH — đặt NGAY dưới thanh %GTC (nổi bật nhất, điều hành số vùng).
+    # Dùng SLOT: giữ chỗ ở đây, nội dung dựng bên dưới (sau khi đủ biến trend/cmp) rồi ghi vào slot.
+    _htri_slot = len(P)
+    P.append("")
+    # Dòng số liệu phụ (Giao TC/LTC/Cần giao) — xuống DƯỚI 3 chỉ số điều hành.
     P.append("<div class='hsc'>"
              "<div class='hsx good'><span>✅ Giao TC</span>"
              "<b>%s<i>/%s</i></b></div>"
@@ -1442,9 +1446,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                ("<span class='htld %s'>%s</span>" % (cc, ct)) if ct else "", mt,
                _am_drill(fld, hb, tgt, col))
             for l, v, s, mt, gc, cc, ct, fld, hb, tgt, col in _tri)
-        P.append("<div class='htri'><div class='htri-h'>🎯 3 chỉ số điều hành "
-                 "<span class='htri-s'>· số LIVE · bấm xem từng AM 14 ngày</span></div>"
-                 "<div class='htri-g'>%s</div></div>" % _cells)
+        P[_htri_slot] = ("<div class='htri'><div class='htri-h'>🎯 3 CHỈ SỐ ĐIỀU HÀNH VÙNG "
+                         "<span class='htri-s'>· số LIVE · bấm xem từng AM 14 ngày</span></div>"
+                         "<div class='htri-g'>%s</div></div>" % _cells)
 
     # DÒNG CẢNH BÁO RỦI RO VẬN HÀNH — CHỈ hiện khi có rủi ro (tắc gán / backlog tăng bất thường).
     # (Bỏ dòng đánh giá thường ngày '🟡 CẦN CHÚ Ý · còn X điểm' 08/10 — trùng số %GTC + bar + chips.)
@@ -2279,13 +2283,16 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .spklbl{font-size:9.5px;color:var(--mut);font-weight:600;letter-spacing:.02em;margin-bottom:3px}
 svg.spk{display:block}
 /* 3 ĐƯỜNG XU HƯỚNG 14 NGÀY ngay dưới số %GTC (%GTC · Backlog>120h · Tồn gán 12h) */
-.htri{margin-top:14px}
-.htri-h{font-size:10.5px;color:var(--mut);font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
-.htri-h .htri-s{font-weight:500;text-transform:none;letter-spacing:0;opacity:.7}
-.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:start}
-.htl{position:relative;background:rgba(255,255,255,.04);border:1px solid var(--line);
+/* KHỐI ĐIỀU HÀNH NỔI BẬT — khung nhấn riêng, đặt ngay dưới số %GTC */
+.htri{margin-top:14px;padding:11px 11px 12px;border-radius:16px;
+ background:linear-gradient(180deg,rgba(167,139,250,.07),rgba(255,255,255,.02));
+ border:1px solid rgba(167,139,250,.22)}
+.htri-h{font-size:12px;color:#e8ebfa;font-weight:800;letter-spacing:.03em;text-transform:uppercase;margin-bottom:9px}
+.htri-h .htri-s{font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut)}
+.htri-g{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;align-items:start}
+.htl{position:relative;background:rgba(255,255,255,.05);border:1px solid var(--line);
  border-radius:13px;padding:0;min-width:0;overflow:hidden}
-.htl>summary{display:flex;flex-direction:column;list-style:none;cursor:pointer;padding:9px 10px 7px}
+.htl>summary{display:flex;flex-direction:column;list-style:none;cursor:pointer;padding:10px 11px 8px}
 .htl>summary::-webkit-details-marker{display:none}
 .htl[open]{grid-column:1/-1}
 .htcar{position:absolute;top:8px;right:9px;font-size:10px;color:var(--mut);transition:transform .2s;z-index:1}
@@ -2305,10 +2312,10 @@ svg.spk{display:block}
 .htl.gbad{background:rgba(242,88,95,.1);border-color:rgba(242,88,95,.32)}
 .htl.gwarn{background:rgba(249,181,52,.1);border-color:rgba(249,181,52,.32)}
 .htl.gok{background:rgba(23,201,131,.09);border-color:rgba(23,201,131,.3)}
-.htll{font-size:10.5px;color:#cdd4ea;font-weight:700;line-height:1.2;min-height:25px;padding-right:13px;
+.htll{font-size:11px;color:#dce2f6;font-weight:700;line-height:1.2;min-height:26px;padding-right:13px;
  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* caret chỉ chiếm góc trên-phải → dòng 2 của nhãn KHÔNG cần chừa chỗ (bỏ padding ở dòng 2 nhờ box narrow) */
-.htlv{font-family:'Geist Mono','Geist',monospace;font-weight:800;font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:-.04em;line-height:1.02;margin:3px 0 5px;color:#fff}
+.htlv{font-family:'Geist Mono','Geist',monospace;font-weight:900;font-size:31px;font-variant-numeric:tabular-nums;letter-spacing:-.045em;line-height:1;margin:4px 0 6px;color:#fff}
 .htl.gbad .htlv{color:#ff7b81}.htl.gwarn .htlv{color:#f9b534}.htl.gok .htlv{color:#2ee88c}.htl.na .htlv{color:var(--mut)}
 .htlk{height:40px}.htlk svg.spk{width:100%;height:40px}
 .htlf{margin-top:4px;display:flex;flex-direction:column;gap:1px}
@@ -2317,8 +2324,8 @@ svg.spk{display:block}
 .htld{font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;
  overflow:hidden;text-overflow:ellipsis}
 .htld.cbad{color:#ff8e93}.htld.cok{color:#4de39a}.htld.cfl{color:var(--mut)}
-@media(max-width:412px){.htri-g{gap:6px}.htl{padding:8px 7px 6px}.htll{font-size:9.5px}.htlv{font-size:22px}
- .htlt{font-size:8.5px}.htld{font-size:9.5px}}
+@media(max-width:412px){.htri{padding:10px 9px 11px}.htri-g{gap:7px}.htl>summary{padding:9px 8px 7px}
+ .htll{font-size:10px}.htlv{font-size:27px}.htlt{font-size:8.5px}.htld{font-size:9.5px}}
 /* DẢI MỎNG ĐÁNH GIÁ trong Hero (thay dòng Xu hướng) */
 .hverd{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.6;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
