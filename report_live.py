@@ -2286,8 +2286,8 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hsx b{font-family:'Geist',sans-serif;font-size:21px;font-weight:900;color:#fff;
  font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.1;white-space:nowrap}
 .hsx b i{font-style:normal;font-size:13px;font-weight:600;color:var(--mut)}
-.hsx .hfr{font-size:11px;color:var(--mut);font-weight:700;margin-top:1px;
- font-variant-numeric:tabular-nums}
+.hsx .hfr{font-size:10px;color:var(--mut);font-weight:700;margin-top:1px;
+ letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow:visible}
 .hsx.good b{color:#2ee88c}
 .hsx.warn b{color:var(--warn)}
 .href{display:flex;flex-wrap:wrap;gap:8px 9px;margin-top:14px}
