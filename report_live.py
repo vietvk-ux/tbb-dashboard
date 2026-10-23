@@ -1335,7 +1335,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
     # Dòng số liệu chính (to, đậm) — ĐƯA LÊN NGAY DƯỚI THANH %GTC, TRÊN tồn kho.
     P.append("<div class='hsc'>"
-             "<div class='hsx good'><span>✅ Giao thành công</span>"
+             "<div class='hsx good'><span>✅ Giao TC</span>"
              "<b>%s<i>/%s</i></b></div>"
              "<div class='hsx'><span>🔁 LTC</span><b>%s</b></div>"
              "<div class='hsx warn'><span>📦 Cần giao</span><b>%s</b></div></div>"
