@@ -124,21 +124,15 @@ async def fetch_chua_gan(session, hub_id, token):
          dagan_weight(đã gán g)}."""
     try:
         tn, wards, dw_none = await _detail_by_status(session, hub_id, token, "DAILY_TRIP_NONE")
-        ta, _, dw_all = await _detail_by_status(session, hub_id, token, "ALL")
-        # SỐ ĐƠN GIAO (gồm ưu tiên): tổng cần giao = ALL; đã gán = ALL − NONE; chưa gán = NONE.
-        none_giao = tn.get("DELIVER", 0) + tn.get("DELIVER_PRIORITY", 0)
-        all_giao = ta.get("DELIVER", 0) + ta.get("DELIVER_PRIORITY", 0)
+        _, _, dw_all = await _detail_by_status(session, hub_id, token, "ALL")
         return {"deliver": tn.get("DELIVER", 0), "pick": tn.get("PICK", 0),
                 "return": tn.get("RETURN", 0), "deliver_priority": tn.get("DELIVER_PRIORITY", 0),
                 "deliver_weight": dw_none,                        # chưa gán (gram, kg thực)
                 "dagan_weight": max(dw_all - dw_none, 0),         # đã gán = ALL − NONE (gram)
-                "deliver_all": all_giao,                          # TỔNG đơn cần giao (ALL, gồm ưu tiên)
-                "deliver_assigned": max(all_giao - none_giao, 0), # đã gán giao (ALL − NONE, số đơn)
                 "wards": wards[:20]}
     except Exception:
         return {"deliver": 0, "pick": 0, "return": 0, "deliver_priority": 0,
-                "deliver_weight": 0, "dagan_weight": 0, "deliver_all": 0,
-                "deliver_assigned": 0, "wards": []}
+                "deliver_weight": 0, "dagan_weight": 0, "wards": []}
 
 
 async def _finished_trips(session, token, hub_id, hub_name, yyyymmdd, sem, next_ymd=None):

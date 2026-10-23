@@ -1015,8 +1015,6 @@ async def fetch_live(token):
                 backlog = bl.get("deliver", 0)   # Giao "chưa có chuyến đi trong ngày" (chuẩn Tồn LGT)
                 backlog_weight = bl.get("deliver_weight", 0)   # kg thực (gram) Giao chưa gán (gồm ưu tiên)
                 dagan_weight = bl.get("dagan_weight", 0)       # kg thực (gram) Giao ĐÃ GÁN (ALL−NONE, gồm ưu tiên)
-                dagan_giao = bl.get("deliver_assigned", 0)     # SỐ ĐƠN giao đã gán (ALL−NONE, gồm ưu tiên)
-                tong_cangiao = bl.get("deliver_all", 0)        # SỐ ĐƠN tổng cần giao (ALL, gồm ưu tiên)
                 ton_lay = bl.get("pick", 0)       # đơn LẤY chưa có chuyến
                 ton_tra = bl.get("return", 0)     # đơn TRẢ tồn
                 backlog_wards = bl.get("wards", [])   # [(tên xã, số đơn Giao chưa gán)] giảm dần
@@ -1169,7 +1167,6 @@ async def fetch_live(token):
                 h_kien_gtc = sum(d["kien_gtc"] for d in drivers.values())
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "backlog_weight_g": backlog_weight,
-                        "dagan_giao": dagan_giao, "tong_cangiao": tong_cangiao,
                         "ton_lay": ton_lay, "ton_tra": ton_tra,
                         "backlog_wards": backlog_wards, "giao120h": g120,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
@@ -1223,8 +1220,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         nv_avg = None
     globals()["_NV_AVG"] = nv_avg or {}   # mũi tên NV trong _drv_table đọc từ đây
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
-         "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0,
-         "dagan_giao": 0, "tong_cangiao": 0}
+         "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0}
     prov = {}
     am = {}
     for r in rows:
@@ -1342,11 +1338,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     _htri_slot = len(P)
     P.append("")
     # Dòng số liệu phụ (Giao TC/LTC/%Gán giao) — xuống DƯỚI 3 chỉ số điều hành.
-    # %Gán giao = SỐ ĐƠN đã gán giao / TỔNG đơn cần giao (từ endpoint backlog: ALL−NONE / ALL,
-    # gồm cả ưu tiên giao). Dùng R["dagan_giao"]/R["tong_cangiao"] — KHÔNG dùng R["total"]
-    # (đơn trong chuyến, nhỏ hơn) để phản ánh đúng tiến độ phủ gán.
-    _dg_giao = R.get("dagan_giao", 0)
-    _tcg = R.get("tong_cangiao", 0)
+    # %Gán giao = ĐÃ GÁN / TỔNG CẦN GIAO = R["total"] / (R["total"]+R["backlog"]).
+    # Dùng ĐÚNG R["total"] (số "Đã gán" ở dải 'Chỉ số quan trọng') để đồng nhất toàn trang.
+    _dg_giao = R["total"]
+    _tcg = can_giao
     _pg = (_dg_giao / _tcg * 100.0) if _tcg else 0.0
     _pgs = ("%.1f%%" % _pg).replace(".", ",")
     P.append("<div class='hsc'>"
