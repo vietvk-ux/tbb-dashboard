@@ -1884,7 +1884,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         diag.append(_dgr("👤", "Nhân viên %GTC &lt;50%", "<b>%d</b>" % nv_low))
     if nv_rate is not None:
         diag.append(_dgr("✅", "NV đạt ≥50%",
-                         "<b>%d%%</b> <span class='dgs'>· %d NV</span>" % (nv_rate, nv_qual)))
+                         "<b>%d</b> <span class='dgs'>/ %d NV · %d%%</span>"
+                         % (nv_qual - nv_low, nv_qual, nv_rate)))
     if not diag:
         diag.append(_dgr("✅", "Vùng vận hành ổn định", ""))
 
