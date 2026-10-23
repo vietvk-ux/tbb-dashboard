@@ -914,7 +914,7 @@ def _bc_drv_details(r, arrow="", pos=None):
     P.append(_bar(pc, cls))
     P.append("<div class='bcm'><span>📥 %s</span><span class='w'>⏳ %s</span><span>✅ %s</span>"
              "<span class='ltc'>LTC %s</span>%s%s%s</div>"
-             % (_n(r.get("dagan_giao", 0)), _n(r.get("backlog", 0)), _n(r["gtc"]),
+             % (_n(r["total"]), _n(r.get("backlog", 0)), _n(r["gtc"]),
                 _n(r.get("ltc", 0)), _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0)),
                 _late_badge(_late_cnt(r)), _low_badge(_low_cnt(r))))
     P.append("</summary><div class='dtl'>")
@@ -1548,15 +1548,13 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                        "<th>Đã gán</th><th>GTC</th></tr></thead><tbody>"]
                 for _amn, _v, _tp, _yp, _yv in _rows_am:
                     _dp, _sp = _dpp(_tp, _yp)
-                    _yda = _yv[2] if len(_yv) >= 3 else 0          # đã gán hôm qua (0 nếu snapshot cũ)
-                    _dg_cell = (_cqd(*_dpc(_v["dagan_giao"], _yda), good_up=False)
-                                if _yda else "")                   # ẩn delta khi chưa có nền hôm qua
+                    _dg, _sg = _dpc(_v["total"], _yv[1])            # 'đã gán' chi tiết AM giữ nguyên (luỹ kế)
                     _dv, _sv = _dpc(_v["gtc"], _yv[0])
                     _R2.append("<tr><td class='aml'>%s</td><td><b>%s%%</b> %s</td>"
                                "<td>%s %s</td><td>%s %s</td></tr>"
                                % (_esc(_amn), ("%g" % _tp).replace(".", ","),
                                   _cqd(_dp, _sp, True, suffix="đ"),
-                                  _n(_v["dagan_giao"]), _dg_cell,
+                                  _n(_v["total"]), _cqd(_dg, _sg, False),
                                   _n(_v["gtc"]), _cqd(_dv, _sv, False)))
                 _R2.append("</tbody></table>")
                 _am_tbl = "".join(_R2)
@@ -2116,7 +2114,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _am_low = sum(_low_cnt(r) for r in am_rows.get(amn, []))
         P.append("<div class='pmeta'><span>🏤 %s BC</span><span>📥 %s</span><span class='w'>⏳ %s</span>"
                  "<span>✅ %s</span><span class='ltc'>LTC %s</span>%s%s%s</div>"
-                 % (v["bc"], _n(v["dagan_giao"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["ltc"]),
+                 % (v["bc"], _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]), _n(v["ltc"]),
                     _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0)) if v.get("vngh") else "",
                     _late_badge(_am_late) if _am_late else "",
                     _low_badge(_am_low) if _am_low else ""))
@@ -2149,7 +2147,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _pv_low = sum(_low_cnt(r) for r in prov_rows.get(pv, []))
         P.append("<div class='pmeta'><span>🏃 %s</span><span>📥 %s</span><span class='w'>⏳ %s</span>"
                  "<span>✅ %s</span><span class='ltc'>LTC %s</span>%s%s%s</div>"
-                 % (_n(v["ontrip"] + v["fin"]), _n(v["dagan_giao"]), _n(v["backlog"]), _n(v["gtc"]),
+                 % (_n(v["ontrip"] + v["fin"]), _n(v["total"]), _n(v["backlog"]), _n(v["gtc"]),
                     _n(v["ltc"]),
                     _tt_chip(v.get("vngh_gtc", 0), v.get("vngh", 0)) if v.get("vngh") else "",
                     _late_badge(_pv_late) if _pv_late else "",
@@ -2184,7 +2182,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("<div class='bcm'><span>🏃 %s</span><span>🏁 %s</span><span>📥 %s</span>"
                  "<span class='w'>⏳ %s</span><span>✅ %s</span>"
                  "<span class='ltc'>LTC %s</span>%s%s%s</div>"
-                 % (_n(r["ontrip"]), _n(r["fin"]), _n(r.get("dagan_giao", 0)), _n(r["backlog"]), _n(r["gtc"]),
+                 % (_n(r["ontrip"]), _n(r["fin"]), _n(r["total"]), _n(r["backlog"]), _n(r["gtc"]),
                     _n(r.get("ltc", 0)),
                     _tt_chip(r.get("vngh_gtc", 0), r.get("vngh", 0)),
                     _late_badge(_late_cnt(r)), _low_badge(_low_cnt(r))))
