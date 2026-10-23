@@ -1337,13 +1337,18 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # Dùng SLOT: giữ chỗ ở đây, nội dung dựng bên dưới (sau khi đủ biến trend/cmp) rồi ghi vào slot.
     _htri_slot = len(P)
     P.append("")
-    # Dòng số liệu phụ (Giao TC/LTC/Cần giao) — xuống DƯỚI 3 chỉ số điều hành.
+    # Dòng số liệu phụ (Giao TC/LTC/%Gán giao) — xuống DƯỚI 3 chỉ số điều hành.
+    # %Gán giao = đơn ĐÃ gán giao / TỔNG đơn cần giao (đã gán + chưa gán) → tiến độ phủ gán.
+    _pg = (R["total"] / can_giao * 100.0) if can_giao else 0.0
+    _pgs = ("%.1f%%" % _pg).replace(".", ",")
     P.append("<div class='hsc'>"
              "<div class='hsx good'><span>✅ Giao TC</span>"
              "<b>%s<i>/%s</i></b></div>"
              "<div class='hsx'><span>🔁 LTC</span><b>%s</b></div>"
-             "<div class='hsx warn'><span>📦 Cần giao</span><b>%s</b></div></div>"
-             % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]), _n(can_giao)))
+             "<div class='hsx'><span>📦 %%Gán giao</span><b>%s</b>"
+             "<span class='hfr'>%s/%s</span></div></div>"
+             % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]),
+                _pgs, _n(R["total"]), _n(can_giao)))
     # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, DƯỚI dòng số liệu
     if lgt_w:
         _ysnap = (cmp_y.get("snap") or {}) if cmp_y else {}   # khối lượng tồn kho CÙNG GIỜ HÔM QUA
@@ -2273,6 +2278,8 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hsx b{font-family:'Geist',sans-serif;font-size:21px;font-weight:900;color:#fff;
  font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.1;white-space:nowrap}
 .hsx b i{font-style:normal;font-size:13px;font-weight:600;color:var(--mut)}
+.hsx .hfr{font-size:11px;color:var(--mut);font-weight:700;margin-top:1px;
+ font-variant-numeric:tabular-nums}
 .hsx.good b{color:#2ee88c}
 .hsx.warn b{color:var(--warn)}
 .href{display:flex;flex-wrap:wrap;gap:8px 9px;margin-top:14px}
