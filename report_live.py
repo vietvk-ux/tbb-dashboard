@@ -1503,7 +1503,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                          % (reg_pct, _cp, s))
         if "dagan_giao" in cmp_y:
             d, s = _dpc(R["dagan_giao"], cmp_y["dagan_giao"])
-            parts.append("<span class='scq'><i>Đã gán</i><b>%s</b><span class='cq %s'>%s</span></span>"
+            parts.append("<span class='scq'><i>Đang giao</i><b>%s</b><span class='cq %s'>%s</span></span>"
                          % (_n(R["dagan_giao"]), _dir(d), s))
         if "gtc" in cmp_y:
             d, s = _dpc(R["gtc"], cmp_y["gtc"])
@@ -1514,7 +1514,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
             parts.append("<span class='scq'><i>Backlog</i><b>%s</b><span class='cq %s'>%s</span></span>"
                          % (_n(giao_120h), _dir(d), s))
         _miss = "" if ("dagan_giao" in cmp_y and "gtc" in cmp_y and "g120" in cmp_y) else \
-                " · <i>(Đã gán/GTC/Backlog đủ từ mai)</i>"
+                " · <i>(Đang giao/GTC/Backlog đủ từ mai)</i>"
         # CHI TIẾT THEO AM (bấm dòng ⏱ để xổ): %GTC + Đã gán + GTC từng AM vs cùng giờ hôm qua.
         _ybc_h = cmp_y.get("bcsnap") if isinstance(cmp_y.get("bcsnap"), dict) else None
         _am_tbl = ""
@@ -1968,7 +1968,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     tt_rgb = {"good": GREEN, "warn": AMBER, "bad": RED}.get(_cls(vpct), NEU) if vpct is not None else NEU
     #      icon, giá trị, nhãn, màu rgb, extra, neu, key(snap), raw(số nay), up_good
     kpis = [
-        ("📥", _n(R["dagan_giao"]),"Đã gán",          NEU,   "", True,  "dagan_giao", R["dagan_giao"], None),
+        ("🚚", _n(R["dagan_giao"]),"Đơn đang giao",    NEU,   "", True,  "dagan_giao", R["dagan_giao"], None),
         ("🏃", _n(R["ontrip"]),    "Đang chạy",       NEU,   "", True,  "ontrip",   R["ontrip"],   None),
         ("🚛", _n(on_road),        "Còn phải giao",   NEU,   "", True,  "on_road",  on_road,       False),
         ("✅", _n(R["gtc"]),       "GTC nay",         NEU,   "", True,  "gtc",      R["gtc"],      True),
@@ -2195,7 +2195,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("</div>")                                    # đóng pane Bưu cục
     P.append("<div class='foot'><b>📖 Giải thích chỉ số</b><br>"
              "<span class='up' style='color:var(--good);font-weight:800'>▲</span>/<span class='dn' style='color:var(--bad);font-weight:800'>▼ %</span> cạnh số ở lưới = thay đổi <b>ngày chốt hôm qua so hôm kia</b> · <span style='color:var(--good)'>xanh = tốt lên</span> · <span style='color:var(--bad)'>đỏ = xấu đi</span> (tồn/NV cần xử lý tăng là xấu; sản lượng/GTC/NV đạt tăng là tốt)<br>"
-             "📥 <b>Đã gán</b> = đơn đã xếp vào chuyến hôm nay · ⏳ <b>Chưa gán</b> = đơn tồn ở kho chưa xếp chuyến<br>"
+             "🚚 <b>Đơn đang giao</b> (dải vùng) = đơn đã gán chuyến ĐANG giao, còn tồn (khớp trang Tồn đọng GHN · 'đang có chuyến đi', gồm ưu tiên giao) · ⏳ <b>Chưa gán</b> = đơn tồn ở kho chưa xếp chuyến (gồm ưu tiên)<br>"
+             "📥 <b>Đã gán</b> (thẻ AM/Tỉnh/Bưu cục) = đơn đã xếp vào chuyến hôm nay (luỹ kế, gồm đơn đã giao xong — là mẫu số %GTC)<br>"
              "🏃 <b>Đang chạy</b> = số NV còn chuyến chưa kết thúc · 🚛 <b>Còn phải giao</b> = đơn của chuyến đang chạy CHƯA giao xong (đang trên đường)<br>"
              "🔴 <b>Backlog giao 120h</b> = đơn Giao tồn quá 120 giờ toàn vùng (khớp trang Tồn đọng) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
              "🕘 <b>XP muộn &gt;9h30</b> = số NV xuất phát sau 9h30 (kỷ luật ra hàng) · 🛍️ <b>TikTok</b> = đơn hàng sàn TikTok Shop<br>"
