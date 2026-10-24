@@ -1355,6 +1355,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # %Gán giao = ĐÃ GÁN GIAO (đang có chuyến, còn tồn) / TỔNG đơn cần giao (= đã gán + tồn chưa gán).
     # Nguồn trang Tồn đọng GHN: đã gán = ALL − NONE (R["dagan_giao"]); tồn chưa gán = NONE (R["backlog"]).
     # KHÔNG dùng R["total"] (gồm cả đơn đã giao xong → to hơn, không khớp 'đang có chuyến đi' của GHN).
+    # Tổng đơn CẦN GIAO = đã gán giao (đang có chuyến, R["dagan_giao"]) + tồn chưa gán (R["backlog"]).
     _dg_giao = R["dagan_giao"]
     _tcg = R["dagan_giao"] + R["backlog"]
     _pg = (_dg_giao / _tcg * 100.0) if _tcg else 0.0
@@ -1363,10 +1364,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "<div class='hsx good'><span>✅ Giao TC</span><b>%s</b>"
              "<span class='hfr'>/%s đã gán</span></div>"
              "<div class='hsx'><span>🔁 LTC</span><b>%s</b></div>"
-             "<div class='hsx'><span>🚚 Đơn đang giao</span><b>%s</b>"
-             "<span class='hfr'>%s gán chuyến</span></div></div>"
+             "<div class='hsx'><span>📦 Tổng cần giao</span><b>%s</b>"
+             "<span class='hfr'>%s đã gán</span></div></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]),
-                _n(_dg_giao), _pgs))
+                _n(_tcg), _pgs))
     # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, DƯỚI dòng số liệu
     if lgt_w:
         _ysnap = (cmp_y.get("snap") or {}) if cmp_y else {}   # khối lượng tồn kho CÙNG GIỜ HÔM QUA
