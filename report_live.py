@@ -1347,6 +1347,44 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              % (_hcls, _hic, _hst, _href2))
     P.append("</div>")
     P.append(_bar(reg_pct, _cls(reg_pct), target=70))
+
+    # ===== 🎯 BẢNG ĐIỀU HÀNH NHANH (Dự báo về đích + Việc cần làm ngay) — NGAY dưới thanh %GTC,
+    # TRÊN 3 chỉ số điều hành. Chỉ hiện TỪ 14h (sáng %GTC luỹ kế thấp, dự báo chưa đáng tin).
+    if now.hour >= int(os.environ.get("HACT_MIN_HOUR", "14")) and R["total"] and reg_pct is not None:
+        _fc = (reg_pct + fc_uplift) if (fc_uplift is not None) else None
+        _fc_cls = "good" if (_fc is not None and _fc >= 70) else ("warn" if (_fc is not None and _fc >= 62) else "bad")
+        _hleft = max(22 - (now.hour + now.minute / 60.0), 0.5)         # giờ còn lại tới ~22h
+        _need = max((0.70 * R["total"] - R["gtc"]) / _hleft, 0)
+        _pace_s = ("%d đơn/giờ" % round(pace)) if pace else "đang đo…"
+        _fcb = []
+        if _fc is not None:
+            _fcb.append("<div class='hac-v %s'>~%d%%</div><div class='hac-s'>theo đà chốt cuối ngày</div>"
+                        % (_fc_cls, round(_fc)))
+        else:
+            _fcb.append("<div class='hac-v'>…</div><div class='hac-s'>đang học dữ liệu (đủ sau vài ngày)</div>")
+        _fcb.append("<div class='hac-l'>🚀 Tốc độ giao: <b>%s</b></div>" % _pace_s)
+        _fcb.append("<div class='hac-l'>🎯 Cần <b>+%s đơn/giờ</b> để đạt 70%%</div>" % _n(int(round(_need))))
+        _am_lo = sorted(((k, _pct(v["gtc"], v["total"]), v) for k, v in am.items() if v["total"] >= 50),
+                        key=lambda x: (x[1] if x[1] is not None else 999))
+        _worst = _am_lo[0] if _am_lo else None
+        _bc_lo = sum(1 for r in rows if r["total"] >= 20 and (_pct(r["gtc"], r["total"]) or 99) < 50)
+        _nv_lo = sum(1 for r in rows for d in r.get("drivers", [])
+                     if d.get("total", 0) >= 20 and (_pct(d.get("gtc", 0), d["total"]) or 99) < 50)
+        _bl = max(rows, key=lambda r: r.get("backlog", 0)) if rows else None
+        _act = []
+        if _worst and _worst[1] is not None:
+            _act.append("<div class='hac-l'>🔴 AM yếu nhất: <b>%s</b> <span class='bad'>%s%%</span></div>"
+                        % (_esc(_worst[0]), ("%g" % _worst[1]).replace(".", ",")))
+        _act.append("<div class='hac-l'>🏤 <b>%d</b> bưu cục &lt;50%% · 👤 <b>%d</b> NV cần đốc</div>"
+                    % (_bc_lo, _nv_lo))
+        if _bl and _bl.get("backlog", 0) > 0:
+            _act.append("<div class='hac-l'>📦 Tồn nặng nhất: <b>%s</b> <span class='warn'>%s</span></div>"
+                        % (_esc(_bl["name"]), _n(_bl["backlog"])))
+        P.append("<div class='hact'>"
+                 "<div class='hac fc %s'><div class='hac-h'>📈 DỰ BÁO VỀ ĐÍCH</div>%s</div>"
+                 "<div class='hac act'><div class='hac-h'>⚡ VIỆC CẦN LÀM NGAY</div>%s</div></div>"
+                 % (_fc_cls, "".join(_fcb), "".join(_act)))
+
     # 🎯 3 CHỈ SỐ ĐIỀU HÀNH — đặt NGAY dưới thanh %GTC (nổi bật nhất, điều hành số vùng).
     # Dùng SLOT: giữ chỗ ở đây, nội dung dựng bên dưới (sau khi đủ biến trend/cmp) rồi ghi vào slot.
     _htri_slot = len(P)
@@ -1595,45 +1633,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if _wchot:
         P.append(_wchot)
     P.append("</section>")
-
-    # ===== 🎯 BẢNG ĐIỀU HÀNH NHANH (Dự báo về đích + Việc cần làm ngay) — chỉ hiện TỪ 14h =====
-    # Dành cho GĐV điều hành buổi chiều: trái = dự phóng %GTC chốt + tốc độ + cần thêm/giờ;
-    # phải = tóm tắt việc ưu tiên (AM yếu nhất, N BC/NV <50%, bưu cục tồn nặng nhất).
-    if now.hour >= int(os.environ.get("HACT_MIN_HOUR", "14")) and R["total"] and reg_pct is not None:
-        _fc = (reg_pct + fc_uplift) if (fc_uplift is not None) else None
-        _fc_cls = "good" if (_fc is not None and _fc >= 70) else ("warn" if (_fc is not None and _fc >= 62) else "bad")
-        _hleft = max(22 - (now.hour + now.minute / 60.0), 0.5)         # giờ còn lại tới ~22h
-        _need = max((0.70 * R["total"] - R["gtc"]) / _hleft, 0)
-        _pace_s = ("%d đơn/giờ" % round(pace)) if pace else "đang đo…"
-        _fcb = []
-        if _fc is not None:
-            _fcb.append("<div class='hac-v %s'>~%d%%</div><div class='hac-s'>theo đà chốt cuối ngày</div>"
-                        % (_fc_cls, round(_fc)))
-        else:
-            _fcb.append("<div class='hac-v'>…</div><div class='hac-s'>đang học dữ liệu (đủ sau vài ngày)</div>")
-        _fcb.append("<div class='hac-l'>🚀 Tốc độ giao: <b>%s</b></div>" % _pace_s)
-        _fcb.append("<div class='hac-l'>🎯 Cần <b>+%s đơn/giờ</b> để đạt 70%%</div>" % _n(int(round(_need))))
-        # Việc cần làm ngay
-        _am_lo = sorted(((k, _pct(v["gtc"], v["total"]), v) for k, v in am.items() if v["total"] >= 50),
-                        key=lambda x: (x[1] if x[1] is not None else 999))
-        _worst = _am_lo[0] if _am_lo else None
-        _bc_lo = sum(1 for r in rows if r["total"] >= 20 and (_pct(r["gtc"], r["total"]) or 99) < 50)
-        _nv_lo = sum(1 for r in rows for d in r.get("drivers", [])
-                     if d.get("total", 0) >= 20 and (_pct(d.get("gtc", 0), d["total"]) or 99) < 50)
-        _bl = max(rows, key=lambda r: r.get("backlog", 0)) if rows else None
-        _act = []
-        if _worst and _worst[1] is not None:
-            _act.append("<div class='hac-l'>🔴 AM yếu nhất: <b>%s</b> <span class='bad'>%s%%</span></div>"
-                        % (_esc(_worst[0]), ("%g" % _worst[1]).replace(".", ",")))
-        _act.append("<div class='hac-l'>🏤 <b>%d</b> bưu cục &lt;50%% · 👤 <b>%d</b> NV cần đốc</div>"
-                    % (_bc_lo, _nv_lo))
-        if _bl and _bl.get("backlog", 0) > 0:
-            _act.append("<div class='hac-l'>📦 Tồn nặng nhất: <b>%s</b> <span class='warn'>%s</span></div>"
-                        % (_esc(_bl["name"]), _n(_bl["backlog"])))
-        P.append("<div class='hact'>"
-                 "<div class='hac fc %s'><div class='hac-h'>📈 DỰ BÁO VỀ ĐÍCH</div>%s</div>"
-                 "<div class='hac act'><div class='hac-h'>⚡ VIỆC CẦN LÀM NGAY</div>%s</div></div>"
-                 % (_fc_cls, "".join(_fcb), "".join(_act)))
 
     # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
     nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
