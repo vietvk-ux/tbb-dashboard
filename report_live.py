@@ -1363,10 +1363,12 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='hsc'>"
              "<div class='hsx good'><span>✅ Giao TC</span><b>%s</b>"
              "<span class='hfr'>/%s đã gán</span></div>"
-             "<div class='hsx'><span>🔁 LTC</span><b>%s</b></div>"
+             "<div class='hsx'><span>🔁 LTC</span><b>%s</b>"
+             "<span class='hfr%s'>📦 LTB %s</span></div>"
              "<div class='hsx'><span>📦 Cần giao</span><b>%s</b>"
              "<span class='hfr'>%s đã gán</span></div></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]),
+                (" bad" if R["ltb"] else ""), _n(R["ltb"]),
                 _n(_tcg), _pgs))
     # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, DƯỚI dòng số liệu
     if lgt_w:
@@ -2307,6 +2309,7 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hsx .hfr{font-size:10px;color:var(--mut);font-weight:700;margin-top:1px;
  letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow:visible}
 .hsx .hfr.wrap{white-space:normal;line-height:1.25}
+.hsx .hfr.bad{color:var(--bad)}
 .hsx.good b{color:#2ee88c}
 .hsx.warn b{color:var(--warn)}
 .href{display:flex;flex-wrap:wrap;gap:8px 9px;margin-top:14px}
