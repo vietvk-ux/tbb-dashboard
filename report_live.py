@@ -1599,6 +1599,45 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append(_wchot)
     P.append("</section>")
 
+    # ===== 🎯 BẢNG ĐIỀU HÀNH NHANH (Dự báo về đích + Việc cần làm ngay) — chỉ hiện TỪ 14h =====
+    # Dành cho GĐV điều hành buổi chiều: trái = dự phóng %GTC chốt + tốc độ + cần thêm/giờ;
+    # phải = tóm tắt việc ưu tiên (AM yếu nhất, N BC/NV <50%, bưu cục tồn nặng nhất).
+    if now.hour >= int(os.environ.get("HACT_MIN_HOUR", "14")) and R["total"] and reg_pct is not None:
+        _fc = (reg_pct + fc_uplift) if (fc_uplift is not None) else None
+        _fc_cls = "good" if (_fc is not None and _fc >= 70) else ("warn" if (_fc is not None and _fc >= 62) else "bad")
+        _hleft = max(22 - (now.hour + now.minute / 60.0), 0.5)         # giờ còn lại tới ~22h
+        _need = max((0.70 * R["total"] - R["gtc"]) / _hleft, 0)
+        _pace_s = ("%d đơn/giờ" % round(pace)) if pace else "đang đo…"
+        _fcb = []
+        if _fc is not None:
+            _fcb.append("<div class='hac-v %s'>~%d%%</div><div class='hac-s'>theo đà chốt cuối ngày</div>"
+                        % (_fc_cls, round(_fc)))
+        else:
+            _fcb.append("<div class='hac-v'>…</div><div class='hac-s'>đang học dữ liệu (đủ sau vài ngày)</div>")
+        _fcb.append("<div class='hac-l'>🚀 Tốc độ giao: <b>%s</b></div>" % _pace_s)
+        _fcb.append("<div class='hac-l'>🎯 Cần <b>+%s đơn/giờ</b> để đạt 70%%</div>" % _n(int(round(_need))))
+        # Việc cần làm ngay
+        _am_lo = sorted(((k, _pct(v["gtc"], v["total"]), v) for k, v in am.items() if v["total"] >= 50),
+                        key=lambda x: (x[1] if x[1] is not None else 999))
+        _worst = _am_lo[0] if _am_lo else None
+        _bc_lo = sum(1 for r in rows if r["total"] >= 20 and (_pct(r["gtc"], r["total"]) or 99) < 50)
+        _nv_lo = sum(1 for r in rows for d in r.get("drivers", [])
+                     if d.get("total", 0) >= 20 and (_pct(d.get("gtc", 0), d["total"]) or 99) < 50)
+        _bl = max(rows, key=lambda r: r.get("backlog", 0)) if rows else None
+        _act = []
+        if _worst and _worst[1] is not None:
+            _act.append("<div class='hac-l'>🔴 AM yếu nhất: <b>%s</b> <span class='bad'>%s%%</span></div>"
+                        % (_esc(_worst[0]), ("%g" % _worst[1]).replace(".", ",")))
+        _act.append("<div class='hac-l'>🏤 <b>%d</b> bưu cục &lt;50%% · 👤 <b>%d</b> NV cần đốc</div>"
+                    % (_bc_lo, _nv_lo))
+        if _bl and _bl.get("backlog", 0) > 0:
+            _act.append("<div class='hac-l'>📦 Tồn nặng nhất: <b>%s</b> <span class='warn'>%s</span></div>"
+                        % (_esc(_bl["name"]), _n(_bl["backlog"])))
+        P.append("<div class='hact'>"
+                 "<div class='hac fc %s'><div class='hac-h'>📈 DỰ BÁO VỀ ĐÍCH</div>%s</div>"
+                 "<div class='hac act'><div class='hac-h'>⚡ VIỆC CẦN LÀM NGAY</div>%s</div></div>"
+                 % (_fc_cls, "".join(_fcb), "".join(_act)))
+
     # ===== ⚡ CẦN LÀM NGAY — việc ưu tiên (Mẫu 1) =====
     nvx_n = nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0)
     coll_nv = sum(len(us) for us in collectable.values()) if collectable else None
@@ -2379,6 +2418,21 @@ svg.spk{display:block}
 .hpace.good{border-color:rgba(23,201,131,.45);background:rgba(23,201,131,.10)}.hpace.good b{color:var(--good)}
 .hpace.warn{border-color:rgba(245,170,23,.45);background:rgba(245,170,23,.10)}.hpace.warn b{color:var(--warn)}
 .hpace.bad{border-color:rgba(245,69,92,.45);background:rgba(245,69,92,.10)}.hpace.bad b{color:var(--bad)}
+/* 🎯 BẢNG ĐIỀU HÀNH NHANH (Dự báo + Việc cần làm) — 2 cột dưới hero, từ 14h */
+.hact{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 12px}
+.hac{border:1px solid var(--line);border-radius:16px;padding:12px 13px;background:var(--card);min-width:0}
+.hac-h{font-size:10.5px;font-weight:800;color:#e8ebfa;text-transform:uppercase;letter-spacing:.03em;margin-bottom:7px}
+.hac-v{font-family:'Geist Mono','Geist',monospace;font-size:34px;font-weight:900;letter-spacing:-.045em;line-height:1;color:#fff}
+.hac-v.good{color:var(--good)}.hac-v.warn{color:var(--warn)}.hac-v.bad{color:var(--bad)}
+.hac-s{font-size:10px;color:var(--mut);font-weight:600;margin:1px 0 7px}
+.hac-l{font-size:11.5px;color:#d4dbf0;font-weight:600;line-height:1.5;margin-top:3px}
+.hac-l b{color:#fff;font-weight:800}
+.hac-l .bad{color:var(--bad);font-weight:800}.hac-l .warn{color:var(--warn);font-weight:800}
+.hac.fc.good{border-color:rgba(23,201,131,.4);background:rgba(23,201,131,.07)}
+.hac.fc.warn{border-color:rgba(245,170,23,.4);background:rgba(245,170,23,.07)}
+.hac.fc.bad{border-color:rgba(245,69,92,.4);background:rgba(245,69,92,.07)}
+.hac.act{border-color:rgba(167,139,250,.28)}
+@media(max-width:360px){.hact{grid-template-columns:1fr}}
 /* ⏱ SO CÙNG GIỜ HÔM QUA — dòng đánh giá vùng theo mốc giờ */
 .hcmp{margin-top:10px;font-size:13.5px;font-weight:600;color:#d4dbf0;line-height:1.7;
  padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
