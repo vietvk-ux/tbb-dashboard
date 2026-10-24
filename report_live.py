@@ -1978,9 +1978,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     xp_rgb = RED if late_cnt else NEU                       # xuất phát muộn: đỏ khi >0
     tt_rgb = {"good": GREEN, "warn": AMBER, "bad": RED}.get(_cls(vpct), NEU) if vpct is not None else NEU
     #      icon, giá trị, nhãn, màu rgb, extra, neu, key(snap), raw(số nay), up_good
-    # LTC (lấy thành công) kèm LTB (lấy thất bại) dạng chữ nhỏ trên cùng card. Bỏ ô 'Còn phải giao' & 'GTC nay'.
-    _ltc_sub = ("<div class='slx'>📦 LTB <b class='%s'>%s</b></div>"
-                % ("bad" if R["ltb"] else "", _n(R["ltb"])))
+    # Bỏ ô 'Còn phải giao', 'GTC nay', 'LTC'/'LTB' khỏi dải (LTC/LTB đã hiển thị ở card hero).
     kpis = [
         ("🚚", _n(R["dagan_giao"]),"Đơn đang giao",    NEU,   "", True,  "dagan_giao", R["dagan_giao"], None),
         ("🏃", _n(R["ontrip"]),    "Đang chạy",       NEU,   "", True,  "ontrip",   R["ontrip"],   None),
@@ -1989,7 +1987,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("🛍️", _n(R["vngh_gtc"]), "TikTok GTC",      NEU,   "", True,  "vngh_gtc", R["vngh_gtc"], True),
         ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"), "%GTC TikTok", tt_rgb, "", vpct is None, "vpct", vpct, True),
         ("💰", _codm(R["cod_gtb"]),"COD GTB",         AMBER, "", False, "cod_gtb",  R["cod_gtb"],  False),
-        ("🛒", _n(R["ltc"]),       "LTC",             NEU,   _ltc_sub, True, "ltc",   R["ltc"],      True),
         ("📉", _n(nv_low),         "NV %GTC &lt;50%", (RED if nv_low else NEU), "", not nv_low, "nv_low", nv_low, False),
     ]
     # Snapshot CÙNG GIỜ HÔM QUA (để so ▲/▼ mỗi ô) — đầy đủ từ ngày sau khi bắt đầu log snap.
