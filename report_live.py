@@ -1371,12 +1371,16 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _nv_lo = sum(1 for r in rows for d in r.get("drivers", [])
                      if d.get("total", 0) >= 20 and (_pct(d.get("gtc", 0), d["total"]) or 99) < 50)
         _bl = max(rows, key=lambda r: r.get("backlog", 0)) if rows else None
+        _bl120 = max(rows, key=lambda r: r.get("giao120h", 0)) if rows else None
         _act = []
         if _worst and _worst[1] is not None:
             _act.append("<div class='hac-l'>🔴 AM yếu nhất: <b>%s</b> <span class='bad'>%s%%</span></div>"
                         % (_esc(_worst[0]), ("%g" % _worst[1]).replace(".", ",")))
         _act.append("<div class='hac-l'>🏤 <b>%d</b> bưu cục &lt;50%% · 👤 <b>%d</b> NV cần đốc</div>"
                     % (_bc_lo, _nv_lo))
+        if _bl120 and _bl120.get("giao120h", 0) > 0:
+            _act.append("<div class='hac-l'>🔴 Giao &gt;120h nhiều nhất: <b>%s</b> <span class='bad'>%s</span></div>"
+                        % (_esc(_bl120["name"]), _n(_bl120["giao120h"])))
         if _bl and _bl.get("backlog", 0) > 0:
             _act.append("<div class='hac-l'>📦 Tồn nặng nhất: <b>%s</b> <span class='warn'>%s</span></div>"
                         % (_esc(_bl["name"]), _n(_bl["backlog"])))
