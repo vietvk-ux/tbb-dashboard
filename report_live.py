@@ -943,9 +943,9 @@ async def fetch_giao_120h(session, hub_ids, token):
         return None
 
 
-def _agg_lgt_weight(d, types):
-    """Cộng total_weight (gram) theo order_type từ response get-general-info /
-    get-backlog-transport-info. Nhiều hub → chỉ entry 'ALL'; 1 hub → entry đó."""
+def _agg_lgt_weight(d, types, key="total_weight"):
+    """Cộng `key` (mặc định total_weight gram; 'total_order' = SỐ ĐƠN) theo order_type từ response
+    get-general-info / get-backlog-transport-info. Nhiều hub → chỉ entry 'ALL'; 1 hub → entry đó."""
     data = (d or {}).get("data") or []
     alle = [e for e in data if str(e.get("hub_id") or "") == "ALL"]
     use = alle if alle else data
@@ -954,7 +954,7 @@ def _agg_lgt_weight(d, types):
         for gi in (e.get("general_infos") or []):
             ot = gi.get("order_type")
             if ot in agg:
-                agg[ot] += gi.get("total_weight") or 0
+                agg[ot] += gi.get(key) or 0
     return agg
 
 
@@ -969,15 +969,21 @@ async def fetch_lgt_weight(session, hub_ids, token):
     try:
         d = await _post(session, "/core/oss/v1/report/get-general-info",
                         {"hub_ids": hids, "view_mode": "WARD", "order_type": "ALL"}, hid0, token)
-        a = _agg_lgt_weight(d, ("PICK", "DELIVER", "DELIVER_PRIORITY", "RETURN"))
+        _dt = ("PICK", "DELIVER", "DELIVER_PRIORITY", "RETURN")
+        a = _agg_lgt_weight(d, _dt)
         out["lay"] = a["PICK"]; out["giao"] = a["DELIVER"] + a["DELIVER_PRIORITY"]; out["tra"] = a["RETURN"]
+        c = _agg_lgt_weight(d, _dt, "total_order")   # SỐ ĐƠN tồn kho (hiển thị cạnh kg)
+        out["n_lay"] = c["PICK"]; out["n_giao"] = c["DELIVER"] + c["DELIVER_PRIORITY"]; out["n_tra"] = c["RETURN"]
     except Exception:
         pass
     try:
         d2 = await _post(session, "/core/oss/v1/report/get-backlog-transport-info",
                          {"hub_ids": hids}, hid0, token)
-        a2 = _agg_lgt_weight(d2, ("TRANSPORT_DELIVERY", "TRANSPORT_RETURN"))
+        _lt = ("TRANSPORT_DELIVERY", "TRANSPORT_RETURN")
+        a2 = _agg_lgt_weight(d2, _lt)
         out["lc_giao"] = a2["TRANSPORT_DELIVERY"]; out["lc_tra"] = a2["TRANSPORT_RETURN"]
+        c2 = _agg_lgt_weight(d2, _lt, "total_order")
+        out["n_lc_giao"] = c2["TRANSPORT_DELIVERY"]; out["n_lc_tra"] = c2["TRANSPORT_RETURN"]
     except Exception:
         pass
     return out if any(out.values()) else None
@@ -1366,8 +1372,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         _ysnap = (cmp_y.get("snap") or {}) if cmp_y else {}   # khối lượng tồn kho CÙNG GIỜ HÔM QUA
 
         def _wi(icon, lbl, key, ykey):
-            return ("<div class='hwi'><span>%s %s</span><b>%s</b>%s</div>"
-                    % (icon, lbl, _kgfmt(lgt_w.get(key, 0) / 1000.0),
+            _ncnt = lgt_w.get("n_" + key, 0)
+            _ns = ("<span class='hwn'>%s đơn</span>" % _n(_ncnt)) if _ncnt else ""
+            return ("<div class='hwi'><span>%s %s</span><b>%s</b>%s%s</div>"
+                    % (icon, lbl, _kgfmt(lgt_w.get(key, 0) / 1000.0), _ns,
                        _w_arrow(lgt_w.get(key, 0), _ysnap.get(ykey))))
         _lc = ""
         if lgt_w.get("lc_giao") or lgt_w.get("lc_tra"):
@@ -2283,6 +2291,7 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hwi{display:flex;flex-direction:column;gap:1px;min-width:0}
 .hwi span{font-size:10px;color:var(--mut);font-weight:500;white-space:nowrap}
 .hwi b{font-family:'Geist',sans-serif;font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1.15;white-space:nowrap}
+.hwn{font-size:10px;color:var(--mut);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:1px}
 .hwa{font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
 .hwa.up{color:#ff6274}.hwa.dn{color:#2ee88c}.hwa.fl{color:var(--mut)}
 .hsc{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 2px}
