@@ -1365,9 +1365,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
              "<span class='hfr'>/%s đã gán</span></div>"
              "<div class='hsx'><span>🔁 LTC</span><b>%s</b></div>"
              "<div class='hsx'><span>📦 Tổng cần giao</span><b>%s</b>"
-             "<span class='hfr wrap'>%s đã gán + %s chưa gán giao</span></div></div>"
+             "<span class='hfr'>%s đã gán</span></div></div>"
              % (_n(R["gtc"]), _n(R["total"]), _n(R["ltc"]),
-                _n(_tcg), _n(_dg_giao), _n(R["backlog"])))
+                _n(_tcg), _pgs))
     # ⚖️ TỒN KHO (kg thực) — khối riêng, gọn, DƯỚI dòng số liệu
     if lgt_w:
         _ysnap = (cmp_y.get("snap") or {}) if cmp_y else {}   # khối lượng tồn kho CÙNG GIỜ HÔM QUA
