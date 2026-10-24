@@ -164,9 +164,9 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         } for o in orders]
         n = _upsert(url, key, "chi_tiet_don", od, "ngay,buu_cuc,ma_don")
         logger.info("Supabase: lưu %d đơn chi tiết (ngày %s).", n, date_iso)
-        # Giữ chi tiết đơn 40 ngày (gọn gói Free 500MB — 60 ngày ~2,2M dòng có nguy cơ vượt).
-        # Bảng tổng hợp (vùng/bưu cục/nhân viên) KHÔNG xóa → giữ nhiều năm.
-        keep = int(os.environ.get("DB_KEEP_DETAIL_DAYS", "40") or "40")
+        # Giữ chi tiết đơn 35 ngày (gọn gói Free 500MB — 40 ngày ~1,55M dòng ≈ 380MB/76%, hạ 35 cho
+        # nhẹ còn ~340MB/68%). Bảng tổng hợp (vùng/bưu cục/nhân viên) KHÔNG xóa → giữ nhiều năm.
+        keep = int(os.environ.get("DB_KEEP_DETAIL_DAYS", "35") or "35")
         _cleanup_detail(url, key, keep)
     return True
 
