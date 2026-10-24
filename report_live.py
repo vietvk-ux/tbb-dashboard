@@ -1586,11 +1586,8 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # dưới (cần am_pcts…) rồi ghi vào P[_diag_slot]. (Chuyển từ trên lưới vào hero 08/10.)
     _diag_slot = len(P)
     P.append("")
-    # 🤖 PHÂN TÍCH ĐIỂM NÓNG theo khung giờ (rule-based) — ngay dưới Điểm Nóng, từ ~10h.
-    if now.hour >= float(os.environ.get("CMP_MIN_HOUR", "10")):
-        _aibox = _ai_hotspot(rows, bc_avg, now)
-        if _aibox:
-            P.append(_aibox)
+    # 🤖 Khối "Phân tích Top 5 bưu cục điểm nóng" (_ai_hotspot) ĐÃ BỎ 24/10 — trùng với
+    # "Việc cần làm ngay" (khối điều hành nhanh dưới hero). Hàm _ai_hotspot giữ lại, không gọi.
 
     # (4 chip tham chiếu Mục tiêu/Hôm qua/TB7/TB30 ĐÃ GỘP lên badge trạng thái cạnh số %GTC — bỏ ở đây cho gọn.)
     # 🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT — bản CHỐT 23h30 (frozen) — ĐƯA VÀO HERO (user 22/10) cho gọn.
