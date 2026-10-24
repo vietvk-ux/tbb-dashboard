@@ -2298,7 +2298,7 @@ body{margin:0;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .hsc{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 2px}
 .hsx{border:1px solid var(--line);border-radius:12px;padding:9px 11px;
  background:rgba(255,255,255,.04);min-width:0;display:flex;flex-direction:column;gap:3px}
-.hsx span{font-size:10px;color:var(--mut);font-weight:600;white-space:nowrap;
+.hsx span{font-size:9.5px;color:var(--mut);font-weight:600;white-space:nowrap;letter-spacing:-.2px;
  overflow:hidden;text-overflow:ellipsis}
 .hsx b{font-family:'Geist',sans-serif;font-size:21px;font-weight:900;color:#fff;
  font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.1;white-space:nowrap}
