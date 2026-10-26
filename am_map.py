@@ -7,12 +7,12 @@ Cập nhật 30/09/2026: BỎ AM Đinh Văn Thu (4 BC chia lại); THÊM AM mớ
 """
 
 AM_OF = {
-    # Nguyễn Công Nam (12)
-    "(LCH) Nậm Hàng": "Nguyễn Công Nam", "(LCA) Sa Pa": "Nguyễn Công Nam",
+    # Nguyễn Công Nam (9)
+    "(LCH) Nậm Hàng": "Nguyễn Công Nam", "(LCA) Sa Pa": "Nguyễn Đức Thịnh",
     "(LCH) Sìn Hồ": "Nguyễn Công Nam", "(LCH) Nậm Mạ": "Nguyễn Công Nam",
     "(LCH) Tân Phong": "Nguyễn Công Nam",
-    "(LCH) Phong Thổ": "Nguyễn Công Nam", "(LCA) Lào Cai": "Nguyễn Công Nam",
-    "(LCH) Bum Tở": "Nguyễn Công Nam", "(LCA) Bát Xát": "Nguyễn Công Nam",
+    "(LCH) Phong Thổ": "Nguyễn Công Nam", "(LCA) Lào Cai": "Nguyễn Đức Thịnh",
+    "(LCH) Bum Tở": "Nguyễn Công Nam", "(LCA) Bát Xát": "Nguyễn Đức Thịnh",
     "(LCH) Bình Lư": "Nguyễn Công Nam", "(LCH) Than Uyên": "Nguyễn Công Nam",
     "(LCH) Tân Uyên": "Nguyễn Công Nam",
     # Bùi Văn Đông (4) — Na Sang chuyển sang Lò Văn Thảnh
@@ -26,7 +26,7 @@ AM_OF = {
     # Lò Văn Thảnh (4) — AM MỚI (30/09/2026)
     "(DBI) Tuần Giáo": "Lò Văn Thảnh", "(DBI) Mường Ảng": "Lò Văn Thảnh",
     "(DBI) Tủa Chùa": "Lò Văn Thảnh", "(DBI) Na Sang": "Lò Văn Thảnh",
-    # Nguyễn Đức Thịnh (9)
+    # Nguyễn Đức Thịnh (12)
     "(LCA) Bảo Hà": "Nguyễn Đức Thịnh", "(LCA) Bảo Yên": "Nguyễn Đức Thịnh",
     "(LCA) Si Ma Cai": "Nguyễn Đức Thịnh", "(LCA) Bắc Hà": "Nguyễn Đức Thịnh",
     "(LCA) Bảo Thắng": "Nguyễn Đức Thịnh", "(LCA) Cam Đường 1": "Nguyễn Đức Thịnh",
