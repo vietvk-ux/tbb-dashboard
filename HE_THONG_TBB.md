@@ -321,3 +321,6 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 
 ### Nhật ký 26/10 — Đổi cơ cấu AM
 - **Chuyển 3 bưu cục (LCA) Sa Pa · Bát Xát · Lào Cai từ AM Nguyễn Công Nam → Nguyễn Đức Thịnh** (user yêu cầu). Sửa DUY NHẤT `am_map.py` (AM_OF) → tự áp mọi trang/báo cáo. Đồng bộ copy sang **cả 2 repo** (tbb-dashboard-github + bao-cao-trip-tbb-github — repo sau chạy các báo cáo GTalk pre-EOD/EOD/giữa ca/cuối ca/abnormal). Kết quả: **Nguyễn Công Nam 12→9 BC · Nguyễn Đức Thịnh 9→12 BC · tổng vẫn 54 BC** (Σ AM = tổng vùng, lệch 0). Quy trình chuẩn [[dong-bo-co-cau-am]].
+
+### Nhật ký 27/10 — Bỏ khối "So cùng giờ hôm qua"
+- **XOÁ khối hero "⏱ SO CÙNG GIỜ HÔM QUA"** (hàng chip %GTC·Đã gán·GTC·Backlog + bảng chi tiết AM bung ra) khỏi `report_live.gen_html` (user yêu cầu). Xoá cùng các helper `_dpp/_dpc/_dir/_cqd` (chỉ dùng trong khối). **GIỮ LẠI** (user chốt "vẫn giữ"): ① chip ▲/▼ nhỏ trên 8 ô dải "Chỉ số quan trọng" (`.sd`, so cùng giờ hôm qua); ② mũi tên ▲/▼ cạnh %GTC trên thẻ AM/Tỉnh/BC/NV (`.ga`, so TB 7 ngày). `cmp_y`/`_fetch_hour_vs_yesterday` VẪN fetch (nuôi 2 cái giữ lại). CSS `.hcmp/.scqrow/.scq/.amtab...` thành dead (vô hại, không xoá tránh đụng class chung `.cq/.hvi`). Verify: `.hcmp`=0, dải `.sd`=8, mũi tên thẻ=174.
