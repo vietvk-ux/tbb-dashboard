@@ -324,3 +324,6 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 
 ### Nhật ký 27/10 — Bỏ khối "So cùng giờ hôm qua"
 - **XOÁ khối hero "⏱ SO CÙNG GIỜ HÔM QUA"** (hàng chip %GTC·Đã gán·GTC·Backlog + bảng chi tiết AM bung ra) khỏi `report_live.gen_html` (user yêu cầu). Xoá cùng các helper `_dpp/_dpc/_dir/_cqd` (chỉ dùng trong khối). **GIỮ LẠI** (user chốt "vẫn giữ"): ① chip ▲/▼ nhỏ trên 8 ô dải "Chỉ số quan trọng" (`.sd`, so cùng giờ hôm qua); ② mũi tên ▲/▼ cạnh %GTC trên thẻ AM/Tỉnh/BC/NV (`.ga`, so TB 7 ngày). `cmp_y`/`_fetch_hour_vs_yesterday` VẪN fetch (nuôi 2 cái giữ lại). CSS `.hcmp/.scqrow/.scq/.amtab...` thành dead (vô hại, không xoá tránh đụng class chung `.cq/.hvi`). Verify: `.hcmp`=0, dải `.sd`=8, mũi tên thẻ=174.
+
+### Nhật ký 28/10 — Bỏ khối chú giải chân trang
+- **XOÁ khối chân trang "📖 Giải thích chỉ số"** (`P.append("<div class='foot'>...")`) khỏi `report_live.gen_html` cho gọn (user yêu cầu). Thay bằng comment đánh dấu; `<script>function tgw...</script>` đứng ngay sau giữ nguyên. Chân trang giờ kết thúc ngay sau 3 tab AM/Tỉnh/BC. Verify trên trang live: `.foot`=0, không còn chữ "Giải thích chỉ số".
