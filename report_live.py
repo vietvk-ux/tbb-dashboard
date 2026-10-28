@@ -2144,20 +2144,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         P.append("</div></details>")
 
     P.append("</div>")                                    # đóng pane Bưu cục
-    P.append("<div class='foot'><b>📖 Giải thích chỉ số</b><br>"
-             "<span class='up' style='color:var(--good);font-weight:800'>▲</span>/<span class='dn' style='color:var(--bad);font-weight:800'>▼ %</span> cạnh số ở lưới = thay đổi <b>ngày chốt hôm qua so hôm kia</b> · <span style='color:var(--good)'>xanh = tốt lên</span> · <span style='color:var(--bad)'>đỏ = xấu đi</span> (tồn/NV cần xử lý tăng là xấu; sản lượng/GTC/NV đạt tăng là tốt)<br>"
-             "🚚 <b>Đơn đang giao</b> (dải vùng) = đơn đã gán chuyến ĐANG giao, còn tồn (khớp trang Tồn đọng GHN · 'đang có chuyến đi', gồm ưu tiên giao) · ⏳ <b>Chưa gán</b> = đơn tồn ở kho chưa xếp chuyến (gồm ưu tiên)<br>"
-             "📥 <b>Đã gán</b> (thẻ AM/Tỉnh/Bưu cục) = đơn đã xếp vào chuyến hôm nay (luỹ kế, gồm đơn đã giao xong — là mẫu số %GTC)<br>"
-             "🏃 <b>Đang chạy</b> = số NV còn chuyến chưa kết thúc · 🚛 <b>Còn phải giao</b> = đơn của chuyến đang chạy CHƯA giao xong (đang trên đường)<br>"
-             "🔴 <b>Backlog giao 120h</b> = đơn Giao tồn quá 120 giờ toàn vùng (khớp trang Tồn đọng) · ✅ <b>GTC nay</b> = đơn giao thành công (chuyến đã kết thúc)<br>"
-             "🕘 <b>XP muộn &gt;9h30</b> = số NV xuất phát sau 9h30 (kỷ luật ra hàng) · 🛍️ <b>TikTok</b> = đơn hàng sàn TikTok Shop<br>"
-             "💰 <b>COD GTB</b> = tiền thu hộ kẹt trên đơn giao hỏng (triệu đồng) · 🛒 <b>LTC</b> = lấy hàng thành công · 📦 <b>LTB</b> = lấy hàng thất bại (đã thao tác nhưng không lấy được)<br>"
-             "🎯 <b>NV đạt ≥50%</b> = số nhân viên có %GTC ≥50% (≥20 đơn đã gán)<br>"
-             "🎯 <b>%GTC</b> = GTC / tổng đơn đã gán · gộp theo mã đơn (đơn giao lại tính 1 lần)<br>"
-             "🕘 <b>cạnh tên NV / chip 🕘 N</b> = nhân viên xuất phát sau 9h30 (số trên thẻ Bưu cục·AM·Tỉnh = tổng NV muộn của đơn vị đó)<br>"
-             "🎨 <b>Màu tên NV · Bưu cục · AM · Tỉnh</b> = theo %GTC: <span style='color:var(--bad)'>đỏ &lt;60%</span> · <span style='color:var(--warn)'>vàng 60–70%</span> · <span style='color:var(--good)'>xanh ≥70%</span> · <span style='opacity:.7'>buổi sáng %GTC luỹ kế còn thấp nên đa số đỏ, phản ánh đúng dần về chiều/tối</span><br>"
-             "📉 <b>chip 📉 N</b> ở thẻ Bưu cục·AM·Tỉnh = số NV %GTC &lt;50% (≥20 đơn) — nhóm yếu cần chú ý của đơn vị đó<br>"
-             "<span style='opacity:.7'>Số LIVE gồm cả chuyến đã kết thúc trong ngày · %GTC còn thấp giữa ngày là bình thường (chuyến chưa đóng) · nguồn nhanh.ghn.vn</span></div>")
+    # (Khối chú giải chân trang "📖 Giải thích chỉ số" ĐÃ BỎ 28/10 — user yêu cầu cho gọn.)
     P.append("<script>function tgw(tr){tr.classList.toggle('op');"
              "var s=tr.nextElementSibling;if(s&&s.classList.contains('wsub'))s.classList.toggle('show');}</script>")
     P.append("<script>function filt(){var q=document.getElementById('q').value.toLowerCase().trim(),n=0;"
