@@ -211,7 +211,7 @@ def gen_html(rows, collectable=None):
     P = ["<!doctype html><html lang='vi'><head><meta charset='utf-8'>",
          "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>",
          "<meta name='robots' content='noindex,nofollow'>",
-         "<meta http-equiv='refresh' content='300'>",
+         "<meta http-equiv='refresh' content='900'>",
          "<meta name='theme-color' content='#0a0d18'>",
          "<title>Hiệu suất chuyến đi · TBB</title>", _CSS, _CSS2, "<div class='wrap'>"]
     P.append("<header class='top'><div class='brand'><span class='live'></span>⚡ HIỆU SUẤT CHUYẾN ĐI</div>"

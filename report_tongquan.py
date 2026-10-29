@@ -149,7 +149,7 @@ def build_html(rows):
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
     P.append("<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>")
     P.append("<meta name='robots' content='noindex,nofollow'>")
-    P.append("<meta http-equiv='refresh' content='300'>")
+    P.append("<meta http-equiv='refresh' content='900'>")
     P.append("<meta name='theme-color' content='#0a0d18'>")
     P.append("<title>Tổng quan TBB · %s</title>" % now.strftime("%H:%M"))
     P.append(_CSS)

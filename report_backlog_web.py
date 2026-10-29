@@ -578,7 +578,7 @@ def build_html(entries, hub_count):
     P = ["<!doctype html><html lang='vi'><head><meta charset='utf-8'>",
          "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>",
          "<meta name='robots' content='noindex,nofollow'>",
-         "<meta http-equiv='refresh' content='300'>",
+         "<meta http-equiv='refresh' content='900'>",
          "<meta name='theme-color' content='#0a0d18'>",
          "<title>Tồn đọng TBB · %s</title>" % now.strftime("%H:%M"),
          _CSS, "<div class='wrap'>"]
@@ -697,7 +697,7 @@ def build_backlog_fallback(agg, backlog, day):
     P = ["<!doctype html><html lang='vi'><head><meta charset='utf-8'>",
          "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>",
          "<meta name='robots' content='noindex,nofollow'>",
-         "<meta http-equiv='refresh' content='300'>",
+         "<meta http-equiv='refresh' content='900'>",
          "<meta name='theme-color' content='#0a0d18'>",
          "<title>Tồn đọng TBB · dự phòng</title>",
          _CSS, "<div class='wrap'>"]

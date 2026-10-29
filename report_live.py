@@ -1314,7 +1314,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<!doctype html><html lang='vi'><head><meta charset='utf-8'>")
     P.append("<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>")
     P.append("<meta name='robots' content='noindex,nofollow'>")
-    P.append("<meta http-equiv='refresh' content='300'>")
+    P.append("<meta http-equiv='refresh' content='900'>")   # tự làm mới 15' (số thật cập nhật mỗi 30' → 5' cũ lãng phí)
     P.append("<meta name='theme-color' content='#080a16'>")
     P.append("<link rel='preconnect' href='https://fonts.googleapis.com'>")
     P.append("<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>")
