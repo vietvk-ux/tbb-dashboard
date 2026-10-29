@@ -202,17 +202,20 @@ def _store_weight(kg):
         pass
 
 
-def _region_snapshot(rows, giao_120h=None, lgt_w=None):
-    """Snapshot toàn bộ chỉ số DẢI của vùng (để lưu theo giờ → so cùng giờ hôm qua).
-    Khớp đúng cách tính trong gen_html (R + on_road/late/nv_low/vpct). lgt_w (gram) để so
-    khối lượng TỒN KHO cùng giờ hôm qua (mũi tên ▲/▼ trên hero)."""
+def _region_snapshot(rows, giao_120h=None, lgt_w=None, nvx_n=None, coll_nv=None, wtr_region=None):
+    """Snapshot toàn bộ chỉ số DẢI + TỔNG QUAN VẬN HÀNH của vùng (lưu theo giờ → so cùng giờ
+    hôm qua). Khớp đúng cách tính trong gen_html. lgt_w (gram) để so khối lượng TỒN KHO. Thêm
+    ton_lay/ton_tra/weight_g/nv_dat (từ rows) + nvx_n/coll_nv (truyền vào) cho mũi tên Tổng Quan."""
     tot = gtc = vngh = vgtc = cod = ltc = ltb = ontrip = chua_gan = dagan = 0
-    ot_tot = ot_done = late = nv_low = 0
+    ot_tot = ot_done = late = nv_low = nv_dat = 0
+    ton_lay = ton_tra = weight_g = 0
     for r in rows:
         tot += r.get("total", 0); gtc += r.get("gtc", 0); ontrip += r.get("ontrip", 0)
         vngh += r.get("vngh", 0); vgtc += r.get("vngh_gtc", 0); cod += r.get("cod_gtb", 0)
         ltc += r.get("ltc", 0); ltb += r.get("ltb", 0); chua_gan += r.get("backlog", 0)
         dagan += r.get("dagan_giao", 0)
+        ton_lay += r.get("ton_lay", 0); ton_tra += r.get("ton_tra", 0)
+        weight_g += r.get("weight_g", 0)
         for d in r.get("drivers", []):
             ot_tot += d.get("ot_tot", 0); ot_done += d.get("ot_done", 0)
             st = d.get("st")
@@ -222,10 +225,14 @@ def _region_snapshot(rows, giao_120h=None, lgt_w=None):
                 p = _pct(d.get("gtc", 0), d["total"])
                 if p is not None and p < 50:
                     nv_low += 1
+                elif p is not None and p >= 50:
+                    nv_dat += 1
     s = {"total": tot, "ontrip": ontrip, "on_road": max(ot_tot - ot_done, 0), "gtc": gtc,
          "late": late, "vngh": vngh, "vngh_gtc": vgtc, "vpct": _pct(vgtc, vngh),
          "cod_gtb": cod, "ltc": ltc, "ltb": ltb, "nv_low": nv_low, "g120": giao_120h,
-         "chua_gan": chua_gan, "dagan_giao": dagan}
+         "chua_gan": chua_gan, "dagan_giao": dagan,
+         "ton_lay": ton_lay, "ton_tra": ton_tra, "weight_g": weight_g, "nv_dat": nv_dat,
+         "nvx": nvx_n, "coll_nv": coll_nv, "wtr": wtr_region}
     if lgt_w:   # khối lượng tồn kho (gram) → so cùng giờ hôm qua
         s["w_lay"] = lgt_w.get("lay", 0); s["w_giao"] = lgt_w.get("giao", 0)
         s["w_tra"] = lgt_w.get("tra", 0); s["w_lcg"] = lgt_w.get("lc_giao", 0)
@@ -1270,6 +1277,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         bc_avg = None
         nv_avg = None
     globals()["_NV_AVG"] = nv_avg or {}   # mũi tên NV trong _drv_table đọc từ đây
+    ysnap = (cmp_y or {}).get("snap") or {}   # snapshot CÙNG GIỜ HÔM QUA (ẩn trước 10h do cmp_y=None)
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0,
          "dagan_giao": 0, "wtr": 0}
@@ -1598,36 +1606,21 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     if pt_trend and len(pt_trend) >= 2:
         pt_spark = _spark(pt_trend, "#fbbf24", w=60, h=22)
 
-    # ----- Delta ▲/▼ so NGÀY CHỐT TRƯỚC (2 điểm cuối trend: hôm qua vs hôm kia) -----
-    def _dchip(vals, up_good):
-        xs = [v for v in (vals or []) if v is not None]
-        if len(xs) < 2:
+    # ----- Delta ▲/▼ SỐ LIVE vs CÙNG GIỜ HÔM QUA (đồng bộ với chip dải .sd; ẩn trước 10h) -----
+    def _dlive(live, ykey, up_good):
+        """Chip ▲/▼ Tổng Quan Vận Hành: số LIVE bây giờ vs CÙNG GIỜ HÔM QUA (ysnap[ykey]).
+        % tương đối; TỐT=xanh · XẤU=đỏ. Ẩn nếu thiếu số hôm qua / nền quá nhỏ (<5)."""
+        y = ysnap.get(ykey)
+        if live is None or y is None or abs(y) < 5:
             return ""
-        prev = xs[-2]
-        # Baseline quá nhỏ (chuỗi dữ liệu mới bắt đầu / gần 0) → % thay đổi vô nghĩa
-        # (vd 455 vs 1 = 45.400%). Bỏ chip thay vì hiện số nổ.
-        if abs(prev) < 5:
-            return ""
-        d = round((xs[-1] - prev) / abs(prev) * 100)
+        d = round((live - y) / abs(y) * 100)
         if d == 0:
             return " <span class='dl fl'>▬</span>"
         up = d > 0
-        cls = "up" if (up == up_good) else "dn"   # thay đổi TỐT = xanh · XẤU = đỏ
-        if abs(d) > 300:            # % nổ (nền hôm qua nhỏ) → chữ thay vì số phi lý "999%"
+        cls = "up" if (up == up_good) else "dn"
+        if abs(d) > 300:            # nền hôm qua nhỏ → % nổ → chữ thay số phi lý
             return " <span class='dl %s'>%s nhiều</span>" % (cls, "▲ tăng" if up else "▼ giảm")
         return " <span class='dl %s'>%s%d%%</span>" % (cls, "▲" if up else "▼", abs(d))
-
-    _tr = trend or []
-    _dc_g120 = _dchip(g120_trend, False)
-    _dc_cg = _dchip([t.get("chuagan") for t in _tr], False)
-    _dc_tl = _dchip([t.get("ton_lay") for t in _tr], False)
-    _dc_tt = _dchip([t.get("ton_tra") for t in _tr], False)
-    _dc_cx = _dchip(cx_trend, False)
-    _dc_pt = _dchip(pt_trend, False)
-    _dc_nvd = _dchip(nvdat_trend, True)
-    _dc_sl = _dchip([t.get("don_giao") for t in _tr], True)
-    _dc_kg = _dchip([t.get("weight_kg") for t in _tr], True)
-    _dc_ttk = _dchip([t.get("tiktok_gtc") for t in _tr], True)
 
     # ----- Nội dung chi tiết (inner) của từng dòng — bung NGAY TẠI CHỖ khi bấm -----
     def _row(cls, icon, title, sub, spark, value, vstyle, inner, onclick="", href=""):
@@ -1713,13 +1706,13 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     # (Điểm Nóng Chú Ý đã chuyển VÀO HERO 08/10 — placeholder _diag_slot nằm trong hero, dưới ⏱.)
     P.append("<div class='sectitle'>⚡ Tổng Quan Vận Hành Vùng TBB</div><section class='prilist'>")
     P.append(_row("bd", "🔴", "Backlog giao 120h", "bấm xem AM → bưu cục", g120_spark,
-                  (_n(giao_120h) if giao_120h is not None else "—") + _dc_g120, "", _in_g120))
+                  (_n(giao_120h) if giao_120h is not None else "—") + _dlive(giao_120h, "g120", False), "", _in_g120))
     P.append(_row("wn", "⏳", "Tồn chưa gán giao", "bấm xem AM → bưu cục → xã", cg_spark,
-                  _n(R["backlog"]) + _dc_cg, "", _in_cgd))
+                  _n(R["backlog"]) + _dlive(R["backlog"], "chua_gan", False), "", _in_cgd))
     P.append(_row("wn", "🛒", "Tồn Lấy chưa gán", "đơn lấy chưa có chuyến · bấm xem AM → bưu cục", tl_spark,
-                  _n(_ton_lay) + _dc_tl, "", _in_tld))
+                  _n(_ton_lay) + _dlive(_ton_lay, "ton_lay", False), "", _in_tld))
     P.append(_row("wn", "↩️", "Tồn Trả", "đơn trả tồn · bấm xem AM → bưu cục", tt_spark,
-                  _n(_ton_tra) + _dc_tt, "", _in_ttd))
+                  _n(_ton_tra) + _dlive(_ton_tra, "ton_tra", False), "", _in_ttd))
     # NV cần xử lý — bung TOÀN BỘ embed NGAY TẠI CHỖ (Supabase; lỗi → fallback NV<50% hôm nay)
     if nvm is not None:
         _in_nvx = nvm["html"]
@@ -1742,9 +1735,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         else:
             _in_nvx = ""
     P.append(_row("vi", "👤", "NV cần xử lý", "%GTC kém dai dẳng · bấm xem", cx_spark,
-                  _n(nvx_n) + _dc_cx, " style='color:var(--bad)'", _in_nvx))
+                  _n(nvx_n) + _dlive(nvx_n, "nvx", False), " style='color:var(--bad)'", _in_nvx))
     if coll_nv is not None:
-        P.append(_row("wn", "💵", "NV chưa nộp tiền", "", pt_spark, _n(coll_nv) + _dc_pt, "", "",
+        P.append(_row("wn", "💵", "NV chưa nộp tiền", "", pt_spark, _n(coll_nv) + _dlive(coll_nv, "coll_nv", False), "", "",
                       href="chuyendi.html"))
     # NV đạt GTC ≥50% — (sức khỏe đội ngũ)
     if nvdat_trend and len(nvdat_trend) >= 2:
@@ -1752,7 +1745,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                      if d.get("total", 0) >= 20 and _pct(d["gtc"], d["total"]) is not None
                      and _pct(d["gtc"], d["total"]) >= 50)
         P.append(_row("", "🎯", "NV đạt GTC ≥50%", "", _spark(nvdat_trend, "#34d399", w=60, h=22),
-                      _n(nv_dat) + _dc_nvd, " style='color:var(--good)'", ""))
+                      _n(nv_dat) + _dlive(nv_dat, "nv_dat", True), " style='color:var(--good)'", ""))
     # Sản lượng giao/ngày + TikTok giao TC/ngày
     if trend and len(trend) >= 2:
         sl_don = [t.get("don_giao") for t in trend]
@@ -1821,7 +1814,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                 _in_sld = "".join(S)
             P.append(_row("", "📦", "Sản lượng giao / ngày",
                           "bấm AM → bưu cục → xã · đã gán + chưa gán + tổng",
-                          _spark(sl_don, "#22d3ee", w=60, h=22), _n(R["total"]) + _dc_sl, "", _in_sld))
+                          _spark(sl_don, "#22d3ee", w=60, h=22), _n(R["total"]) + _dlive(R["total"], "total", True), "", _in_sld))
         # Khối lượng (kg thực) đơn giao đã gán — ngay dưới Sản lượng · bung chi tiết AM→BC tại chỗ
         if R["weight_g"] > 0:
             sl_kg = [t.get("weight_kg") for t in trend]
@@ -1852,10 +1845,10 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
                 _in_kgd = "".join(K)
             P.append(_row("", "⚖️", "Khối lượng giao / ngày",
                           "kg thực · đã gán + chưa gán · bấm xem AM → bưu cục",
-                          kg_spark, _kgfmt(R["weight_g"] / 1000.0) + _dc_kg, "", _in_kgd))
+                          kg_spark, _kgfmt(R["weight_g"] / 1000.0) + _dlive(R["weight_g"], "weight_g", True), "", _in_kgd))
         if any(v is not None for v in sl_ttg):
             P.append(_row("", "🛍️", "TikTok giao TC / ngày", "", _spark(sl_ttg, "#e879c8", w=60, h=22),
-                          _n(R["vngh_gtc"]) + _dc_ttk, "", ""))
+                          _n(R["vngh_gtc"]) + _dlive(R["vngh_gtc"], "vngh_gtc", True), "", ""))
     P.append("</section>")
 
     # ===== Dòng CHẨN ĐOÁN VÙNG (tự sinh từ rows) =====
@@ -1970,10 +1963,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"), "%GTC TikTok", tt_rgb, "", vpct is None, "vpct", vpct, True),
         ("💰", _codm(R["cod_gtb"]),"COD GTB",         AMBER, "", False, "cod_gtb",  R["cod_gtb"],  False),
         ("📉", _n(nv_low),         "NV %GTC &lt;50%", (RED if nv_low else NEU), "", not nv_low, "nv_low", nv_low, False),
-        ("↩️", _n(_wtr_tot),       "Chờ chuyển trả",  (AMBER if _wtr_tot else NEU), "wtr", not _wtr_tot, None, None, None),
+        ("↩️", _n(_wtr_tot),       "Chờ chuyển trả",  (AMBER if _wtr_tot else NEU), "wtr", not _wtr_tot, "wtr", _wtr_tot, False),
     ]
-    # Snapshot CÙNG GIỜ HÔM QUA (để so ▲/▼ mỗi ô) — đầy đủ từ ngày sau khi bắt đầu log snap.
-    ysnap = (cmp_y or {}).get("snap") or {}
+    # (ysnap = snapshot cùng giờ hôm qua — đã định nghĩa 1 lần ở đầu gen_html, dùng chung dải + Tổng Quan)
 
     def _sd(raw, y, up_good, is_pct=False):
         """Chip ▲/▼ so cùng giờ hôm qua. is_pct → chênh điểm; khác → % tương đối."""
@@ -2894,7 +2886,9 @@ def main():
         _gtc_now = sum(r["gtc"] for r in rows)
         _tot_now = sum(r["total"] for r in rows)
         _rp_now = _pct(_gtc_now, _tot_now)
-        _snap_now = _region_snapshot(rows, giao_120h, lgt_w)
+        _snvx = (nvm["n"] if nvm else (len(nv_xuly) if nv_xuly else 0))
+        _scoll = (sum(len(us) for us in collectable.values()) if collectable else None)
+        _snap_now = _region_snapshot(rows, giao_120h, lgt_w, nvx_n=_snvx, coll_nv=_scoll, wtr_region=wtr_region)
         _bcsnap_now = _bc_snapshot(rows)
         _nvsnap_now = _nv_snapshot(rows)
         _store_hourly_pct(_rp_now, gtc=_gtc_now, total=_tot_now, g120=giao_120h,
