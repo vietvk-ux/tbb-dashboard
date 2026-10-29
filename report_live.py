@@ -1006,6 +1006,40 @@ async def _giao120h_one(session, hid, token):
         return 0
 
 
+async def _wtr_one(session, hid, token):
+    """Số đơn 'Chờ chuyển trả' (WAITING_TO_RETURN) đang GIỮ tại 1 bưu cục → int; lỗi → 0.
+    Dùng để xếp hạng top BC. (get-backlog-waiting-to-return hub đơn, view_mode WARD.)"""
+    try:
+        d = await _post(session, "/core/oss/v1/report/get-backlog-waiting-to-return",
+                        {"hub_ids": [str(hid)], "view_mode": "WARD", "order_type": "ALL"}, hid, token)
+        n = 0
+        data = d.get("data") or []
+        e = next((x for x in data if str(x.get("hub_id") or "") == "ALL"), None) or (data[0] if data else None)
+        if e:
+            for gi in (e.get("general_infos") or []):
+                n += gi.get("total_order") or 0
+        return n
+    except Exception:
+        return 0
+
+
+async def fetch_wtr_region(session, hub_ids, token):
+    """TỔNG VÙNG đơn 'Chờ chuyển trả' — 1 call gộp hết hub_ids (body đúng như frontend GHN:
+    order_type ALL, KHÔNG view_mode → trả entry 'ALL'). Khớp số trang GHN. Lỗi → None."""
+    hids = [str(h) for h in hub_ids]
+    try:
+        d = await _post(session, "/core/oss/v1/report/get-backlog-waiting-to-return",
+                        {"hub_ids": hids, "order_type": "ALL"}, hids[0] if hids else "1", token)
+        n = 0
+        for e in (d.get("data") or []):
+            if str(e.get("hub_id") or "") == "ALL":
+                for gi in (e.get("general_infos") or []):
+                    n += gi.get("total_order") or 0
+        return n
+    except Exception:
+        return None
+
+
 async def fetch_live(token):
     today = datetime.now(VN).date()
     ymd = today.year * 10000 + today.month * 100 + today.day
@@ -1033,6 +1067,8 @@ async def fetch_live(token):
                 backlog_wards = bl.get("wards", [])   # [(tên xã, số đơn Giao chưa gán)] giảm dần
                 async with sem:
                     g120 = await _giao120h_one(session, hid, token)   # Giao>120h bưu cục này (drill)
+                async with sem:
+                    wtr = await _wtr_one(session, hid, token)         # Chờ chuyển trả GIỮ tại BC này
 
                 async def _list(status):
                     async with sem:
@@ -1181,7 +1217,7 @@ async def fetch_live(token):
                 return {"name": name, "prov": _prov(name), "backlog": backlog,
                         "backlog_weight_g": backlog_weight, "dagan_giao": dagan_giao,
                         "ton_lay": ton_lay, "ton_tra": ton_tra,
-                        "backlog_wards": backlog_wards, "giao120h": g120,
+                        "backlog_wards": backlog_wards, "giao120h": g120, "wtr": wtr,
                         "ontrip": len(ontrip), "fin": len(fin), "gtc": h_gtc,
                         "att": h_att, "total": h_total, "ltc": h_ltc, "ltb": h_ltb,
                         "weight_g": dagan_weight,   # kg thực đơn giao ĐÃ GÁN (get-detail-by-status)
@@ -1201,7 +1237,9 @@ async def fetch_live(token):
         giao_120h = sum(r.get("giao120h", 0) for r in rows)
         # Khối lượng tồn Lấy/Giao/Trả toàn vùng — 1 call gộp (hero).
         lgt_w = await fetch_lgt_weight(session, [str(h["locationCode"]) for h in hubs], token)
-        return rows, giao_120h, lgt_w
+        # Tổng vùng 'Chờ chuyển trả' — 1 call gộp (khớp số GHN; per-BC đã lấy trong one()).
+        wtr_region = await fetch_wtr_region(session, [str(h["locationCode"]) for h in hubs], token)
+        return rows, giao_120h, lgt_w, wtr_region
 
 
 def _read_watch_chot():
@@ -1222,7 +1260,7 @@ def _read_watch_chot():
 def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, trend=None,
              g120_trend=None, cx_trend=None, pt_trend=None, nvdat_trend=None, bcm=None,
              fc_uplift=None, pace=None, cmp_y=None, bc_avg=None, lgt_w=None, nv_avg=None,
-             noon12_trend=None, am_ctrend=None):
+             noon12_trend=None, am_ctrend=None, wtr_region=None):
     now = datetime.now(VN)
     # SO CÙNG GIỜ HÔM QUA / TB 7 NGÀY chỉ hiện từ ~10h sáng (ENV CMP_MIN_HOUR): trước đó %GTC
     # luỹ kế biến động mạnh do 'sóng gán đơn' đầu ngày (mẫu số nhảy vọt) → so sánh dễ hiểu nhầm.
@@ -1234,7 +1272,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     globals()["_NV_AVG"] = nv_avg or {}   # mũi tên NV trong _drv_table đọc từ đây
     R = {"backlog": 0, "ontrip": 0, "fin": 0, "gtc": 0, "att": 0, "total": 0, "ltc": 0, "ltb": 0,
          "vngh": 0, "vngh_gtc": 0, "cod_gtb": 0, "kien": 0, "kien_gtc": 0, "weight_g": 0,
-         "dagan_giao": 0}
+         "dagan_giao": 0, "wtr": 0}
     prov = {}
     am = {}
     for r in rows:
@@ -1913,6 +1951,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     vpct = _pct(R["vngh_gtc"], R["vngh"])
     _cgo = ("onclick=\"var d=document.getElementById('cgd');if(d){d.open=true;"
             "d.scrollIntoView({behavior:'smooth',block:'start'});}\"")
+    # Tổng vùng 'Chờ chuyển trả' = số GHN (wtr_region, 1 call); per-BC (Σ r['wtr']) thấp hơn vì
+    # một phần đơn đang luân chuyển chưa về BC cụ thể → ghi chú rõ trong khối bung.
+    _wtr_tot = wtr_region if wtr_region else R["wtr"]
+    _wtro = ("onclick=\"var d=document.getElementById('wtrd');if(d){d.open=true;"
+             "d.scrollIntoView({behavior:'smooth',block:'start'});}\"")
     # Kỷ luật ngữ nghĩa: NEU = ô đếm số (tối trung tính) · màu chỉ dành cho ô cảnh báo
     NEU, AMBER, RED, GREEN = "128,140,174", "247,185,85", "242,88,95", "47,208,122"
     xp_rgb = RED if late_cnt else NEU                       # xuất phát muộn: đỏ khi >0
@@ -1928,6 +1971,7 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("🛍️", (("%d%%" % vpct) if vpct is not None else "—"), "%GTC TikTok", tt_rgb, "", vpct is None, "vpct", vpct, True),
         ("💰", _codm(R["cod_gtb"]),"COD GTB",         AMBER, "", False, "cod_gtb",  R["cod_gtb"],  False),
         ("📉", _n(nv_low),         "NV %GTC &lt;50%", (RED if nv_low else NEU), "", not nv_low, "nv_low", nv_low, False),
+        ("↩️", _n(_wtr_tot),       "Chờ chuyển trả",  (AMBER if _wtr_tot else NEU), "wtr", not _wtr_tot, None, None, None),
     ]
     # Snapshot CÙNG GIỜ HÔM QUA (để so ▲/▼ mỗi ô) — đầy đủ từ ngày sau khi bắt đầu log snap.
     ysnap = (cmp_y or {}).get("snap") or {}
@@ -1958,13 +2002,37 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
     P.append("<div class='sectitle'>📊 Chỉ số quan trọng của vùng</div>")
     P.append("<section class='strip'>")
     for ic, val, lab, rgb, extra, neu, key, raw, up_good in kpis:
-        cls = "st" + (" cg" if extra == "cg" else "") + (" neu" if neu else "")
-        oc = (" " + _cgo) if extra == "cg" else ""
-        sub = extra if (extra and extra != "cg") else ""   # chữ nhỏ phụ trên card (vd LTB dưới LTC)
+        _clk = extra in ("cg", "wtr")
+        cls = "st" + (" cg" if _clk else "") + (" neu" if neu else "")
+        oc = (" " + _cgo) if extra == "cg" else ((" " + _wtro) if extra == "wtr" else "")
+        sub = extra if (extra and not _clk) else ""   # chữ nhỏ phụ trên card (vd LTB dưới LTC)
         sd = _sd(raw, ysnap.get(key), up_good, is_pct=(key == "vpct")) if key else ""
         P.append("<div class='%s' style='--h:%s'%s><div class='sv'>%s</div>"
                  "<div class='sl'>%s %s</div>%s%s</div>" % (cls, rgb, oc, val, ic, lab, sd, sub))
     P.append("</section>")
+
+    # ===== ↩️ CHỜ CHUYỂN TRẢ — bung top bưu cục cao→thấp (bấm ô 'Chờ chuyển trả' ở dải trên) =====
+    _wtr_rows = sorted([r for r in rows if r.get("wtr", 0) > 0], key=lambda r: -r["wtr"])
+    if _wtr_tot:
+        _wb = ["<details id='wtrd' class='cgbento' style='--h:247,185,85'><summary>"
+               "<div class='mic'>↩️</div>"
+               "<div class='mtx'><div class='mn'>CHỜ CHUYỂN TRẢ · toàn vùng</div>"
+               "<div class='ms'>Đơn chờ gom chuyển trả về shop · nguồn Tồn đọng chờ chuyển trả GHN</div></div>"
+               "<div class='mbig'>%s<span class='cvar'>▾</span></div></summary>"
+               "<div class='wtrbody'>" % _n(_wtr_tot)]
+        _wtr_bc_sum = sum(r["wtr"] for r in _wtr_rows)
+        _mx = _wtr_rows[0]["wtr"] if _wtr_rows else 1
+        _wb.append("<div class='wtrnote'>🏤 <b>%d</b> bưu cục đang giữ <b>%s</b> đơn (xếp cao→thấp). "
+                   "Phần chênh <b>%s</b> đơn là hàng đang luân chuyển chưa về bưu cục cụ thể.</div>"
+                   % (len(_wtr_rows), _n(_wtr_bc_sum), _n(max(_wtr_tot - _wtr_bc_sum, 0))))
+        for r in _wtr_rows:
+            _amn = AM_OF.get(r["name"]) or "—"
+            _pw = round(r["wtr"] * 100.0 / _mx) if _mx else 0
+            _wb.append("<div class='wtrrow'><div class='wtrn'>%s<span class='wtram'>%s</span></div>"
+                       "<div class='wtrbar'><i style='width:%d%%'></i></div>"
+                       "<b class='wtrv'>%s</b></div>" % (_esc(r["name"]), _esc(_amn), _pw, _n(r["wtr"])))
+        _wb.append("</div></details>")
+        P.append("".join(_wb))
 
     # ===== 🏤 BẢNG TỔNG QUÁT BƯU CỤC — ô NỔI BẬT, DƯỚI dải 'Chỉ số quan trọng' (bung scorecard AM→BC) =====
     if bcm is not None:
@@ -2519,6 +2587,16 @@ details.wbc[open] .wcar{transform:rotate(180deg)}
 .cgbento .cvar{flex:none;color:rgb(var(--h));font-size:14px;transition:transform .2s}
 .cgbento[open] .cvar{transform:rotate(180deg)}
 .cgbento .dtl{padding:0 12px 12px}
+/* ↩️ Chờ chuyển trả — danh sách top bưu cục cao→thấp */
+.wtrbody{padding:0 13px 13px}
+.wtrnote{font-size:11.5px;color:var(--mut);line-height:1.5;margin:0 0 10px}
+.wtrnote b{color:#f2d79a;font-weight:800}
+.wtrrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid rgba(255,255,255,.05)}
+.wtrn{flex:none;width:118px;font-size:12px;font-weight:700;line-height:1.25;overflow:hidden}
+.wtram{display:block;font-size:9.5px;color:var(--mut);font-weight:600}
+.wtrbar{flex:1;height:7px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
+.wtrbar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#f7b955,#e0893f)}
+.wtrv{flex:none;width:44px;text-align:right;font-family:'Geist Mono',monospace;font-size:13px;font-weight:800;color:#f2d79a}
 /* 🏤 Bảng tổng quát Bưu cục — ô NỔI BẬT, to & cân bằng */
 .bcfeat{margin:6px 0 16px;border-width:1.5px;border-color:rgba(var(--h),.7);
  background:linear-gradient(120deg,rgba(var(--h),.30),#0d1526 70%);
@@ -2762,7 +2840,7 @@ def main():
     if not token:
         raise SystemExit("Thiếu NHANH_TOKEN")
     try:
-        rows, giao_120h, lgt_w = asyncio.run(fetch_live(token))
+        rows, giao_120h, lgt_w, wtr_region = asyncio.run(fetch_live(token))
         # NV cần xử lý (kém dai dẳng 14 ngày, đọc Supabase — có creds trong step live).
         # Supabase thiếu/lỗi → None → gen_html tự fallback về "NV <50% hôm nay".
         nv_xuly, _nvr, nvm = None, None, None
@@ -2868,7 +2946,7 @@ def main():
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
                  fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg, lgt_w=lgt_w,
-                 nv_avg=nv_avg, noon12_trend=noon12_trend, am_ctrend=am_ctrend)
+                 nv_avg=nv_avg, noon12_trend=noon12_trend, am_ctrend=am_ctrend, wtr_region=wtr_region)
     for fn in ("index.html", "live.html"):
         with open(os.path.join(outdir, fn), "w", encoding="utf-8") as f:
             f.write(h)
