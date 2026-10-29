@@ -327,3 +327,6 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 
 ### Nhật ký 28/10 — Bỏ khối chú giải chân trang
 - **XOÁ khối chân trang "📖 Giải thích chỉ số"** (`P.append("<div class='foot'>...")`) khỏi `report_live.gen_html` cho gọn (user yêu cầu). Thay bằng comment đánh dấu; `<script>function tgw...</script>` đứng ngay sau giữ nguyên. Chân trang giờ kết thúc ngay sau 3 tab AM/Tỉnh/BC. Verify trên trang live: `.foot`=0, không còn chữ "Giải thích chỉ số".
+
+### Nhật ký 29/10 — Card "Cần giao": dòng nhỏ rõ nghĩa hơn
+- **Card hero "📦 Cần giao" (hsc thứ 3)** đổi dòng `.hfr` nhỏ từ **"4,5% đã gán"** (`_pgs` = `_dg_giao/_tcg`, khó luận) → **"N đang giao"** (`_n(_dg_giao)` = R["dagan_giao"], khớp ô "🚚 Đơn đang giao" ở dải Chỉ số quan trọng). Xoá biến `_pg`/`_pgs` không còn dùng. (Kiểm số liệu toàn trang trước đó: Hero=Σ7 AM=Σ54 BC lệch 0; các trang con chuyến đi/xếp hạng/backlog/EOD/kho/khu vực/xu hướng đều khớp nội bộ; 2 drift <1% là lệch thời điểm fetch, không sửa theo ý user.) Verify live 08:01: dòng nhỏ = "3.359 đang giao", hết "% đã gán".
