@@ -2006,8 +2006,9 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         oc = (" " + _cgo) if extra == "cg" else ((" " + _wtro) if extra == "wtr" else "")
         sub = extra if (extra and not _clk) else ""   # chữ nhỏ phụ trên card (vd LTB dưới LTC)
         sd = _sd(raw, ysnap.get(key), up_good, is_pct=(key == "vpct")) if key else ""
-        P.append("<div class='%s' style='--h:%s'%s><div class='sv'>%s</div>"
-                 "<div class='sl'>%s %s</div>%s%s</div>" % (cls, rgb, oc, val, ic, lab, sd, sub))
+        _svc = "sv rat" if "/" in str(val) else "sv"   # ô ghép kiểu 'GTC/gán' → chữ nhỏ cho khít mobile
+        P.append("<div class='%s' style='--h:%s'%s><div class='%s'>%s</div>"
+                 "<div class='sl'>%s %s</div>%s%s</div>" % (cls, rgb, oc, _svc, val, ic, lab, sd, sub))
     P.append("</section>")
 
     # ===== ↩️ CHỜ CHUYỂN TRẢ — bung top bưu cục cao→thấp (bấm ô 'Chờ chuyển trả' ở dải trên) =====
@@ -2622,6 +2623,7 @@ details.wbc[open] .wcar{transform:rotate(180deg)}
 .streak .cel.bad{background:var(--bad)}.streak .cel.z{background:#2a3050}
 .nvxm{margin-top:5px;color:var(--mut);font-size:10.5px;font-variant-numeric:tabular-nums}
 .sv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:rgb(var(--h))}
+.sv.rat{font-size:13px;letter-spacing:-.4px}   /* ô ghép 'GTC/gán' — nhỏ lại cho khít khổ điện thoại */
 .sv.good{color:var(--good)}.sv.warn{color:var(--warn)}.sv.bad{color:var(--bad)}
 .sl{color:var(--mut);font-size:10.5px;margin-top:3px;line-height:1.3;word-break:break-word}
 .slx{color:var(--mut);font-size:9.5px;margin-top:3px;font-variant-numeric:tabular-nums;white-space:nowrap}
