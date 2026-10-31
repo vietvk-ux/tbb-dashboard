@@ -344,3 +344,8 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 
 ### Nhật ký 29/10 — Nâng chu kỳ tự làm mới 5' → 15'
 - **Meta refresh `content='300'` → `content='900'`** trên TẤT CẢ trang live: `report_live` (index/live), `report_backlog_web` (×2 gồm fallback), `report_buucuc`, `report_chuyendi`, `report_tongquan`. (trend/khuvuc/xephang vốn đã 900.) Lý do: số thật chỉ cập nhật mỗi 30' (workflow live-30m) nên 5' cũ tải lại y hệt 5/6 lần → lãng phí data mobile + render + nhảy về đầu trang. Đo: trang gzip ~341 KB/refresh (gốc 3,6 MB chưa nén, gồm blob NVM ~399 KB + mọi drill-down nhúng sẵn). Sau nâng: ~20–40 MB/ngày → ~7–14 MB/ngày, số liệu không cũ đi.
+
+### Nhật ký 31/10 — Cơ cấu AM mới: thêm Hoàng Quang Trung (8 AM)
+- **THÊM AM mới Hoàng Quang Trung (5 BC):** (LCH) Nậm Mạ/Than Uyên/Tân Uyên/Bình Lư (từ Nguyễn Công Nam) + (SLA) Mộc Sơn (từ Hoàng Gia Đạt).
+- **(YBA) Cát Thịnh/Mù Cang Chải/Âu Lâu/Cầu Thia: Bế Ngọc Chuyển → Nguyễn Công Nam.**
+- Kết quả **8 AM · 54 BC:** Thịnh 12 · Nam 9 · Luân 7 · Chuyển 7 (−4) · Đạt 6 (−1) · **Trung 5 (mới)** · Đông 4 · Thảnh 4. Sửa `am_map.py` + đồng bộ CẢ 2 repo (dashboard + trip). Verify live 08:50: scorecard re-group 8 AM, Trung 5 BC, Σ AM = Σ 54 BC lệch 0 (gán 39.387 · GTC 24.311), không BC lạc.
