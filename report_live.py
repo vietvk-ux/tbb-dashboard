@@ -1915,10 +1915,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         grps.append(_dgrp("🔴 Top tồn chưa gán giao", [
             "<div class='drow'><span class='dn'>%s</span><span class='dv w'>%s đơn</span></div>"
             % (_esc(r["name"]), _n(r["backlog"])) for r in top_bl5]))
-    if am_worst5:
-        grps.append(_dgrp("🟠 AM %GTC thấp nhất", [
-            "<div class='drow'><span class='dn'>%s</span><span class='pill sm %s'>%s%%</span></div>"
-            % (_esc(a), _cls(p), p) for a, p in am_worst5]))
     if bc_low5:
         grps.append(_dgrp("🏤 Top bưu cục %GTC thấp (≥20 đơn)", [
             "<div class='drow'><span class='dn'>%s</span><span class='pill sm %s'>%s%%</span></div>"
@@ -1927,6 +1923,11 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         grps.append(_dgrp("🕙 Top bưu cục Backlog giao 120h", [
             "<div class='drow'><span class='dn'>%s</span><span class='dv w'>%s đơn</span></div>"
             % (_esc(r["name"]), _n(r["giao120h"])) for r in bl120_5]))
+    # AM %GTC thấp nhất — chuyển XUỐNG CUỐI (sau Backlog giao 120h) theo yêu cầu
+    if am_worst5:
+        grps.append(_dgrp("🟠 AM %GTC thấp nhất", [
+            "<div class='drow'><span class='dn'>%s</span><span class='pill sm %s'>%s%%</span></div>"
+            % (_esc(a), _cls(p), p) for a, p in am_worst5]))
 
     # Ghi vào CHỖ ĐẶT SẴN trên đầu (trước lưới Tổng Quan Vận Hành) thay vì append cuối.
     if grps:
