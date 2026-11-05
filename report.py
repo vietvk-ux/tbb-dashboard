@@ -207,6 +207,9 @@ async def _trip_items(session, token, hub_id, trip_code, sem):
             rec["lat"] = lat if isinstance(lat, (int, float)) else None
             rec["lng"] = lng if isinstance(lng, (int, float)) else None
             rec["fail"] = (x.get("failNote") or "").strip()   # lý do giao hỏng (eod)
+            # Tên mặt hàng đầu tiên — report_mathang phân nhóm rồi chỉ lưu số đếm.
+            _its = x.get("items") or []
+            rec["item"] = (_its[0].get("name") or "") if _its else ""
         recs.append(rec)
     return recs
 

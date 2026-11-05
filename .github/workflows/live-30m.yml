@@ -129,6 +129,11 @@ jobs:
         env:
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_khuvuc.py render
+      - name: Tạo trang Mặt hàng (mathang.html — đọc mathang_data/ trong repo)
+        continue-on-error: true
+        env:
+          DASH_SLUG: 9c7e4b21a6f0
+        run: python report_mathang.py
       - name: Giữ bản CHỐT Bảng điều khiển Bưu cục (buucuc_chot.json — như eod.html; slot 23:15 đã tự ghi mới)
         run: |
           F=docs/9c7e4b21a6f0/buucuc_chot.json

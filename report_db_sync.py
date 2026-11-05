@@ -71,6 +71,15 @@ def main():
     except Exception as e:
         logger.warning("Ghi dữ liệu khu vực lỗi (bỏ qua): %s", str(e)[:200])
 
+    # MẶT HÀNG: tái dùng payload → KHÔNG tốn call API. Ghi mathang_data/<ngày>.json (giữ 30 ngày,
+    # chỉ số đếm theo nhóm). Lỗi KHÔNG làm hỏng sync chính.
+    try:
+        import report_mathang
+        _mh = report_mathang.build_day_payload(payload)
+        logger.info("Lưu mặt hàng → %s (%d đơn, GTC %d)", report_mathang.write_day(_mh), _mh["tot"], _mh["gtc"])
+    except Exception as e:
+        logger.warning("Ghi dữ liệu mặt hàng lỗi (bỏ qua): %s", str(e)[:200])
+
     # Tồn đọng Lấy·Giao·Trả·Luân chuyển (số LIVE lúc chạy ~23h) → bảng bao_cao_ton_dong.
     # Lỗi (token/API/bảng chưa tạo) KHÔNG làm hỏng phần sync chính ở trên.
     try:
