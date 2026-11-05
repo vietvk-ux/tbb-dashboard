@@ -139,27 +139,8 @@ def fetch_trend(days=60):   # chỉ lấy 60 ngày gần nhất cho biểu đồ
     nv30 = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=driver_id,ten_nv,buu_cuc,cod_gtb,gtb,don_giao" % since10)
     # GTC theo NGÀY 30 ngày (so đơn GTC ngày gần nhất vs TB của chính NV)
     nv_gtc = _get_all(url, key, "bao_cao_nhan_vien?ngay=gte.%s&select=ngay,driver_id,ten_nv,buu_cuc,gtc" % since30)
-    # Tồn đọng theo NGÀY (gộp toàn vùng) — cho biểu đồ xu hướng.
-    #  gt120_giao = đơn GIAO tồn >120h (khách chờ lâu)
-    #  red_tra_lc = đơn ĐỎ Trả+Luân chuyển (Trả>120h + LC giao>48h + LC trả>48h) — cột g_red
-    td_raw = _get_all(url, key, "bao_cao_ton_dong?ngay=gte.%s&select=ngay,order_type,g_gt120,g_red" % since)
-    # đơn đỏ tách riêng từng loại (ngưỡng đúng): Trả>120h · LC giao>48h · LC trả>48h
-    RED_FIELD = {"RETURN": "red_return", "TRANSPORT_DELIVERY": "red_lcgiao",
-                 "TRANSPORT_RETURN": "red_lctra"}
-    tdd = {}
-    for r in td_raw:
-        a = tdd.setdefault(r["ngay"], {"ngay": r["ngay"], "gt120_giao": 0, "has_red": False,
-                                       "red_return": 0, "red_lcgiao": 0, "red_lctra": 0})
-        ot = r.get("order_type")
-        if ot == "DELIVER":
-            a["gt120_giao"] += r.get("g_gt120") or 0
-        if r.get("g_red") is not None:   # ngày đã có cột g_red (sau migration)
-            a["has_red"] = True
-        if ot in RED_FIELD:
-            a[RED_FIELD[ot]] += r.get("g_red") or 0
-    tondong = sorted(tdd.values(), key=lambda x: x["ngay"])
     return {
-        "vung": vung, "bc30": bc, "nv30": nv30, "nv_gtc": nv_gtc, "tondong": tondong,
+        "vung": vung, "bc30": bc, "nv30": nv30, "nv_gtc": nv_gtc,
         "nangsuat": _get_safe(url, key, "v_nv_nangsuat?so_ngay_lam=gte.10&order=nang_suat.desc&limit=20"),
     }
 
@@ -606,37 +587,12 @@ def gen_html(data):
              "<div class='lg'><span class='k bg2'></span>Đơn giao <span class='k bg-good'></span>GTC</div>"
              "</section>" % _bars(vung, 21))
 
-    # Tồn chưa gán
-    cg = [v.get("chua_gan") for v in vung if v.get("chua_gan") is not None]
-    if any(cg):
-        P.append("<div class='sec'>⏳ Tồn chưa gán giao theo ngày</div>")
-        P.append("<section class='card'>%s</section>"
-                 % _line(vung, "chua_gan", 0, (max(cg) // 100 + 1) * 100, "warn", 140))
-
-    # Xu hướng TỒN ĐỌNG (Lấy·Giao·Trả·Luân chuyển) theo ngày — từ bao_cao_ton_dong
-    td = data.get("tondong") or []
-    if td:
-        g120 = [v["gt120_giao"] for v in td]
-        last_td = td[-1]
-        P.append("<div class='sec' style='color:var(--bad)'>🔴 Đơn GIAO quá hạn &gt;120h theo ngày</div>")
-        P.append("<section class='card'><div class='note' style='margin:0 0 6px'>"
-                 "Đơn giao khách chờ &gt;5 ngày · hôm nay: <b style='color:var(--bad)'>%s</b> đơn</div>%s</section>"
-                 % (_n(last_td["gt120_giao"]),
-                    _line(td, "gt120_giao", 0, (max(g120) // 100 + 1) * 100 if g120 else 100, "bad", 150)))
-        # Đơn đỏ tách RIÊNG 3 loại (ngưỡng đúng). Chỉ vẽ ngày ĐÃ có g_red (sau migration).
-        td_red = [v for v in td if v.get("has_red")]
-        if td_red:
-            _COL = {"bad": "var(--bad)", "orng": "#ff9d5c", "warn": "var(--warn)"}
-            for title, field, accent in (
-                    ("↩️ Đơn TRẢ quá hạn &gt;120h theo ngày", "red_return", "bad"),
-                    ("🚚 LC GIAO quá hạn &gt;48h theo ngày", "red_lcgiao", "orng"),
-                    ("↩️ LC TRẢ quá hạn &gt;48h theo ngày", "red_lctra", "warn")):
-                vals = [v[field] for v in td_red]
-                P.append("<div class='sec' style='color:%s'>%s</div>" % (_COL[accent], title))
-                P.append("<section class='card'><div class='note' style='margin:0 0 6px'>"
-                         "Hôm nay: <b style='color:%s'>%s</b> đơn</div>%s</section>"
-                         % (_COL[accent], _n(td_red[-1][field]),
-                            _line(td_red, field, 0, (max(vals) // 100 + 1) * 100 if vals else 100, accent, 150)))
+    # Mặt hàng & %GTC theo tháng (thay các biểu đồ tồn đọng theo ngày + top/bottom bưu cục, bỏ 05/11)
+    try:
+        import report_mathang
+        P.append(report_mathang.month_section())
+    except Exception as e:
+        logger.warning("Mục Mặt hàng theo tháng lỗi (bỏ qua): %s", str(e)[:150])
 
     # Bảng bưu cục %GTC TB 7 ngày
     bc30 = data.get("bc30") or []
@@ -651,22 +607,6 @@ def gen_html(data):
                  "gtc": round(a["sc"] * 100.0 / a["dg"], 1) if a["dg"] else None,
                  "gtb": a["gtb"], "dg": a["dg"]} for a in agg.values()]
         valid = [r for r in rows if r["gtc"] is not None]
-        # 🏆 10 BC %GTC CAO NHẤT (xanh)
-        best = sorted(valid, key=lambda x: -x["gtc"])[:10]
-        P.append("<div class='sec' style='color:var(--good)'>🏆 10 bưu cục %GTC cao nhất (30 ngày)</div>")
-        P.append("<section class='card'><table class='t'><thead><tr><th class='rk'>#</th><th>Bưu cục</th><th>Đơn</th><th>%GTC TB</th></tr></thead><tbody>")
-        for i, r in enumerate(best, 1):
-            P.append("<tr><td class='rk'>%d</td><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
-                     % (i, _esc(r["bc"]), _n(r["dg"]), _cls(r["gtc"]), r["gtc"]))
-        P.append("</tbody></table></section>")
-        # 🔻 10 BC %GTC THẤP NHẤT (đỏ)
-        worst = sorted(valid, key=lambda x: x["gtc"])[:10]
-        P.append("<div class='sec' style='color:var(--bad)'>🔻 10 bưu cục %GTC thấp nhất (30 ngày)</div>")
-        P.append("<section class='card'><table class='t'><thead><tr><th class='rk'>#</th><th>Bưu cục</th><th>GTB</th><th>%GTC TB</th></tr></thead><tbody>")
-        for i, r in enumerate(worst, 1):
-            P.append("<tr><td class='rk'>%d</td><td class='nv'>%s</td><td>%s</td><td><span class='pill sm %s'>%s%%</span></td></tr>"
-                     % (i, _esc(r["bc"]), _n(r["gtb"]), _cls(r["gtc"]), r["gtc"]))
-        P.append("</tbody></table></section>")
         # 📦 10 BC SỐ ĐƠN cao nhất (sản lượng)
         topvol = sorted(valid, key=lambda x: -x["dg"])[:10]
         P.append("<div class='sec' style='color:#8ea2ff'>📦 10 bưu cục số đơn cao nhất (30 ngày)</div>")

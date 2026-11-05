@@ -20,6 +20,7 @@ import sys
 from datetime import datetime
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mathang_data")
+MONTH_DIR = os.path.join(DATA_DIR, "thang")
 KEEP_DAYS = 30
 UNCLASSIFIED = "Khác"
 logger = logging.getLogger("mathang")
@@ -92,7 +93,35 @@ def write_day(day_payload):
             os.remove(old)
         except OSError:
             pass
+    _write_month(day_payload)
     return path
+
+
+def _write_month(day_payload):
+    """Cộng ngày vào file tháng (mathang_data/thang/YYYY-MM.json, KHÔNG xoá sau 30 ngày) để xem theo
+    tháng. Lưu theo từng ngày nên chạy lại cùng ngày không bị cộng trùng."""
+    ngay = day_payload["ngay"]
+    os.makedirs(MONTH_DIR, exist_ok=True)
+    path = os.path.join(MONTH_DIR, "%s.json" % ngay[:7])
+    try:
+        with open(path, encoding="utf-8") as f:
+            m = json.load(f)
+    except (OSError, ValueError):
+        m = {"thang": ngay[:7], "days": {}}
+    m["days"][ngay] = day_payload["nhom"]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(m, f, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def _load_months():
+    out = []
+    for f in sorted(glob.glob(os.path.join(MONTH_DIR, "*.json")), reverse=True):
+        try:
+            with open(f, encoding="utf-8") as fh:
+                out.append(json.load(fh))
+        except Exception:
+            pass
+    return out
 
 
 def _load_days(n=KEEP_DAYS):
@@ -146,7 +175,7 @@ def _pie(slices, tot):
         if f >= 0.9999:      # cả vòng: cung SVG không vẽ được điểm đầu trùng điểm cuối
             paths.append("<circle cx='100' cy='100' r='100' fill='%s'>%s</circle>" % (col, tip))
         else:
-            paths.append("<path d='M100 100L%.2f %.2fA100 100 0 %d 1 %.2f %.2fZ' fill='%s' stroke='#131829' stroke-width='2'>%s</path>"
+            paths.append("<path d='M100 100L%.2f %.2fA100 100 0 %d 1 %.2f %.2fZ' fill='%s' style='stroke:var(--card);stroke-width:2'>%s</path>"
                          % (100 + 100 * math.cos(a), 100 + 100 * math.sin(a), 1 if f > 0.5 else 0,
                             100 + 100 * math.cos(b), 100 + 100 * math.sin(b), col, tip))
         if f >= 0.07:
@@ -156,6 +185,66 @@ def _pie(slices, tot):
         a = b
     return ("<svg viewBox='-2 -2 204 204' role='img' aria-label='Biểu đồ tròn cơ cấu nhóm hàng toàn vùng'>%s%s</svg>"
             % ("".join(paths), "".join(labels)))
+
+
+def _add(agg, nhom):
+    for k, v in nhom.items():
+        a = agg.setdefault(k, [0, 0])
+        a[0] += v[0]
+        a[1] += v[1]
+
+
+def _block(agg):
+    """Ô gộp: 3 số tổng + biểu đồ tròn + bảng 15 nhóm (số đơn · tỷ trọng · %GTC)."""
+    get = lambda k: agg.get(k, [0, 0])
+    tot = sum(v[0] for v in agg.values())
+    gtc = sum(v[1] for v in agg.values())
+    fold_n = sum(get(k)[0] for k in _FOLD)
+    slices = [(k, get(k)[0], c, ink) for k, c, ink in _NAMED]
+    slices += [("Nhóm nhỏ", fold_n, _FOLD_C, "#0b0b0b"), (_LBL_NONE, get(UNCLASSIFIED)[0], _NONE_C, "#fff")]
+    # Hàng bảng: 7 nhóm chính, nhóm nhỏ, chưa phân loại; trong mỗi khối xếp số đơn giảm dần.
+    named_rows = sorted([(k, c) for k, c, _ in _NAMED], key=lambda x: -get(x[0])[0])
+    fold_rows = sorted([(k, _FOLD_C) for k in _FOLD], key=lambda x: -get(x[0])[0])
+    avg = gtc * 100.0 / tot if tot else 0
+    T = []
+    for k, col in named_rows + fold_rows + [(UNCLASSIFIED, _NONE_C)]:
+        n, g = get(k)
+        if not n:
+            continue
+        arrow = "<i class='up'>▲</i>" if g * 100.0 / n >= avg else "<i class='dn'>▼</i>"
+        T.append("<tr><td><span class='sw' style='background:%s'></span>%s</td><td>%s</td><td>%s</td>"
+                 "<td class='g'>%s%s</td></tr>"
+                 % (col, _esc(_LBL_NONE if k == UNCLASSIFIED else k), _n(n), _p1(n, tot), _p1(g, n), arrow))
+    return ("<div class='mh'><div class='kpis'>"
+            "<div><b>%s</b><span>đơn giao</span></div><div><b>%s</b><span>giao thành công</span></div>"
+            "<div><b>%s</b><span>%%GTC toàn vùng</span></div></div>"
+            "<div class='grid'><div class='pie'>%s</div><div class='tw'><table><thead><tr><th>Nhóm hàng</th>"
+            "<th>Số đơn</th><th>Tỷ trọng</th><th>%%GTC</th></tr></thead><tbody>%s</tbody></table>"
+            "<p class='sub'>Lát Nhóm nhỏ trên biểu đồ gộp các dòng có ô màu xám. ▲▼ là cao hơn hoặc thấp hơn %%GTC toàn vùng.</p>"
+            "</div></div></div>" % (_n(tot), _n(gtc), _p1(gtc, tot), _pie(slices, tot), "".join(T)))
+
+
+def month_section():
+    """Mục 'Mặt hàng theo tháng' cho trang Xu hướng: tháng mới nhất mở sẵn, tháng trước bấm để xem."""
+    months = _load_months()
+    P = [_MH_CSS, "<div class='sec'>🛍️ Mặt hàng &amp; %GTC theo tháng</div>"]
+    if not months:
+        P.append("<section class='card'><p class='mhe'>Dữ liệu bắt đầu lưu từ ngày 05/11. "
+                 "Số đầu tiên có sau lần chốt 23:35 của ngày này.</p></section>")
+        return "".join(P)
+    for i, m in enumerate(months):
+        agg = {}
+        days = sorted(m.get("days", {}))
+        for ngay in days:
+            _add(agg, m["days"][ngay])
+        if not days:
+            continue
+        y, mo = m["thang"].split("-")
+        P.append("<details class='card mhm'%s><summary>Tháng %d/%s<span>%d ngày đã chốt · %s đến %s</span></summary>%s</details>"
+                 % (" open" if i == 0 else "", int(mo), y, len(days), _fmt(days[0]), _fmt(days[-1]), _block(agg)))
+    P.append("<p class='mhe'>Số ước lượng, phân nhóm bằng từ khoá trên tên hàng. "
+             "<a href='mathang.html'>Xem cách đọc số liệu</a></p>")
+    return "".join(P)
 
 
 def build_html(days, back=True):
@@ -175,34 +264,8 @@ def build_html(days, back=True):
 
     agg = {}
     for d in days:
-        for k, v in d.get("nhom", {}).items():
-            a = agg.setdefault(k, [0, 0])
-            a[0] += v[0]
-            a[1] += v[1]
-    get = lambda k: agg.get(k, [0, 0])
+        _add(agg, d.get("nhom", {}))
     tot = sum(v[0] for v in agg.values())
-    gtc = sum(v[1] for v in agg.values())
-    fold_n = sum(get(k)[0] for k in _FOLD)
-
-    slices = [(k, get(k)[0], c, ink) for k, c, ink in _NAMED]
-    slices += [("Nhóm nhỏ", fold_n, _FOLD_C, "#0b0b0b"), (_LBL_NONE, get(UNCLASSIFIED)[0], _NONE_C, "#fff")]
-
-    # Hàng bảng: 7 nhóm chính, nhóm nhỏ, chưa phân loại; trong mỗi khối xếp số đơn giảm dần.
-    named_rows = sorted([(k, c) for k, c, _ in _NAMED], key=lambda x: -get(x[0])[0])
-    fold_rows = sorted([(k, _FOLD_C) for k in _FOLD], key=lambda x: -get(x[0])[0])
-    rows = named_rows + fold_rows + [(UNCLASSIFIED, _NONE_C)]
-    avg = gtc * 100.0 / tot if tot else 0
-    T = []
-    for k, col in rows:
-        n, g = get(k)
-        if not n:
-            continue
-        r = g * 100.0 / n
-        arrow = ("<i class='up'>▲</i>" if r >= avg else "<i class='dn'>▼</i>")
-        T.append("<tr><td><span class='sw' style='background:%s'></span>%s</td><td>%s</td><td>%s</td>"
-                 "<td class='g'>%s%s</td></tr>"
-                 % (col, _esc(_LBL_NONE if k == UNCLASSIFIED else k), _n(n), _p1(n, tot), _p1(g, n), arrow))
-
     # Câu tóm tắt tính từ dữ liệu: bỏ nhóm chưa phân loại và nhóm dưới 200 đơn (dễ dao động).
     ranked = sorted([k for k in agg if k != UNCLASSIFIED], key=lambda k: -agg[k][0])
     lead = ""
@@ -215,18 +278,11 @@ def build_html(days, back=True):
         lo = min(solid, key=lambda k: agg[k][1] / agg[k][0])
         lead += " %%GTC cao nhất là %s (%s), thấp nhất là %s (%s)." % (
             hi, _p1(agg[hi][1], agg[hi][0]), lo, _p1(agg[lo][1], agg[lo][0]))
-
     span = _fmt(days[0]["ngay"]) if len(days) == 1 else "%s đến %s" % (_fmt(days[0]["ngay"]), _fmt(days[-1]["ngay"]))
     P.append("<h1>Người mua Tây Bắc Bộ đặt hàng gì?</h1>")
     P.append("<p class='span'>Luỹ kế %d ngày · %s</p>" % (len(days), span))
     P.append("<p class='lead'>%s</p>" % _esc(lead))
-    P.append("<section class='card'><div class='kpis'>"
-             "<div><b>%s</b><span>đơn giao</span></div><div><b>%s</b><span>giao thành công</span></div>"
-             "<div><b>%s</b><span>%%GTC toàn vùng</span></div></div>"
-             "<div class='grid'><div class='pie'>%s</div><div class='tw'><table><thead><tr><th>Nhóm hàng</th>"
-             "<th>Số đơn</th><th>Tỷ trọng</th><th>%%GTC</th></tr></thead><tbody>%s</tbody></table>"
-             "<p class='sub'>Lát Nhóm nhỏ trên biểu đồ gộp các dòng có ô màu xám. ▲▼ là cao hơn hoặc thấp hơn %%GTC toàn vùng.</p>"
-             "</div></div></section>" % (_n(tot), _n(gtc), _p1(gtc, tot), _pie(slices, tot), "".join(T)))
+    P.append("<section class='card'>%s</section>" % _block(agg))
     P.append("<section class='notes'><h2>Cách đọc số liệu</h2><ul>"
              "<li>Tính từng ngày đã chốt, gồm chuyến kết thúc từ 10h, cùng cách tính với báo cáo cuối ngày. "
              "Trang cộng dồn tối đa 30 ngày gần nhất; từ ngày thứ 31, ngày cũ nhất được bỏ ra.</li>"
@@ -239,9 +295,42 @@ def build_html(days, back=True):
     return "".join(P)
 
 
-_CSS = """<style>
+# CSS trong ô gộp, scope .mh để nhúng được vào trang Xu hướng mà không đụng style của trang đó.
+_MH_CSS = """<style>
+.mh{--mh-mut:#b9c1da;--mh-line:rgba(255,255,255,.1);--mh-good:#25dd90;--mh-bad:#ff5668;color:#fff;font-size:14px;line-height:1.5}
+.mh .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.mh .kpis b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.mh .kpis span{color:var(--mh-mut);font-size:12px}
+.mh .grid{display:grid;grid-template-columns:minmax(220px,320px) minmax(0,1fr);gap:18px;align-items:center}
+.mh svg{display:block;width:100%;height:auto}
+.mh svg text{font:700 11px system-ui,-apple-system,'Segoe UI',sans-serif}
+.mh table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.mh th,.mh td{padding:6px;text-align:right;border-top:1px solid var(--mh-line);white-space:nowrap;background:none;color:inherit}
+.mh th{border-top:0;color:var(--mh-mut);font-size:12px;font-weight:600}
+.mh th:first-child,.mh td:first-child{text-align:left;white-space:normal;padding-left:0}
+.mh td:first-child{position:relative;padding-left:17px}
+.mh td:last-child,.mh th:last-child{padding-right:0}
+.mh .sw{position:absolute;left:0;top:11px;width:10px;height:10px;border-radius:3px}
+.mh .g{font-weight:700}
+.mh .g i{font-style:normal;font-size:10px;margin-left:3px}
+.mh .up{color:var(--mh-good)}.mh .dn{color:var(--mh-bad)}
+.mh .sub{color:var(--mh-mut);font-size:12px;margin:8px 0 0}
+.mhm{margin-bottom:8px}
+.mhm>summary{cursor:pointer;font-weight:700;padding:2px 0 8px}
+.mhm>summary span{display:block;font-weight:400;font-size:12px;color:#b9c1da}
+.mhe{color:#b9c1da;font-size:12px;margin:6px 4px}
+.mhe a{color:inherit}
+section.card>.mhe{margin:0 0 6px}
+@media (max-width:640px){
+ .mh .grid{grid-template-columns:minmax(0,1fr)}
+ .mh .pie{max-width:280px;margin:0 auto;width:100%}
+ .mh td,.mh th{font-size:13px}
+}
+</style>"""
+
+_CSS = _MH_CSS + """<style>
 /* Một theme tối, đồng bộ các trang dashboard. Bố cục: 3 số tổng + biểu đồ tròn và bảng trong 1 ô. */
-:root{color-scheme:dark;--bg:#0a0d18;--card:#131829;--line:#1f2740;--txt:#fff;--mut:#b9c1da;--good:#25dd90;--bad:#ff5668;
+:root{color-scheme:dark;--bg:#0a0d18;--card:#131829;--line:#1f2740;--txt:#fff;--mut:#b9c1da;
 --font:'Geist',system-ui,-apple-system,'Segoe UI',sans-serif}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 var(--font)}
@@ -253,31 +342,9 @@ p{margin:0}
 .span{color:var(--mut);font-size:13px}
 .lead{max-width:68ch}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
-.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
-.kpis b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
-.kpis span{color:var(--mut);font-size:12px}
-.grid{display:grid;grid-template-columns:minmax(220px,320px) minmax(0,1fr);gap:18px;align-items:center}
-svg{display:block;width:100%;height:auto}
-svg text{font:700 11px var(--font)}
-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-th,td{padding:6px 6px;text-align:right;border-top:1px solid var(--line);white-space:nowrap}
-th{border-top:0;color:var(--mut);font-size:12px;font-weight:600}
-th:first-child,td:first-child{text-align:left;white-space:normal;padding-left:0}
-td:last-child,th:last-child{padding-right:0}
-td:first-child{position:relative;padding-left:17px}
-.sw{position:absolute;left:0;top:11px;width:10px;height:10px;border-radius:3px}
-.g{font-weight:700}
-.g i{font-style:normal;font-size:10px;margin-left:3px}
-.up{color:var(--good)}.dn{color:var(--bad)}
-.sub{color:var(--mut);font-size:12px;margin-top:8px}
 .notes{color:var(--mut);font-size:13px;padding:4px 2px}
 .notes h2{color:var(--txt)}
 .notes ul{margin:0;padding-left:18px;display:grid;gap:4px;max-width:76ch}
-@media (max-width:640px){
- .grid{grid-template-columns:minmax(0,1fr)}
- .pie{max-width:280px;margin:0 auto;width:100%}
- td,th{font-size:13px}
-}
 </style>"""
 
 
