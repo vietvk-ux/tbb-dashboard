@@ -349,3 +349,17 @@ Local (khi chạy tay): đọc từ `tbb-gtalk-bot/.env`. Đặt secret: `gh sec
 - **THÊM AM mới Hoàng Quang Trung (5 BC):** (LCH) Nậm Mạ/Than Uyên/Tân Uyên/Bình Lư (từ Nguyễn Công Nam) + (SLA) Mộc Sơn (từ Hoàng Gia Đạt).
 - **(YBA) Cát Thịnh/Mù Cang Chải/Âu Lâu/Cầu Thia: Bế Ngọc Chuyển → Nguyễn Công Nam.**
 - Kết quả **8 AM · 54 BC:** Thịnh 12 · Nam 9 · Luân 7 · Chuyển 7 (−4) · Đạt 6 (−1) · **Trung 5 (mới)** · Đông 4 · Thảnh 4. Sửa `am_map.py` + đồng bộ CẢ 2 repo (dashboard + trip). Verify live 08:50: scorecard re-group 8 AM, Trung 5 BC, Σ AM = Σ 54 BC lệch 0 (gán 39.387 · GTC 24.311), không BC lạc.
+
+### Nhật ký 02/11 — Điểm nóng: đổi thứ tự Top 5
+- Trong khối **⚡ ĐIỂM NÓNG CHÚ Ý → Top 5**, chuyển **"🟠 AM %GTC thấp nhất" xuống cuối** (sau "Top bưu cục Backlog giao 120h"). Thứ tự mới: Tồn chưa gán → Bưu cục %GTC thấp → Backlog 120h → AM %GTC thấp nhất. Sửa thứ tự `grps` trong `report_live.gen_html`.
+
+### Nhật ký 05/11 — Trang Mặt hàng (phân nhóm hàng + %GTC) và đổi trang Xu hướng
+- **Nguồn dữ liệu:** `get-trip-items` có `items[].name` = tên mặt hàng của đơn. `report._trip_items` thêm `rec["item"]` = tên mặt hàng ĐẦU TIÊN, chỉ dùng trong bộ nhớ khi chạy, không ghi xuống Supabase.
+- **`report_mathang.py` (mới):** phân 14 nhóm + "Khác" bằng từ khoá có RANH GIỚI TỪ (`(?<![^\W\d_])…(?![^\W\d_])`, chuẩn hoá NFC). Thứ tự luật quan trọng vì khớp nhóm đầu tiên; Mỹ phẩm có 2 dòng (từ khoá chung `kem|tóc…` đứng sau Phụ kiện để "kẹp tóc" không rơi vào Mỹ phẩm). Gộp đơn theo (bưu cục, mã đơn), thành công ở chuyến nào cũng tính GTC.
+- **Độ chính xác:** là ƯỚC LƯỢNG. Đọc tay 140 mẫu, ~117 đúng; yếu nhất Sức khỏe (4/10) và Điện tử (6/10). "Khác" ~20% đơn. Đơn nhiều mặt hàng (~11,5%) chỉ tính mặt hàng đầu.
+- **Lưu trữ:** `report_db_sync` (sync 23:35) ghi, không tốn thêm call API. Chỉ lưu SỐ ĐẾM theo nhóm, không lưu tên hàng/mã đơn. `mathang_data/YYYY-MM-DD.json` giữ 30 ngày; `mathang_data/thang/YYYY-MM.json` lưu theo từng ngày trong tháng, KHÔNG xoá (chạy lại cùng ngày không cộng trùng). `sync-23h.yml` commit thêm `mathang_data/`. Bắt đầu lưu từ 05/11, không backfill.
+- **Trang `mathang.html` (mới, dựng trong `live-30m.yml`):** luỹ kế tối đa 30 ngày, gộp 3 số tổng + biểu đồ tròn + bảng 15 nhóm (số đơn · tỷ trọng · %GTC) trong 1 ô, chỉ số TOÀN VÙNG. Menu trang trực tiếp thêm ô 🛍️ Mặt hàng.
+- **Trang Xu hướng (`report_trend`):** XOÁ Tồn chưa gán theo ngày, Đơn GIAO >120h, Đơn TRẢ >120h, LC GIAO >48h, LC TRẢ >48h, 10 BC %GTC cao nhất, 10 BC %GTC thấp nhất; bỏ truy vấn `bao_cao_ton_dong` không còn dùng ở trang này. THÊM mục "🛍️ Mặt hàng & %GTC theo tháng" (`report_mathang.month_section`): tháng mới nhất mở sẵn, tháng trước bấm xem. GIỮ 10 BC số đơn cao nhất.
+- **Số đối chiếu ngày 04/11 (dò qua Chrome, chưa lưu vào `mathang_data`):** 26.249/40.724 = 64,5%, khớp đúng EOD. Cao nhất Thực phẩm và Mẹ & bé 72,2%; thấp nhất Giày dép 57,6%, Thời trang 60,2%, xu hướng giống nhau ở cả 5 tỉnh. Chưa biết nguyên nhân; hướng tiếp theo là ghép `failNote` theo nhóm hàng.
+- **CẦN KIỂM:** job đêm chưa chạy với dữ liệu thật khi viết mục này. Sau lần chốt đầu tiên phải đối chiếu `mathang_data/2026-11-05.json` (`tot`, `gtc`) với EOD 05/11. Không chạy thử `sync-23h` với ngày cũ vì `sync_backlog` sẽ ghi số tồn đọng hiện tại đè lên ngày đó.
+- Artifact claude.ai "Mặt hàng đơn giao TBB" chỉ là bản cố định số 04/11, không tự cập nhật.
