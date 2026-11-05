@@ -2055,7 +2055,6 @@ def gen_html(rows, giao_120h=None, nv_xuly=None, nvm=None, collectable=None, tre
         ("chuyendi.html", "🚚", "Hiệu suất chuyến đi", "đơn/giờ · giờ ra hàng", "255,138,61", [40, 58, 70, 52, 78, 64, 86]),
         ("xephang.html", "🏆", "Xếp hạng tổng hợp", "AM · bưu cục · NV", "255,213,74", [55, 48, 70, 62, 84, 74, 92]),
         ("khochuyentiep.html", "📦", "Kho Chuyển Tiếp", "tồn luân chuyển", "255,110,169", [48, 62, 54, 70, 60, 78, 66]),
-        ("mathang.html", "🛍️", "Mặt hàng", "luỹ kế 30 ngày · %GTC", "99,179,237", [52, 64, 58, 72, 60, 68, 76]),
     ]
     P.append("<div class='menu'>")
     # (Ô 'Báo cáo tổng quan' đã BỎ 03/10 theo yêu cầu — trang tongquan.html cũng ngưng tạo)
