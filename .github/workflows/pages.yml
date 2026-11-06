@@ -43,6 +43,7 @@ jobs:
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
           DASH_SLUG: 9c7e4b21a6f0
+          DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
         run: python report_live.py
       - name: Báo cáo %GTC cuối ngày (eod.html) + gửi GTalk
         env:
@@ -68,6 +69,10 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           DASH_SLUG: 9c7e4b21a6f0
         run: python report_trend.py
+      - name: Mã hoá toàn bộ trang (thiếu DASH_PASSWORD thì dừng, không đưa trang chưa mã hoá lên)
+        env:
+          DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
+        run: python protect_pages.py seal docs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs

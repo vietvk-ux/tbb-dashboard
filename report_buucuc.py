@@ -69,7 +69,8 @@ def load_chot_http(slug, timeout=15):
         r = requests.get(url, timeout=timeout)
         if not r.ok:
             return None
-        d = r.json()
+        import protect_pages
+        d = protect_pages.open_json(r.json())   # file trên Pages đã mã hoá
         d["rows"] = [_unslim_row(x) for x in d.get("rows", [])]
         return d
     except Exception:

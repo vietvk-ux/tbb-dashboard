@@ -63,6 +63,9 @@ jobs:
           F=docs/9c7e4b21a6f0/watch_chot.json
           curl -sf "https://vietvk-ux.github.io/tbb-dashboard/9c7e4b21a6f0/watch_chot.json" -o "$F" \
             || echo "chưa có watch_chot.json (sẽ có sau bản EOD 23:30 đầu tiên)"
+          python protect_pages.py unseal "$F"
+        env:
+          DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
       - name: Tạo trang realtime (index.html + live.html)
         env:
           NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
@@ -71,6 +74,7 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           BUUCUC_CHOT: ${{ github.event.inputs.buucuc_chot }}
           WEIGHT_NOON: ${{ github.event.inputs.weight_noon }}
+          DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
         run: python report_live.py
       - name: Tạo trang tồn đọng (backlog.html)
         continue-on-error: true   # hiccup GHN/API không chặn deploy trang chính
@@ -143,6 +147,10 @@ jobs:
           else
             echo "slot 23:15 vừa ghi bản chốt mới — giữ nguyên"
           fi
+      - name: Mã hoá toàn bộ trang (thiếu DASH_PASSWORD thì dừng, không đưa trang chưa mã hoá lên)
+        env:
+          DASH_PASSWORD: ${{ secrets.DASH_PASSWORD }}
+        run: python protect_pages.py seal docs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
