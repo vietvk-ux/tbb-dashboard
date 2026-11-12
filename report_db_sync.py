@@ -40,9 +40,12 @@ def main():
     latest = now.date() if now.hour >= 22 else (now.date() - timedelta(days=1))
     s = os.environ.get("EOD_DATE", "").strip()
     d = datetime.strptime(s, "%Y-%m-%d").date() if s else latest
-    # CHẠY BÙ ngày cũ: số chuyến đã đóng thì cố định, nhưng số TỒN lấy lúc chạy là của hôm nay
-    # → không ghi tồn (chưa gán, bảng tồn đọng) vào ngày cũ.
-    backfill = d < latest
+    # CHẠY BÙ ngày cũ (chỉ khi gõ EOD_DATE): số chuyến đã đóng thì cố định, nhưng số TỒN lấy lúc chạy
+    # là của hiện tại → không ghi tồn (chưa gán, bảng tồn đọng) vào ngày cũ. Ngày D còn được tính
+    # là "chưa qua" tới 06:00 sáng D+1 (lịch chạy đêm hay trễ sang rạng sáng). Lịch tự động không có
+    # EOD_DATE nên không bao giờ là chạy bù.
+    cutoff = now.date() if now.hour >= 6 else now.date() - timedelta(days=1)
+    backfill = bool(s) and d < cutoff
     logger.info("Sync dữ liệu ngày %s vào Supabase%s...", d, " (chạy bù — bỏ số tồn)" if backfill else "")
 
     try:
