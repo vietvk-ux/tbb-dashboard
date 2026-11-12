@@ -36,13 +36,14 @@ def main():
         logger.info("Thiếu SUPABASE_URL/SUPABASE_SERVICE_KEY — bỏ qua, không sync.")
         return
 
+    now = datetime.now(VN)
+    latest = now.date() if now.hour >= 22 else (now.date() - timedelta(days=1))
     s = os.environ.get("EOD_DATE", "").strip()
-    if s:
-        d = datetime.strptime(s, "%Y-%m-%d").date()
-    else:
-        now = datetime.now(VN)
-        d = now.date() if now.hour >= 22 else (now.date() - timedelta(days=1))
-    logger.info("Sync dữ liệu ngày %s vào Supabase...", d)
+    d = datetime.strptime(s, "%Y-%m-%d").date() if s else latest
+    # CHẠY BÙ ngày cũ: số chuyến đã đóng thì cố định, nhưng số TỒN lấy lúc chạy là của hôm nay
+    # → không ghi tồn (chưa gán, bảng tồn đọng) vào ngày cũ.
+    backfill = d < latest
+    logger.info("Sync dữ liệu ngày %s vào Supabase%s...", d, " (chạy bù — bỏ số tồn)" if backfill else "")
 
     try:
         payload = asyncio.run(report.fetch_report(token, d))
@@ -52,6 +53,8 @@ def main():
 
     backlog = {}
     try:
+        if backfill:
+            raise RuntimeError("chạy bù ngày cũ")
         backlog = asyncio.run(fetch_backlog(token))
     except Exception as e:
         logger.warning("Không lấy được tồn chưa gán (bỏ qua field này): %s", str(e)[:120])
@@ -82,6 +85,9 @@ def main():
 
     # Tồn đọng Lấy·Giao·Trả·Luân chuyển (số LIVE lúc chạy ~23h) → bảng bao_cao_ton_dong.
     # Lỗi (token/API/bảng chưa tạo) KHÔNG làm hỏng phần sync chính ở trên.
+    if backfill:
+        logger.info("Chạy bù: bỏ qua lưu tồn đọng (số hiện tại không thuộc ngày %s).", d)
+        return
     try:
         entries, _ = asyncio.run(BL.fetch_all(token))
         rows = BL.backlog_rows(entries)

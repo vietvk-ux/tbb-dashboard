@@ -117,7 +117,8 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         "vngh_don": g.get("vngh_total"), "vngh_gtc": g.get("vngh_gtc"),
         "gio_xuat_phat_tb": gio_xp_tb, "so_nv_muon": so_nv_muon,
     }
-    if not skip_cg:
+    # Không có số tồn (lỗi lấy tồn / chạy bù ngày cũ) → để trống, KHÔNG ghi 0.
+    if not skip_cg and backlog:
         vung_row["chua_gan"] = total_backlog
     _upsert(url, key, "bao_cao_vung", [vung_row], "ngay")
 
@@ -134,7 +135,7 @@ def sync(date_iso, agg, orders, backlog=None, backlog_time="cuối ngày", detai
         "vngh_gtc": (round(b["vngh_success"] / b["vngh_total"] * 100, 1)
                      if b.get("vngh_total") else None),
     } for b in agg["bcs"]]
-    if not skip_cg:
+    if not skip_cg and backlog:
         for row, b in zip(bc_rows, agg["bcs"]):
             row["chua_gan"] = backlog.get(b["bc"], {}).get("deliver", 0)
     _upsert(url, key, "bao_cao_buu_cuc", bc_rows, "ngay,buu_cuc")
