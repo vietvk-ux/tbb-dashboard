@@ -1249,18 +1249,49 @@ async def fetch_live(token):
         return rows, giao_120h, lgt_w, wtr_region
 
 
-def _read_watch_chot():
-    """Đọc khối 'Bưu cục cần theo dõi sâu sát' đã CHỐT 23h30 (report_dashboard ghi watch_chot.json)
-    → trang trực tiếp hiển thị FROZEN cả ngày (KHÔNG cập nhật live). Thiếu file → ''."""
-    slug = os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/")
+WATCH_CHOT_FROM, WATCH_CHOT_TO = 12 * 60 + 25, 13 * 60 + 59   # cửa sổ chốt (lịch chạy 12:30)
+
+
+def _watch_chot_path():
+    return os.path.join("docs", os.environ.get("DASH_SLUG", "9c7e4b21a6f0").strip("/"), "watch_chot.json")
+
+
+def _read_watch_json():
     try:
-        with open(os.path.join("docs", slug, "watch_chot.json"), encoding="utf-8") as f:
-            w = json.load(f)
-        if w.get("html"):
-            return ("<div class='wchot-hdr'><span class='hvi'>📌</span> Chốt <b>23h30 · %s</b> · giữ nguyên cả ngày</div>%s"
-                    % (_esc(str(w.get("date", ""))), w["html"]))
+        with open(_watch_chot_path(), encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
-        pass
+        return {}
+
+
+def _save_watch_chot(rows, now_vn):
+    """CHỐT 'Bưu cục cần theo dõi sâu sát' lúc 12h30 bằng số LIVE: backlog giao >120h + tồn chưa gán
+    giao lúc chốt (đã bỏ %GTC). Chỉ chốt 1 lần/ngày trong cửa sổ; giữ nguyên tới lần chốt hôm sau."""
+    import report_dashboard as RD
+    vmin = now_vn.hour * 60 + now_vn.minute
+    today = now_vn.strftime("%Y-%m-%d")
+    if not (WATCH_CHOT_FROM <= vmin <= WATCH_CHOT_TO) or _read_watch_json().get("ngay") == today:
+        return
+    agg = {"date": now_vn.date(),
+           "bcs": [{"bc": r["name"], "total": r.get("total", 0), "success": r.get("gtc", 0)} for r in rows],
+           "drivers": [{"bc": r["name"], "total": d.get("total", 0), "success": d.get("gtc", 0)}
+                       for r in rows for d in r.get("drivers", [])]}
+    html_w = RD._build_watch_bc(agg, {r["name"]: r.get("giao120h", 0) for r in rows},
+                                {r["name"]: r.get("backlog", 0) for r in rows}, noon_lbl="tồn chưa gán")
+    if html_w:
+        with open(_watch_chot_path(), "w", encoding="utf-8") as f:
+            json.dump({"ngay": today, "date": now_vn.strftime("%d/%m"), "time": now_vn.strftime("%H:%M"),
+                       "html": html_w}, f, ensure_ascii=False)
+        logger.info("Đã chốt 'Bưu cục cần theo dõi sâu sát' lúc %s.", now_vn.strftime("%H:%M %d/%m"))
+
+
+def _read_watch_chot():
+    """Khối 'Bưu cục cần theo dõi sâu sát' đã CHỐT 12h30 (watch_chot.json) → hiển thị FROZEN tới lần
+    chốt hôm sau, KHÔNG cập nhật live. Bản cũ chốt 23h30 (không có 'time') vẫn đọc được. Thiếu → ''."""
+    w = _read_watch_json()
+    if w.get("html"):
+        return ("<div class='wchot-hdr'><span class='hvi'>📌</span> Chốt <b>%s · %s</b> · giữ nguyên tới 12h30 hôm sau</div>%s"
+                % (_esc(str(w.get("time", "23:30"))), _esc(str(w.get("date", ""))), w["html"]))
     return ""
 
 
@@ -2940,6 +2971,10 @@ def main():
         bcm = report_buucuc.embed(_bc_rows, _bc_coll, label=_bc_label)
     except Exception as e:
         logger.warning("Nhúng Bảng điều khiển Bưu cục lỗi (bỏ qua): %s", str(e)[:150])
+    try:
+        _save_watch_chot(rows, datetime.now(VN))
+    except Exception as e:
+        logger.warning("Chốt 'Bưu cục cần theo dõi sâu sát' lỗi (giữ bản cũ): %s", str(e)[:150])
     h = gen_html(rows, giao_120h, nv_xuly, nvm, collectable, trend, g120_trend, cx_trend, pt_trend, nvdat_tr, bcm,
                  fc_uplift=fc_uplift, pace=pace, cmp_y=cmp_y, bc_avg=bc_avg, lgt_w=lgt_w,
                  nv_avg=nv_avg, noon12_trend=noon12_trend, am_ctrend=am_ctrend, wtr_region=wtr_region)

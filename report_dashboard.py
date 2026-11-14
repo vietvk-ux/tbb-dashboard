@@ -481,11 +481,10 @@ def _watch_spark(trend, bc, field, color, live_val=None, target=None):
     return _spark(series, color, w=300, h=34, target=target, pad=4)
 
 
-def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=6, min_orders=40):
-    """🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · Top N tệ nhất vùng theo ĐIỂM TỔNG HỢP 3 tiêu chí
-    (user chốt 20/10, cho dễ nhìn): %GTC thấp · backlog >120h cao · tồn gán trước 12h cao.
-    Xếp hạng từng tiêu chí (0=tệ nhất) rồi cộng → điểm thấp = tệ nhất.
-    Tiêu chí 'tồn 12h' chỉ tính khi có log (noon_bl) — chưa có thì dùng 2 tiêu chí còn lại."""
+def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=6, noon_lbl="tồn gán trước 12h"):
+    """🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · Top N tệ nhất vùng theo ĐIỂM TỔNG HỢP 2 tiêu chí:
+    backlog >120h cao · tồn chưa gán cao (noon_bl). BỎ %GTC (user chốt 14/11). Trang trực tiếp
+    chốt lúc 12h30 bằng số live (report_live). Xếp hạng từng tiêu chí (0=tệ nhất) rồi cộng."""
     from collections import defaultdict
     red_giao_bc = red_giao_bc or {}
     noon_bl = noon_bl or {}
@@ -502,7 +501,7 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=6, min_orders=40):
     for b in agg["bcs"]:
         bc = b["bc"]; tot = b["total"]; suc = b["success"]
         g120 = red_giao_bc.get(bc, 0)
-        if tot < min_orders and g120 < 20:          # bỏ bưu cục quá nhỏ (nhiễu %GTC)
+        if not g120 and not noon_bl.get(bc):       # không có tồn nào → không xét
             continue
         ncnt = nv[bc][0] or 1
         recs.append({"bc": bc, "pct": (suc / tot * 100) if tot else 0.0,
@@ -521,17 +520,16 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=6, min_orders=40):
         for r, i in enumerate(order):
             pr[i] = r                 # 0 = tệ nhất
         return pr
-    # 3 tiêu chí ngang trọng số (user chốt 20/10): %GTC · backlog >120h · tồn gán trước 12h.
-    crit = [("pct", False, "%GTC thấp", 1.0),
-            ("g120", True, "backlog >120h cao", 1.0)]
+    # 2 tiêu chí ngang trọng số (bỏ %GTC 14/11): backlog >120h · tồn chưa gán.
+    crit = [("g120", True, "backlog >120h cao", 1.0)]
     if has_noon:
-        crit.append(("noon", True, "tồn gán trước 12h cao", 1.0))
+        crit.append(("noon", True, noon_lbl + " cao", 1.0))
     ranks = {k: _rk(k, hb) for k, hb, _, _ in crit}
     for i, dd in enumerate(recs):
         # Điểm = Σ trọng_số × hạng (hạng 0 = tệ nhất) → điểm THẤP = nguy hiểm nhất.
         dd["score"] = sum(ranks[k][i] * w for k, _, _, w in crit)
         # Tag = 2 tiêu chí tệ nhất theo HẠNG ĐÃ CHIA TRỌNG SỐ (tiêu chí nặng xấu → nổi lên trước).
-        dd["_tags"] = [lbl for _, lbl in sorted((ranks[k][i] / w, lbl) for k, _, lbl, w in crit)][:2]
+        dd["_tags"] = [lbl for _, lbl in sorted((ranks[k][i] / w, lbl) for k, _, lbl, w in crit)][:1]
     recs.sort(key=lambda x: x["score"])
     top = recs[:topn]
 
@@ -539,31 +537,27 @@ def _build_watch_bc(agg, red_giao_bc, noon_bl, topn=6, min_orders=40):
     P.append("<summary><span class='whead'>🔎 BƯU CỤC CẦN THEO DÕI SÂU SÁT · VÙNG TBB</span>"
              "<span class='wcv'><span class='wvo'>▾ Xem %d BC</span><span class='wvc'>▴ Thu gọn</span></span>"
              "</summary>" % len(top))
-    note3 = "3 tiêu chí" if has_noon else "2 tiêu chí <i>(tồn gán trước 12h đầy đủ từ ngày mai)</i>"
-    P.append("<div class='wsub'>Top %d bưu cục tệ nhất vùng theo %s: "
-             "<b>%%GTC thấp · backlog &gt;120h cao · tồn gán trước 12h cao</b>. "
-             "<span style='opacity:.75'>Bấm 1 bưu cục để xem đường 14 ngày.</span></div>" % (len(top), note3))
+    P.append("<div class='wsub'>Top %d bưu cục tệ nhất vùng theo 2 tiêu chí: "
+             "<b>backlog &gt;120h cao · %s cao</b>. "
+             "<span style='opacity:.75'>Bấm 1 bưu cục để xem đường 14 ngày.</span></div>" % (len(top), noon_lbl))
     trend = _fetch_watch_crit_trend(agg.get("date"))
     for i, dd in enumerate(top, 1):
-        cls = _cls(dd["pct"])
-        noon_txt = ("<span class='bd'>⏳ <b>%s</b> tồn 12h</span>" % _n(dd["noon"])) if dd["noon"] is not None else ""
+        cls = "bad" if i <= 3 else "warn"              # 3 BC đầu đỏ, còn lại vàng (không còn %GTC)
+        noon_txt = ("<span class='bd'>⏳ <b>%s</b> %s</span>" % (_n(dd["noon"]), noon_lbl)) if dd["noon"] is not None else ""
         P.append("<details class='wbc %s'><summary>" % cls)
         P.append("<div class='wbh'><span class='wrk'>%d</span><span class='wbn'>%s</span>"
-                 "<span class='pill sm %s'>%d%%</span><span class='wcar'>▾</span></div>"
-                 % (i, _esc(dd["bc"]), cls, round(dd["pct"])))
+                 "<span class='wcar'>▾</span></div>" % (i, _esc(dd["bc"])))
         P.append("<div class='wbm'><span class='bd'>🔴 <b>%s</b> &gt;120h</span>%s</div>"
                  % (_n(dd["g120"]), noon_txt))
         P.append("<div class='wtag'>🔥 %s</div>" % " · ".join(dd["_tags"]))
         P.append("</summary>")
-        # 3 đường xu hướng 14 ngày (cắt ngày khuyết đầu chuỗi; điểm cuối = số cuối ngày)
+        # 2 đường xu hướng 14 ngày (cắt ngày khuyết đầu chuỗi; điểm cuối = số lúc chốt)
         rows_spark = [
-            ("🎯 %GTC", "%d%%" % round(dd["pct"]),
-             _watch_spark(trend, dd["bc"], "pct", _tcol(dd["pct"]), live_val=round(dd["pct"], 1), target=70)),
             ("🔴 Backlog >120h", _n(dd["g120"]),
              _watch_spark(trend, dd["bc"], "g120", "#ff6274", live_val=dd["g120"])),
         ]
         if dd["noon"] is not None:
-            rows_spark.append(("⏳ Tồn gán trước 12h", _n(dd["noon"]),
+            rows_spark.append(("⏳ " + noon_lbl[0].upper() + noon_lbl[1:], _n(dd["noon"]),
                                _watch_spark(trend, dd["bc"], "noon", "#fbbf24", live_val=dd["noon"])))
         inner = []
         for lbl, val, sp in rows_spark:
@@ -1374,15 +1368,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "eod.html"), "w", encoding="utf-8") as f:
         f.write(gen_html(agg, backlog, backlog_time, ontrip, hist, bc_days, red_bc, red_giao_bc, noon_bl))
-    # CHỐT 'Bưu cục cần theo dõi sâu sát' → trang trực tiếp đọc lại, hiển thị FROZEN cả ngày.
-    try:
-        _watch_html = _build_watch_bc(agg, red_giao_bc, noon_bl)
-        if _watch_html:
-            with open(os.path.join(outdir, "watch_chot.json"), "w", encoding="utf-8") as f:
-                json.dump({"date": d.strftime("%d/%m"), "html": _watch_html}, f, ensure_ascii=False)
-            logger.info("Đã ghi watch_chot.json (chốt bưu cục cần theo dõi sâu sát %s).", d)
-    except Exception as e:
-        logger.warning("Không ghi watch_chot.json (bỏ qua): %s", str(e)[:120])
+    # (watch_chot.json giờ do report_live CHỐT lúc 12h30 — EOD không ghi đè nữa, đổi 14/11.)
     with open("dashboard_data.json", "w", encoding="utf-8") as f:
         json.dump({"date": d.isoformat(), "grand": agg["grand"],
                    "provinces": agg["provinces"], "bcs": agg["bcs"],
