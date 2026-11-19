@@ -1,0 +1,36 @@
+name: Kiểm tra NHANH_TOKEN (chạy tay)
+
+# In ĐỘ DÀI + 12 ký tự đầu MÃ BĂM SHA-256 của token (không in token) và mã trả về khi gọi GHN từ
+# máy GitHub. So mã băm với token trong trình duyệt để biết dán đúng chưa.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Kiểm tra
+        env:
+          NHANH_TOKEN: ${{ secrets.NHANH_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, urllib.request, urllib.error
+          t = os.environ.get("NHANH_TOKEN", "")
+          s = t.strip()
+          print("độ dài gốc:", len(t), "· sau khi bỏ khoảng trắng:", len(s))
+          print("có dấu nháy hai đầu:", s[:1] == '"' and s[-1:] == '"')
+          print("3 phần JWT:", s.count(".") == 2, "· bắt đầu bằng eyJ:", s.startswith("eyJ"))
+          print("mã băm:", hashlib.sha256(s.encode()).hexdigest()[:12])
+          req = urllib.request.Request("https://nhanh-api.ghn.vn/api/hms/metadata/get-locations", data=b"{}",
+                                       headers={"Content-Type": "application/json", "Authorization": "Bearer " + s,
+                                                "X-WarehouseId": "22751000"})
+          try:
+              r = urllib.request.urlopen(req, timeout=20)
+              print("GHN trả về:", r.status)
+          except urllib.error.HTTPError as e:
+              print("GHN trả về:", e.code, e.read()[:160].decode("utf-8", "replace"))
+          PY
